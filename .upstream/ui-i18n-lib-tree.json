@@ -1,0 +1,71 @@
+{
+  "sha": "bd08f8c135d107bdbcd942b017bd14426ddd1760",
+  "url": "https://api.github.com/repos/openclaw/openclaw/git/trees/bd08f8c135d107bdbcd942b017bd14426ddd1760",
+  "tree": [
+    {
+      "path": "lit-controller.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0cafa30b6debe6c13f2f5e0d1bb33e8100331885",
+      "size": 2362,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/0cafa30b6debe6c13f2f5e0d1bb33e8100331885"
+    },
+    {
+      "path": "lit-controller.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb60c629c6d6a8a0e6bf54edc6263c29966611d9",
+      "size": 744,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/bb60c629c6d6a8a0e6bf54edc6263c29966611d9"
+    },
+    {
+      "path": "registry.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "273922d991117e735cef09bd3edd9923a1b43500",
+      "size": 1300,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/273922d991117e735cef09bd3edd9923a1b43500"
+    },
+    {
+      "path": "registry.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b110d7270d242fca68d390872b454e2c508645b",
+      "size": 4497,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/4b110d7270d242fca68d390872b454e2c508645b"
+    },
+    {
+      "path": "translate.test-support.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b460b60f81914c3574f3cf120c9b4793364f391a",
+      "size": 770,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/b460b60f81914c3574f3cf120c9b4793364f391a"
+    },
+    {
+      "path": "translate.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8087d428ef970ad312bedfa0e059db29804dc3e",
+      "size": 8416,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/b8087d428ef970ad312bedfa0e059db29804dc3e"
+    },
+    {
+      "path": "translate.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "81435128487e752563f8075c73601173e881b118",
+      "size": 6520,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/81435128487e752563f8075c73601173e881b118"
+    },
+    {
+      "path": "types.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61c4214d91265f8b1a49644ba6d6b287335e3728",
+      "size": 353,
+      "url": "https://api.github.com/repos/openclaw/openclaw/git/blobs/61c4214d91265f8b1a49644ba6d6b287335e3728"
+    }
+  ],
+  "truncated": false
+}

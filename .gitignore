@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.DS_Store
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+node_modules/
+tpm/
+dashboard/dist/*.map
+.pytest_cache/
+.mypy_cache/

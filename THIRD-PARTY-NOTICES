@@ -1,0 +1,18 @@
+flowboard includes adapted source from OpenClaw's Workboard extension:
+
+- Project: OpenClaw
+- Repository: https://github.com/openclaw/openclaw
+- Commit: 78d6c6c0471723721243d67fb053f3810c622bf8
+- License: MIT
+
+The complete import inventory and upstream blob hashes are in
+UPSTREAM-IMPORT.json.
+
+This package also distributes dependencies under their respective licenses:
+
+- @noble/ed25519 (MIT)
+- Commander.js (MIT)
+- Lit (BSD-3-Clause)
+- TypeBox (MIT)
+
+See each dependency's published package for its complete license text.

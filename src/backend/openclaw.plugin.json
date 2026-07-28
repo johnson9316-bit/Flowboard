@@ -1,0 +1,196 @@
+{
+  "id": "flowboard",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true,
+    "onCommands": ["flowboard"]
+  },
+  "dashboard": {
+    "dataBindings": [
+      {
+        "id": "cards.list",
+        "method": "flowboard.cards.list",
+        "description": "List Flowboard cards and statuses."
+      },
+      {
+        "id": "stats",
+        "method": "flowboard.cards.stats",
+        "description": "Read Flowboard card statistics."
+      },
+      {
+        "id": "boards.list",
+        "method": "flowboard.boards.list",
+        "description": "List Flowboard boards."
+      }
+    ],
+    "actionVerbs": [
+      {
+        "id": "dispatch",
+        "method": "flowboard.cards.dispatch",
+        "description": "Dispatch ready Flowboard cards.",
+        "paramShape": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "boardId": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    ]
+  },
+  "name": "Flowboard",
+  "description": "Flowboard for agent-owned issues and sessions.",
+  "catalog": { "featured": true, "order": 10 },
+  "contracts": {
+    "tools": [
+      "flowboard_list",
+      "flowboard_create",
+      "flowboard_link",
+      "flowboard_read",
+      "flowboard_claim",
+      "flowboard_heartbeat",
+      "flowboard_complete",
+      "flowboard_attachment_add",
+      "flowboard_attachment_read",
+      "flowboard_attachment_delete",
+      "flowboard_block",
+      "flowboard_boards",
+      "flowboard_board_create",
+      "flowboard_board_archive",
+      "flowboard_board_delete",
+      "flowboard_stats",
+      "flowboard_runs",
+      "flowboard_specify",
+      "flowboard_decompose",
+      "flowboard_notify_subscribe",
+      "flowboard_notify_list",
+      "flowboard_notify_events",
+      "flowboard_notify_advance",
+      "flowboard_notify_unsubscribe",
+      "flowboard_promote",
+      "flowboard_reassign",
+      "flowboard_reclaim",
+      "flowboard_dispatch",
+      "flowboard_release",
+      "flowboard_comment",
+      "flowboard_proof",
+      "flowboard_worker_log",
+      "flowboard_protocol_violation",
+      "flowboard_unblock",
+      "flowboard_move"
+    ]
+  },
+  "commandAliases": [{ "name": "flowboard" }],
+  "toolMetadata": {
+    "flowboard_list": {
+      "optional": true
+    },
+    "flowboard_create": {
+      "optional": true
+    },
+    "flowboard_link": {
+      "optional": true
+    },
+    "flowboard_read": {
+      "optional": true
+    },
+    "flowboard_claim": {
+      "optional": true
+    },
+    "flowboard_heartbeat": {
+      "optional": true
+    },
+    "flowboard_complete": {
+      "optional": true
+    },
+    "flowboard_attachment_add": {
+      "optional": true
+    },
+    "flowboard_attachment_read": {
+      "optional": true
+    },
+    "flowboard_attachment_delete": {
+      "optional": true
+    },
+    "flowboard_block": {
+      "optional": true
+    },
+    "flowboard_boards": {
+      "optional": true
+    },
+    "flowboard_board_create": {
+      "optional": true
+    },
+    "flowboard_board_archive": {
+      "optional": true
+    },
+    "flowboard_board_delete": {
+      "optional": true
+    },
+    "flowboard_stats": {
+      "optional": true
+    },
+    "flowboard_runs": {
+      "optional": true
+    },
+    "flowboard_specify": {
+      "optional": true
+    },
+    "flowboard_decompose": {
+      "optional": true
+    },
+    "flowboard_notify_subscribe": {
+      "optional": true
+    },
+    "flowboard_notify_list": {
+      "optional": true
+    },
+    "flowboard_notify_events": {
+      "optional": true
+    },
+    "flowboard_notify_advance": {
+      "optional": true
+    },
+    "flowboard_notify_unsubscribe": {
+      "optional": true
+    },
+    "flowboard_promote": {
+      "optional": true
+    },
+    "flowboard_reassign": {
+      "optional": true
+    },
+    "flowboard_reclaim": {
+      "optional": true
+    },
+    "flowboard_dispatch": {
+      "optional": true
+    },
+    "flowboard_release": {
+      "optional": true
+    },
+    "flowboard_comment": {
+      "optional": true
+    },
+    "flowboard_proof": {
+      "optional": true
+    },
+    "flowboard_worker_log": {
+      "optional": true
+    },
+    "flowboard_protocol_violation": {
+      "optional": true
+    },
+    "flowboard_unblock": {
+      "optional": true
+    },
+    "flowboard_move": {
+      "optional": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

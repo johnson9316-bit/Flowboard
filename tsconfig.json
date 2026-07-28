@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": [
+      "node"
+    ],
+    "useDefineForClassFields": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "ui/src/main.ts"
+  ]
+}

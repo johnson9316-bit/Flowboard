@@ -1,0 +1,307 @@
+import {
+  FLOWBOARD_STATUSES,
+  type FlowboardCard,
+  type FlowboardStatus,
+} from "../../contract/index.js";
+// Flowboard plugin module implements cli behavior.
+import type { Command } from "commander";
+import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
+import { addGatewayClientOptions, callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
+import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
+import { getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
+import { isRecord } from "openclaw/plugin-sdk/string-coerce-runtime";
+import { resolveFlowboardCardByIdOrPrefix } from "./card-lookup.js";
+import { redactClaimToken } from "./card-redaction.js";
+import type { FlowboardDispatchResult, FlowboardStore } from "./store.js";
+
+type JsonOptions = {
+  json?: boolean;
+};
+
+type GatewayOptions = JsonOptions & {
+  admin?: boolean;
+  url?: string;
+  token?: string;
+  timeout?: string;
+  expectFinal?: boolean;
+  board?: string;
+};
+
+type DispatchOptions = GatewayOptions & {
+  maxStarts?: number;
+};
+
+function invalidCliArgument(message: string): Error & { code: string; exitCode: number } {
+  const error = new Error(message) as Error & { code: string; exitCode: number };
+  error.name = "InvalidArgumentError";
+  error.code = "commander.invalidArgument";
+  error.exitCode = 1;
+  return error;
+}
+
+function parsePositiveIntegerOption(value: string, flag: string): number {
+  const parsed = parseStrictPositiveInteger(value);
+  if (parsed === undefined) {
+    throw invalidCliArgument(`${flag} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function writeJson(value: unknown): void {
+  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeLine(value: string): void {
+  process.stdout.write(`${value}\n`);
+}
+
+function splitLabels(value: string | undefined): string[] | undefined {
+  return value
+    ?.split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function isFlowboardStatus(value: string): value is FlowboardStatus {
+  return (FLOWBOARD_STATUSES as readonly string[]).includes(value);
+}
+
+function formatCardLine(card: FlowboardCard): string {
+  const boardId = card.metadata?.automation?.boardId ?? "default";
+  const agent = card.agentId ? ` ${card.agentId}` : "";
+  return `${card.id.slice(0, 8)}  ${card.status.padEnd(8)}  ${card.priority.padEnd(6)}  ${boardId}${agent}  ${card.title}`;
+}
+
+function redactDispatchResult(result: FlowboardDispatchResult): FlowboardDispatchResult {
+  return {
+    ...result,
+    promoted: result.promoted.map(redactClaimToken),
+    reclaimed: result.reclaimed.map(redactClaimToken),
+    blocked: result.blocked.map(redactClaimToken),
+    orchestrated: result.orchestrated.map(redactClaimToken),
+  };
+}
+
+function writeCards(cards: FlowboardCard[], options: JsonOptions): void {
+  if (options.json) {
+    writeJson({ cards: cards.map(redactClaimToken) });
+    return;
+  }
+  for (const card of cards) {
+    writeLine(formatCardLine(card));
+  }
+}
+
+async function callFlowboardGateway(
+  method: string,
+  options: GatewayOptions,
+  params?: unknown,
+): Promise<unknown> {
+  return await callGatewayFromCli(method, options, params, {
+    mode: "cli",
+    scopes: options.admin
+      ? ["operator.admin", "operator.write", "operator.read"]
+      : ["operator.write", "operator.read"],
+  });
+}
+
+function isGatewayUnavailableError(error: unknown): boolean {
+  const message = formatErrorMessage(error).toLowerCase();
+  if (
+    [
+      "econnrefused",
+      "econnreset",
+      "ehostunreach",
+      "enotfound",
+      "gateway not connected",
+      "gateway unavailable",
+    ].some((marker) => message.includes(marker))
+  ) {
+    return true;
+  }
+  const unknownMethod = message.match(/unknown method:\s*([a-z0-9._-]+)/)?.[1];
+  return unknownMethod === "flowboard.cards.dispatch";
+}
+
+function hasExplicitGatewayTarget(options: GatewayOptions): boolean {
+  return Boolean(options.url?.trim() || options.token?.trim());
+}
+
+function hasConfiguredRemoteGatewayTarget(): boolean {
+  if (process.env.OPENCLAW_GATEWAY_URL?.trim()) {
+    return true;
+  }
+  try {
+    return getRuntimeConfig().gateway?.mode === "remote";
+  } catch {
+    return false;
+  }
+}
+
+export function registerFlowboardCli(params: { program: Command; store: FlowboardStore }): void {
+  const flowboard = params.program
+    .command("flowboard")
+    .description("Manage Flowboard cards and worker dispatch");
+
+  flowboard
+    .command("list")
+    .description("List Flowboard cards")
+    .option("--board <id>", "Board id")
+    .option("--status <status>", "Filter by status")
+    .option("--include-archived", "Include archived cards (default false)")
+    .option("--json", "Print JSON", false)
+    .action(
+      async (
+        options: JsonOptions & {
+          board?: string;
+          status?: string;
+          includeArchived?: boolean;
+        },
+      ) => {
+        // Text output hides archived cards like /flowboard list, while --json
+        // keeps the shipped full-card contract for existing scripts.
+        let cards = await params.store.list({ boardId: options.board });
+        if (!options.json && options.includeArchived !== true) {
+          cards = cards.filter((card) => !card.metadata?.archivedAt);
+        }
+        if (options.status) {
+          cards = cards.filter((card) => card.status === options.status);
+        }
+        writeCards(cards, options);
+      },
+    );
+
+  flowboard
+    .command("create")
+    .argument("<title...>", "Card title")
+    .description("Create a Flowboard card")
+    .option("--notes <text>", "Card notes")
+    .option("--status <status>", "Initial status", "todo")
+    .option("--priority <priority>", "Priority", "normal")
+    .option("--agent <id>", "Assigned agent id")
+    .option("--board <id>", "Board id")
+    .option("--labels <items>", "Comma-separated labels")
+    .option("--json", "Print JSON", false)
+    .action(
+      async (
+        title: string[],
+        options: JsonOptions & {
+          notes?: string;
+          status?: string;
+          priority?: string;
+          agent?: string;
+          board?: string;
+          labels?: string;
+        },
+      ) => {
+        const card = await params.store.create({
+          title: title.join(" "),
+          notes: options.notes,
+          status: options.status,
+          priority: options.priority,
+          agentId: options.agent,
+          boardId: options.board,
+          labels: splitLabels(options.labels),
+          workspaceAccess: { unrestricted: true },
+        });
+        if (options.json) {
+          writeJson({ card: redactClaimToken(card) });
+        } else {
+          writeLine(formatCardLine(card));
+        }
+      },
+    );
+
+  flowboard
+    .command("show")
+    .argument("<id>", "Card id or prefix")
+    .description("Show one Flowboard card")
+    .option("--json", "Print JSON", false)
+    .action(async (id: string, options: JsonOptions) => {
+      const cards = await params.store.list();
+      const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+      if (!card) {
+        throw new Error(error);
+      }
+      if (options.json) {
+        writeJson({ card: redactClaimToken(card) });
+      } else {
+        writeLine(formatCardLine(card));
+        if (card.notes) {
+          writeLine(card.notes);
+        }
+      }
+    });
+
+  flowboard
+    .command("move")
+    .argument("<id>", "Card id or prefix")
+    .description("Move a Flowboard card to another status")
+    .requiredOption("--status <status>", "Target status")
+    .option("--json", "Print JSON", false)
+    .action(async (id: string, options: JsonOptions & { status: string }) => {
+      if (!isFlowboardStatus(options.status)) {
+        throw new Error(`--status must be one of: ${FLOWBOARD_STATUSES.join(", ")}.`);
+      }
+      const cards = await params.store.list();
+      const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+      if (!card) {
+        throw new Error(error);
+      }
+      const updated = await params.store.move(card.id, options.status, undefined);
+      if (options.json) {
+        writeJson({ card: redactClaimToken(updated) });
+      } else {
+        writeLine(formatCardLine(updated));
+      }
+    });
+
+  addGatewayClientOptions(
+    flowboard
+      .command("dispatch")
+      .description("Promote ready cards and start worker runs through the Gateway")
+      .option("--board <id>", "Dispatch a single board")
+      .option(
+        "--max-starts <count>",
+        "Maximum new worker runs to start in this pass (default 3)",
+        (value: string) => parsePositiveIntegerOption(value, "--max-starts"),
+      )
+      .option("--admin", "Request full-host workspace access", false)
+      .option("--json", "Print JSON", false) as never,
+  ).action(async (options: DispatchOptions) => {
+    try {
+      const method =
+        options.maxStarts === undefined
+          ? "flowboard.cards.dispatch"
+          : "flowboard.cards.dispatchWithOptions";
+      const result = await callFlowboardGateway(method, options, {
+        boardId: options.board,
+        ...(options.maxStarts !== undefined ? { maxStarts: options.maxStarts } : {}),
+      });
+      if (options.json) {
+        writeJson(result);
+      } else {
+        const record = isRecord(result) ? result : {};
+        const started = Array.isArray(record.started) ? record.started.length : 0;
+        const failures = Array.isArray(record.startFailures) ? record.startFailures.length : 0;
+        writeLine(`dispatch complete: started=${started} failures=${failures}`);
+      }
+    } catch (error) {
+      if (
+        !isGatewayUnavailableError(error) ||
+        hasExplicitGatewayTarget(options) ||
+        hasConfiguredRemoteGatewayTarget()
+      ) {
+        throw error;
+      }
+      const result = redactDispatchResult(await params.store.dispatch({ boardId: options.board }));
+      if (options.json) {
+        writeJson({ ...result, gatewayUnavailable: true });
+      } else {
+        writeLine(
+          `gateway unavailable; data dispatch only: promoted=${result.promoted.length} blocked=${result.blocked.length}`,
+        );
+      }
+    }
+  });
+}
