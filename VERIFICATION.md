@@ -59,7 +59,14 @@ separately below because they require a pushed repository and a paired browser.
 
 ## Git distribution
 
-After pushing the initial Flowboard commit, verify from a clean clone:
+The initial commit was cloned with `git clone --no-local` into an empty
+directory. After `npm ci --ignore-scripts`, all automated checks, the
+production build, and `npm pack --dry-run` passed with a clean worktree.
+This verifies that the committed repository contains every build input and
+checked-in artifact required for local development.
+
+After pushing the initial Flowboard commit, repeat the installation check from
+a clean GitHub clone:
 
 ```bash
 git clone https://github.com/johnson9316-bit/Flowboard.git Flowboard
@@ -67,8 +74,8 @@ openclaw plugins install --link /path/to/Flowboard
 openclaw plugins inspect flowboard --runtime
 ```
 
-The release is not considered distribution-verified until this sequence has
-been recorded against a clone without uncommitted source files.
+The release is not considered Git-distribution-verified until this sequence
+has been recorded against the GitHub repository.
 
 ## Trusted iframe UI
 
