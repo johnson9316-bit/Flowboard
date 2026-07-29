@@ -2158,12 +2158,6 @@ function updateEvent(existing, next) {
       ...cardSessionKey(next) ? { sessionKey: cardSessionKey(next) } : {}
     };
   }
-  if (existing.metadata?.claim?.token !== next.metadata?.claim?.token) {
-    return { kind: "claimed" };
-  }
-  if (existing.metadata?.claim?.lastHeartbeatAt !== next.metadata?.claim?.lastHeartbeatAt) {
-    return { kind: "heartbeat" };
-  }
   if (existing.execution?.status !== next.execution?.status || existing.execution?.engine !== next.execution?.engine || cardRunId(existing) !== cardRunId(next)) {
     const existingAttempts = existing.metadata?.attempts ?? [];
     const nextAttempts = next.metadata?.attempts ?? [];
@@ -2188,6 +2182,12 @@ function updateEvent(existing, next) {
       ...cardSessionKey(next) ? { sessionKey: cardSessionKey(next) } : {},
       ...cardRunId(next) ? { runId: cardRunId(next) } : {}
     };
+  }
+  if (existing.metadata?.claim?.token !== next.metadata?.claim?.token) {
+    return { kind: "claimed" };
+  }
+  if (existing.metadata?.claim?.lastHeartbeatAt !== next.metadata?.claim?.lastHeartbeatAt) {
+    return { kind: "heartbeat" };
   }
   if ((existing.metadata?.comments?.length ?? 0) !== (next.metadata?.comments?.length ?? 0) || latestMetadataIdChanged(existing.metadata?.comments, next.metadata?.comments)) {
     return { kind: "comment_added" };
@@ -3385,6 +3385,34 @@ async function abortFlowboardCardExecution(params) {
   return {
     card: stopped
   };
+}
+function terminalExecutionOutcome(value) {
+  const outcome = readOptionalString(value, 40)?.toLowerCase();
+  if (outcome === "ok" || outcome === "error" || outcome === "timeout" || outcome === "killed" || outcome === "reset" || outcome === "deleted") {
+    return outcome;
+  }
+  throw new Error("outcome must be a terminal OpenClaw subagent outcome.");
+}
+async function reconcileFlowboardCardExecution(params) {
+  const card = await resolveCard(params.store, params.id);
+  const expectedRunId = readOptionalString(params.expectedRunId, 200);
+  const runId = card.execution?.runId ?? card.runId;
+  if (!runId) {
+    throw new Error("card execution has no run.");
+  }
+  if (!expectedRunId || expectedRunId !== runId) {
+    throw new Error("card execution changed before it could be reconciled.");
+  }
+  const outcome = terminalExecutionOutcome(params.outcome);
+  const reconciled = await params.store.finishExecutionForRun(runId, {
+    outcome,
+    endedAt: params.endedAt,
+    reason: params.reason
+  });
+  if (!reconciled) {
+    throw new Error("card execution could not be reconciled.");
+  }
+  return { card: reconciled };
 }
 
 // src/backend/src/gateway-helpers.ts
@@ -7217,6 +7245,45 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       });
     });
   }
+  async finishExecutionForRun(runId, input = {}) {
+    const normalizedRunId = normalizeOptionalString(runId);
+    if (!normalizedRunId) {
+      throw new Error("runId is required.");
+    }
+    return await this.enqueueMutation(async () => {
+      const existing = (await this.list()).find(
+        (candidate) => cardRunId(candidate) === normalizedRunId
+      );
+      if (!existing) {
+        return void 0;
+      }
+      if (existing.execution?.status !== "running") {
+        return existing;
+      }
+      const now = Date.now();
+      const endedAt = typeof input.endedAt === "number" && Number.isSafeInteger(input.endedAt) && input.endedAt >= 0 ? Math.min(input.endedAt, now) : now;
+      const outcome = normalizeOptionalString(input.outcome)?.toLowerCase();
+      const succeeded = outcome === "ok";
+      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "execution end reason") ?? (succeeded ? void 0 : `Flowboard execution ended with ${outcome || "an unknown"} outcome.`);
+      return await this.updateCard(existing.id, {
+        execution: {
+          ...existing.execution,
+          status: succeeded ? "done" : "blocked",
+          updatedAt: endedAt
+        },
+        metadata: {
+          ...existing.metadata,
+          claim: void 0,
+          attempts: closeRunningAttempts(
+            existing.metadata?.attempts,
+            endedAt,
+            succeeded ? "succeeded" : "blocked",
+            reason
+          )
+        }
+      });
+    });
+  }
   async claim(id, input, options = {}) {
     const ownerId = normalizeBoundedString(input.ownerId, void 0, 120, "claim owner");
     if (!ownerId) {
@@ -9114,6 +9181,25 @@ function registerFlowboardGatewayMethods(params) {
           id: request.params.id,
           reason: request.params.reason,
           expectedRunId: request.params.expectedRunId
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.reconcile",
+    async (request) => {
+      try {
+        const result = await reconcileFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          expectedRunId: request.params.expectedRunId,
+          outcome: request.params.outcome,
+          endedAt: request.params.endedAt,
+          reason: request.params.reason
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
       } catch (error) {
@@ -15575,6 +15661,11 @@ var index_default = definePluginEntry({
     api.registerService(createFlowboardChangeEventService(store));
     api.on("subagent_ended", async (event) => {
       if (event.runId) {
+        await store.finishExecutionForRun(event.runId, {
+          outcome: event.outcome,
+          endedAt: event.endedAt,
+          reason: event.error ?? event.reason
+        });
         await cleanupFlowboardRunWorktree({
           store,
           worktrees: api.runtime.worktrees,

@@ -54,6 +54,11 @@ export default definePluginEntry({
     api.registerService(createFlowboardChangeEventService(store));
     api.on("subagent_ended", async (event) => {
       if (event.runId) {
+        await store.finishExecutionForRun(event.runId, {
+          outcome: event.outcome,
+          endedAt: event.endedAt,
+          reason: event.error ?? event.reason,
+        });
         await cleanupFlowboardRunWorktree({
           store,
           worktrees: api.runtime.worktrees,

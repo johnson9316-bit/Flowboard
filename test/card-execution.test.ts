@@ -277,4 +277,57 @@ describe("Flowboard native card execution", () => {
       runId: "run-2",
     });
   });
+
+  it("finishes a native run without inferring a Card status change", async () => {
+    const store = createStore();
+    const checkout = createGitCheckout();
+    await store.createProject({
+      id: "alpha",
+      name: "Alpha",
+      initialMilestoneTitle: "Build",
+      defaultWorkspace: { kind: "dir", path: checkout },
+    });
+    const card = await store.create({
+      boardId: "alpha",
+      title: "Keep business status independent",
+      status: "todo",
+    });
+    const options = executionOptions({
+      worktreeRoot: path.join(checkout, ".flowboard-worktrees"),
+      taskRunId: () => "run-1",
+    });
+    const prepared = await prepareFlowboardCardExecution({ store, id: card.id, options });
+    await startFlowboardCardExecution({
+      store,
+      id: card.id,
+      expectedUpdatedAt: prepared.expectedUpdatedAt,
+      options,
+    });
+
+    const completed = await store.finishExecutionForRun("run-1", {
+      outcome: "ok",
+      endedAt: 1_700_000_000_000,
+    });
+    expect(completed).toMatchObject({
+      id: card.id,
+      status: "todo",
+      execution: { status: "done", runId: "run-1" },
+    });
+    expect(completed?.metadata?.claim).toBeUndefined();
+    expect(completed?.metadata?.attempts?.at(-1)).toMatchObject({
+      status: "succeeded",
+      runId: "run-1",
+      endedAt: 1_700_000_000_000,
+    });
+    expect(completed?.events?.at(-1)).toMatchObject({
+      kind: "attempt_updated",
+      runId: "run-1",
+    });
+
+    const failed = await store.finishExecutionForRun("run-1", {
+      outcome: "error",
+      reason: "late duplicate event",
+    });
+    expect(failed).toEqual(completed);
+  });
 });

@@ -210,12 +210,6 @@ export function updateEvent(
       ...(cardSessionKey(next) ? { sessionKey: cardSessionKey(next) } : {}),
     };
   }
-  if (existing.metadata?.claim?.token !== next.metadata?.claim?.token) {
-    return { kind: "claimed" };
-  }
-  if (existing.metadata?.claim?.lastHeartbeatAt !== next.metadata?.claim?.lastHeartbeatAt) {
-    return { kind: "heartbeat" };
-  }
   if (
     existing.execution?.status !== next.execution?.status ||
     existing.execution?.engine !== next.execution?.engine ||
@@ -246,6 +240,12 @@ export function updateEvent(
       ...(cardSessionKey(next) ? { sessionKey: cardSessionKey(next) } : {}),
       ...(cardRunId(next) ? { runId: cardRunId(next) } : {}),
     };
+  }
+  if (existing.metadata?.claim?.token !== next.metadata?.claim?.token) {
+    return { kind: "claimed" };
+  }
+  if (existing.metadata?.claim?.lastHeartbeatAt !== next.metadata?.claim?.lastHeartbeatAt) {
+    return { kind: "heartbeat" };
   }
   if (
     (existing.metadata?.comments?.length ?? 0) !== (next.metadata?.comments?.length ?? 0) ||

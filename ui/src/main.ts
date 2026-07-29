@@ -58,6 +58,14 @@ type CardExecutionPreparationResponse = FlowboardCardExecutionPreparation;
 
 type CardExecutionInspectionResponse = FlowboardCardExecutionInspection;
 
+type NativeSessionDescriptionResponse = {
+  session?: {
+    status?: unknown;
+    hasActiveSubagentRun?: unknown;
+    endedAt?: unknown;
+  } | null;
+};
+
 function validChange(value: unknown): value is ChangeCursor {
   return Boolean(
     value &&
@@ -69,6 +77,41 @@ function validChange(value: unknown): value is ChangeCursor {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function nativeSessionIsActive(session: NativeSessionDescriptionResponse["session"]): boolean {
+  return session?.hasActiveSubagentRun === true;
+}
+
+function nativeSessionTerminalState(session: NativeSessionDescriptionResponse["session"]): {
+  outcome: "ok" | "error" | "timeout" | "killed" | "reset" | "deleted";
+  reason: string;
+  endedAt?: number;
+} {
+  const status = typeof session?.status === "string" ? session.status.toLowerCase() : "";
+  const outcome =
+    status === "done"
+      ? "ok"
+      : status === "timeout"
+        ? "timeout"
+        : status === "killed"
+          ? "killed"
+          : status === "reset"
+            ? "reset"
+            : status === "deleted"
+              ? "deleted"
+              : "error";
+  const endedAt =
+    typeof session?.endedAt === "number" && Number.isSafeInteger(session.endedAt)
+      ? session.endedAt
+      : undefined;
+  return {
+    outcome,
+    reason: session
+      ? `Native subagent session is no longer active (status: ${status || "unknown"}).`
+      : "Native subagent session no longer exists.",
+    ...(endedAt !== undefined ? { endedAt } : {}),
+  };
 }
 
 function normalizeProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
@@ -896,7 +939,28 @@ class FlowboardProjectHost extends LitElement {
     this.requestUpdate();
     void this.gateway
       .request<CardExecutionInspectionResponse>("flowboard.cards.execution.inspect", { id })
-      .then((inspection) => {
+      .then(async (inspection) => {
+        if (this.state.executionInspectionCardId !== id) {
+          return;
+        }
+        if (inspection.active && inspection.sessionKey && inspection.runId) {
+          const native = await this.gateway.request<NativeSessionDescriptionResponse>(
+            "sessions.describe",
+            { key: inspection.sessionKey },
+          );
+          if (!nativeSessionIsActive(native.session)) {
+            const terminal = nativeSessionTerminalState(native.session);
+            await this.gateway.request("flowboard.cards.execution.reconcile", {
+              id,
+              expectedRunId: inspection.runId,
+              ...terminal,
+            });
+            inspection = await this.gateway.request<CardExecutionInspectionResponse>(
+              "flowboard.cards.execution.inspect",
+              { id },
+            );
+          }
+        }
         if (this.state.executionInspectionCardId !== id) {
           return;
         }

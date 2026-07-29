@@ -1458,7 +1458,8 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
   const { state } = controller;
   const projectArchived = Boolean(state.project?.board.archivedAt);
   const inspection = inspectionForCard(state, card.id);
-  const active = inspection?.active ?? hasActiveCardExecution(card);
+  const active = inspection?.active === true;
+  const unresolvedActive = !active && hasActiveCardExecution(card);
   const sessionKey = inspection?.sessionKey ?? card.execution?.sessionKey ?? card.sessionKey;
   const runId = inspection?.runId ?? card.execution?.runId ?? card.runId;
   const taskId = inspection?.taskId ?? card.taskId;
@@ -1565,8 +1566,48 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
               </button>
             </form>
           `
+        : unresolvedActive
+          ? html`
+              <p class="flowboard-project__detail-empty">
+                ${inspectionLoading
+                  ? t("flowboardProject.refreshingExecution")
+                  : t("flowboardProject.executionCheckRequired")}
+              </p>
+              ${inspectionError
+                ? html`<p class="flowboard-project__execution-error">${inspectionError}</p>`
+                : nothing}
+              <button
+                class="btn"
+                type="button"
+                ?disabled=${inspectionLoading}
+                @click=${() => controller.refreshCardExecution(card.id)}
+              >
+                ${t("flowboardProject.refreshExecution")}
+              </button>
+            `
         : html`
-            <p class="flowboard-project__detail-empty">${t("flowboardProject.executionIdle")}</p>
+            <p class="flowboard-project__detail-empty">
+              ${card.execution?.status === "done"
+                ? t("flowboardProject.executionFinished")
+                : card.execution?.status === "blocked"
+                  ? t("flowboardProject.executionStopped")
+                  : t("flowboardProject.executionIdle")}
+            </p>
+            ${runId || taskId || (workspace?.kind === "worktree" && workspace.path)
+              ? html`
+                  <dl class="flowboard-project__execution-facts">
+                    ${runId
+                      ? html`<div><dt>${t("flowboardProject.executionRun")}</dt><dd>${runId}</dd></div>`
+                      : nothing}
+                    ${taskId
+                      ? html`<div><dt>${t("flowboardProject.executionTask")}</dt><dd>${taskId}</dd></div>`
+                      : nothing}
+                    ${workspace?.kind === "worktree" && workspace.path
+                      ? html`<div><dt>${t("flowboardProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
+                      : nothing}
+                  </dl>
+                `
+              : nothing}
             <button
               class="btn btn--primary"
               type="button"

@@ -170,6 +170,58 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
     });
   }
 
+  async finishExecutionForRun(
+    runId: string,
+    input: { outcome?: unknown; endedAt?: unknown; reason?: unknown } = {},
+  ): Promise<FlowboardCard | undefined> {
+    const normalizedRunId = normalizeOptionalString(runId);
+    if (!normalizedRunId) {
+      throw new Error("runId is required.");
+    }
+    return await this.enqueueMutation(async () => {
+      const existing = (await this.list()).find(
+        (candidate) => cardRunId(candidate) === normalizedRunId,
+      );
+      if (!existing) {
+        return undefined;
+      }
+      if (existing.execution?.status !== "running") {
+        return existing;
+      }
+      const now = Date.now();
+      const endedAt =
+        typeof input.endedAt === "number" &&
+        Number.isSafeInteger(input.endedAt) &&
+        input.endedAt >= 0
+          ? Math.min(input.endedAt, now)
+          : now;
+      const outcome = normalizeOptionalString(input.outcome)?.toLowerCase();
+      const succeeded = outcome === "ok";
+      const reason =
+        normalizeBoundedString(input.reason, undefined, 1_000, "execution end reason") ??
+        (succeeded
+          ? undefined
+          : `Flowboard execution ended with ${outcome || "an unknown"} outcome.`);
+      return await this.updateCard(existing.id, {
+        execution: {
+          ...existing.execution,
+          status: succeeded ? "done" : "blocked",
+          updatedAt: endedAt,
+        },
+        metadata: {
+          ...existing.metadata,
+          claim: undefined,
+          attempts: closeRunningAttempts(
+            existing.metadata?.attempts,
+            endedAt,
+            succeeded ? "succeeded" : "blocked",
+            reason,
+          ),
+        },
+      });
+    });
+  }
+
   async claim(
     id: string,
     input: FlowboardClaimInput,

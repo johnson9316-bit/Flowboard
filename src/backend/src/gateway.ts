@@ -6,6 +6,7 @@ import {
   abortFlowboardCardExecution,
   inspectFlowboardCardExecution,
   prepareFlowboardCardExecution,
+  reconcileFlowboardCardExecution,
   startFlowboardCardExecution,
   steerFlowboardCardExecution,
   type FlowboardCardExecutionOptions,
@@ -217,6 +218,26 @@ export function registerFlowboardGatewayMethods(params: {
           id: request.params.id,
           reason: request.params.reason,
           expectedRunId: request.params.expectedRunId,
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.reconcile",
+    async (request) => {
+      try {
+        const result = await reconcileFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          expectedRunId: request.params.expectedRunId,
+          outcome: request.params.outcome,
+          endedAt: request.params.endedAt,
+          reason: request.params.reason,
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
       } catch (error) {

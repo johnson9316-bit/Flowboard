@@ -541,3 +541,47 @@ export async function abortFlowboardCardExecution(params: {
     card: stopped,
   };
 }
+
+function terminalExecutionOutcome(value: unknown): "ok" | "error" | "timeout" | "killed" | "reset" | "deleted" {
+  const outcome = readOptionalString(value, 40)?.toLowerCase();
+  if (
+    outcome === "ok" ||
+    outcome === "error" ||
+    outcome === "timeout" ||
+    outcome === "killed" ||
+    outcome === "reset" ||
+    outcome === "deleted"
+  ) {
+    return outcome;
+  }
+  throw new Error("outcome must be a terminal OpenClaw subagent outcome.");
+}
+
+export async function reconcileFlowboardCardExecution(params: {
+  store: FlowboardStore;
+  id: unknown;
+  expectedRunId?: unknown;
+  outcome?: unknown;
+  endedAt?: unknown;
+  reason?: unknown;
+}) {
+  const card = await resolveCard(params.store, params.id);
+  const expectedRunId = readOptionalString(params.expectedRunId, 200);
+  const runId = card.execution?.runId ?? card.runId;
+  if (!runId) {
+    throw new Error("card execution has no run.");
+  }
+  if (!expectedRunId || expectedRunId !== runId) {
+    throw new Error("card execution changed before it could be reconciled.");
+  }
+  const outcome = terminalExecutionOutcome(params.outcome);
+  const reconciled = await params.store.finishExecutionForRun(runId, {
+    outcome,
+    endedAt: params.endedAt,
+    reason: params.reason,
+  });
+  if (!reconciled) {
+    throw new Error("card execution could not be reconciled.");
+  }
+  return { card: reconciled };
+}
