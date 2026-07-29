@@ -15,10 +15,14 @@ describe("Flowboard M2 project UI host", () => {
     expect(main).toContain("flowboard.projects.get");
     expect(main).toContain("flowboard.cards.moveMilestone");
     expect(main).toContain("flowboard.cards.moveProject");
+    expect(main).toContain('i18n.t("flowboardProject.connectionRequired")');
     expect(main).not.toMatch(/setInterval\s*\(/);
     expect(page).toContain("flowboardProject.unassigned");
     expect(page).toContain("draggable=");
     expect(page).toContain("flowboard-project__kanban");
+    expect(page).toContain("flowboard-project__project-toolbar");
+    expect(page).not.toContain("flowboard-project__sidebar");
+    expect(page).toContain("?disabled=${controller.state.busy || !controller.connected}");
   });
 
   it("keeps all imported locale bundles and their source metadata", () => {

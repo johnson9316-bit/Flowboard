@@ -311,7 +311,7 @@ function renderOrderControls(params: {
   `;
 }
 
-function renderProjectList(controller: FlowboardProjectViewController) {
+function renderProjectToolbar(controller: FlowboardProjectViewController) {
   const { state } = controller;
   const query = state.query.trim().toLocaleLowerCase();
   const projects = state.projects.filter((project) => {
@@ -321,15 +321,7 @@ function renderProjectList(controller: FlowboardProjectViewController) {
     return !query || `${project.name ?? ""} ${project.id}`.toLocaleLowerCase().includes(query);
   });
   return html`
-    <aside class="flowboard-project__sidebar">
-      <button
-        class="flowboard-project__nav-item ${state.screen === "overview" ? "is-active" : ""}"
-        type="button"
-        @click=${() => controller.setScreen("overview")}
-      >
-        <span>${t("flowboardProject.allProjects")}</span>
-        <strong>${projects.length}</strong>
-      </button>
+    <nav class="flowboard-project__project-toolbar" aria-label=${t("flowboardProject.allProjects")}>
       <label class="flowboard-project__search">
         <span class="flowboard-project__sr-only">${t("flowboardProject.searchProjects")}</span>
         <input
@@ -386,7 +378,7 @@ function renderProjectList(controller: FlowboardProjectViewController) {
             )
           : html`<p class="flowboard-project__empty-side">${t("flowboardProject.emptyProject")}</p>`}
       </div>
-    </aside>
+    </nav>
   `;
 }
 
@@ -402,7 +394,12 @@ function renderOverview(controller: FlowboardProjectViewController) {
           <h1>${t("flowboardProject.allProjects")}</h1>
           <p>${t("flowboardProject.title")}</p>
         </div>
-        <button class="btn btn--primary" type="button" @click=${() => controller.openModal({ kind: "project" })}>
+        <button
+          class="btn btn--primary"
+          type="button"
+          ?disabled=${!controller.connected}
+          @click=${() => controller.openModal({ kind: "project" })}
+        >
           ${t("flowboardProject.newProject")}
         </button>
       </div>
@@ -436,7 +433,12 @@ function renderOverview(controller: FlowboardProjectViewController) {
         : html`
             <div class="flowboard-project__blank">
               <p>${t("flowboardProject.emptyOverview")}</p>
-              <button class="btn btn--primary" type="button" @click=${() => controller.openModal({ kind: "project" })}>
+              <button
+                class="btn btn--primary"
+                type="button"
+                ?disabled=${!controller.connected}
+                @click=${() => controller.openModal({ kind: "project" })}
+              >
                 ${t("flowboardProject.newProject")}
               </button>
             </div>
@@ -651,7 +653,7 @@ function renderColumn(
             class="flowboard-project__icon-button"
             type="button"
             title=${t("flowboardProject.newCard")}
-            ?disabled=${projectArchived || (milestone && milestone.state !== "active")}
+            ?disabled=${!controller.connected || projectArchived || (milestone && milestone.state !== "active")}
             @click=${() => controller.openModal({ kind: "card", ...(params.id ? { milestoneId: params.id } : {}) })}
           >+</button>
         </div>
@@ -697,10 +699,20 @@ function renderBoard(controller: FlowboardProjectViewController) {
                 </button>
               `
             : html`
-                <button class="btn" type="button" @click=${() => controller.openModal({ kind: "milestone" })}>
+                <button
+                  class="btn"
+                  type="button"
+                  ?disabled=${!controller.connected}
+                  @click=${() => controller.openModal({ kind: "milestone" })}
+                >
                   ${t("flowboardProject.newMilestone")}
                 </button>
-                <button class="btn btn--primary" type="button" @click=${() => controller.openModal({ kind: "card" })}>
+                <button
+                  class="btn btn--primary"
+                  type="button"
+                  ?disabled=${!controller.connected}
+                  @click=${() => controller.openModal({ kind: "card" })}
+                >
                   ${t("flowboardProject.newCard")}
                 </button>
               `}
@@ -1412,7 +1424,11 @@ function renderModal(controller: FlowboardProjectViewController) {
           <label>${t("flowboardProject.firstMilestone")}<input name="initialMilestoneTitle" required /></label>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
-            <button class="btn btn--primary" type="submit" ?disabled=${controller.state.busy}>${t("flowboardProject.createProject")}</button>
+            <button
+              class="btn btn--primary"
+              type="submit"
+              ?disabled=${controller.state.busy || !controller.connected}
+            >${t("flowboardProject.createProject")}</button>
           </footer>
         </form>
       </openclaw-modal-dialog>
@@ -1442,7 +1458,11 @@ function renderModal(controller: FlowboardProjectViewController) {
           </div>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
-            <button class="btn btn--primary" type="submit" ?disabled=${controller.state.busy}>${t("flowboardProject.createCard")}</button>
+            <button
+              class="btn btn--primary"
+              type="submit"
+              ?disabled=${controller.state.busy || !controller.connected}
+            >${t("flowboardProject.createCard")}</button>
           </footer>
         </form>
       </openclaw-modal-dialog>
@@ -1466,7 +1486,11 @@ function renderModal(controller: FlowboardProjectViewController) {
           <label>Color<input name="color" .value=${milestone?.color ?? ""} /></label>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
-            <button class="btn btn--primary" type="submit" ?disabled=${controller.state.busy}>
+            <button
+              class="btn btn--primary"
+              type="submit"
+              ?disabled=${controller.state.busy || !controller.connected}
+            >
               ${milestone ? t("common.save") : t("flowboardProject.createMilestone")}
             </button>
           </footer>
@@ -1569,7 +1593,20 @@ export function renderFlowboardProjects(controller: FlowboardProjectViewControll
           <button class="flowboard-project__refresh" type="button" title=${t("flowboardProject.refresh")} @click=${controller.refresh}>
             &#8635;
           </button>
-          <button class="btn btn--primary" type="button" @click=${() => controller.openModal({ kind: "project" })}>
+          <button
+            class="btn flowboard-project__all-projects ${state.screen === "overview" ? "is-active" : ""}"
+            type="button"
+            @click=${() => controller.setScreen("overview")}
+          >
+            <span>${t("flowboardProject.allProjects")}</span>
+            <strong>${state.projects.length}</strong>
+          </button>
+          <button
+            class="btn btn--primary"
+            type="button"
+            ?disabled=${!controller.connected}
+            @click=${() => controller.openModal({ kind: "project" })}
+          >
             ${t("flowboardProject.newProject")}
           </button>
         </div>
@@ -1578,13 +1615,11 @@ export function renderFlowboardProjects(controller: FlowboardProjectViewControll
         ? html`<div class="callout">${t("flowboardProject.connectionRequired")}</div>`
         : nothing}
       ${state.error ? html`<div class="callout danger" role="alert">${state.error}</div>` : nothing}
-      <div class="flowboard-project__layout">
-        ${renderProjectList(controller)}
-        <main class="flowboard-project__main">
-          ${state.project && state.screen !== "overview" ? renderProjectTabs(controller) : nothing}
-          ${projectView}
-        </main>
-      </div>
+      ${renderProjectToolbar(controller)}
+      <main class="flowboard-project__main">
+        ${state.project && state.screen !== "overview" ? renderProjectTabs(controller) : nothing}
+        ${projectView}
+      </main>
       ${renderModal(controller)}
     </section>
   `;

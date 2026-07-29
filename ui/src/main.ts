@@ -120,6 +120,9 @@ class FlowboardProjectHost extends LitElement {
     } else if (!state.connected && wasConnected) {
       this.changeLoopGeneration += 1;
     }
+    if (!state.connected && state.error) {
+      this.state.error = state.error;
+    }
     this.requestUpdate();
   }
 
@@ -262,6 +265,11 @@ class FlowboardProjectHost extends LitElement {
 
   private async mutate(action: () => Promise<void>, options: { closeModal?: boolean } = {}) {
     if (this.state.busy) {
+      return;
+    }
+    if (!this.connectedToGateway) {
+      this.state.error = i18n.t("flowboardProject.connectionRequired");
+      this.requestUpdate();
       return;
     }
     this.state.busy = true;
