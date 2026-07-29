@@ -12,6 +12,8 @@ import { i18n } from "./i18n/index.ts";
 import {
   createFlowboardProjectUiState,
   renderFlowboardProjects,
+  type FlowboardCardExecutionInspection,
+  type FlowboardCardExecutionPreparation,
   type FlowboardProjectModal,
   type FlowboardProjectUiState,
 } from "./pages/projects/project-view.ts";
@@ -43,6 +45,10 @@ type ProjectDocumentReadResponse = {
   preview: FlowboardProjectDocumentRead;
 };
 
+type CardExecutionPreparationResponse = FlowboardCardExecutionPreparation;
+
+type CardExecutionInspectionResponse = FlowboardCardExecutionInspection;
+
 function validChange(value: unknown): value is ChangeCursor {
   return Boolean(
     value &&
@@ -62,6 +68,7 @@ class FlowboardProjectHost extends LitElement {
   private changeLoopGeneration = 0;
   private changeCursor: ChangeCursor | undefined;
   private refreshGeneration = 0;
+  private executionRefreshTimer: number | null = null;
   private unsubscribeI18n?: () => void;
   private stopHostSync?: () => void;
   private readonly state: FlowboardProjectUiState = createFlowboardProjectUiState();
@@ -96,6 +103,7 @@ class FlowboardProjectHost extends LitElement {
     this.stopped = true;
     this.changeLoopGeneration += 1;
     this.refreshGeneration += 1;
+    this.clearExecutionRefreshTimer();
     this.unsubscribeI18n?.();
     this.unsubscribeI18n = undefined;
     this.stopHostSync?.();
@@ -185,6 +193,7 @@ class FlowboardProjectHost extends LitElement {
         this.state.selectedDocumentId = null;
         this.state.documentPreview = null;
         this.state.documentPreviewError = null;
+        this.clearExecutionState();
         this.state.screen = "overview";
       } else if (selectedId) {
         const project = await this.gateway.request<ProjectResponse>("flowboard.projects.get", {
@@ -254,13 +263,53 @@ class FlowboardProjectHost extends LitElement {
   }
 
   private openModal(modal: FlowboardProjectModal) {
+    this.clearExecutionRefreshTimer();
     this.state.modal = modal;
     this.requestUpdate();
+    if (modal.kind === "card-detail") {
+      void this.refreshCardExecution(modal.cardId);
+    }
   }
 
   private closeModal() {
+    this.clearExecutionRefreshTimer();
     this.state.modal = null;
     this.requestUpdate();
+  }
+
+  private clearExecutionRefreshTimer() {
+    if (this.executionRefreshTimer !== null) {
+      window.clearTimeout(this.executionRefreshTimer);
+      this.executionRefreshTimer = null;
+    }
+  }
+
+  private clearExecutionState() {
+    this.clearExecutionRefreshTimer();
+    this.state.executionPreparationCardId = null;
+    this.state.executionPreparation = null;
+    this.state.executionPreparationLoading = false;
+    this.state.executionPreparationError = null;
+    this.state.executionInspectionCardId = null;
+    this.state.executionInspection = null;
+    this.state.executionInspectionLoading = false;
+    this.state.executionInspectionError = null;
+  }
+
+  private scheduleExecutionRefresh(cardId: string) {
+    this.clearExecutionRefreshTimer();
+    if (
+      this.stopped ||
+      !this.connectedToGateway ||
+      this.state.modal?.kind !== "card-detail" ||
+      this.state.modal.cardId !== cardId
+    ) {
+      return;
+    }
+    this.executionRefreshTimer = window.setTimeout(() => {
+      this.executionRefreshTimer = null;
+      void this.refreshCardExecution(cardId);
+    }, 3_000);
   }
 
   private async mutate(action: () => Promise<void>, options: { closeModal?: boolean } = {}) {
@@ -602,6 +651,139 @@ class FlowboardProjectHost extends LitElement {
     }, { closeModal: false });
   }
 
+  private prepareCardExecution(id: string) {
+    if (!this.connectedToGateway) {
+      this.state.error = i18n.t("flowboardProject.connectionRequired");
+      this.requestUpdate();
+      return;
+    }
+    this.clearExecutionRefreshTimer();
+    this.state.modal = { kind: "execution-start", cardId: id };
+    this.state.executionPreparationCardId = id;
+    this.state.executionPreparation = null;
+    this.state.executionPreparationLoading = true;
+    this.state.executionPreparationError = null;
+    this.requestUpdate();
+    void this.gateway
+      .request<CardExecutionPreparationResponse>("flowboard.cards.execution.prepare", { id })
+      .then((preparation) => {
+        if (
+          this.state.executionPreparationCardId !== id ||
+          this.state.modal?.kind !== "execution-start" ||
+          this.state.modal.cardId !== id
+        ) {
+          return;
+        }
+        this.state.executionPreparation = preparation;
+        if (preparation.active) {
+          this.state.modal = { kind: "card-detail", cardId: id };
+          void this.refreshCardExecution(id);
+        }
+      })
+      .catch((error) => {
+        if (this.state.executionPreparationCardId === id) {
+          this.state.executionPreparationError = errorMessage(error);
+        }
+      })
+      .finally(() => {
+        if (this.state.executionPreparationCardId === id) {
+          this.state.executionPreparationLoading = false;
+          this.requestUpdate();
+        }
+      });
+  }
+
+  private startCardExecution(id: string) {
+    const preparation =
+      this.state.executionPreparationCardId === id ? this.state.executionPreparation : null;
+    if (!preparation) {
+      return;
+    }
+    void this.mutate(
+      async () => {
+        await this.gateway.request("flowboard.cards.execution.start", {
+          id,
+          expectedUpdatedAt: preparation.expectedUpdatedAt,
+        });
+        this.state.modal = { kind: "card-detail", cardId: id };
+        this.state.executionPreparation = null;
+        this.state.executionPreparationError = null;
+        this.state.executionInspectionCardId = id;
+        this.state.executionInspection = null;
+        this.refreshCardExecution(id);
+      },
+      { closeModal: false },
+    );
+  }
+
+  private refreshCardExecution(id: string) {
+    if (!this.connectedToGateway || this.state.executionInspectionLoading) {
+      return;
+    }
+    this.state.executionInspectionCardId = id;
+    this.state.executionInspectionLoading = true;
+    this.state.executionInspectionError = null;
+    this.requestUpdate();
+    void this.gateway
+      .request<CardExecutionInspectionResponse>("flowboard.cards.execution.inspect", { id })
+      .then((inspection) => {
+        if (this.state.executionInspectionCardId !== id) {
+          return;
+        }
+        this.state.executionInspection = inspection;
+        if (inspection.active) {
+          this.scheduleExecutionRefresh(id);
+        } else {
+          this.clearExecutionRefreshTimer();
+        }
+      })
+      .catch((error) => {
+        if (this.state.executionInspectionCardId === id) {
+          this.state.executionInspectionError = errorMessage(error);
+          const card = this.state.project?.cards.find((candidate) => candidate.id === id);
+          const stillActive =
+            this.state.executionInspection?.active ||
+            card?.execution?.status === "running" ||
+            Boolean(card?.metadata?.attempts?.some((attempt) => attempt.status === "running"));
+          if (stillActive) {
+            this.scheduleExecutionRefresh(id);
+          }
+        }
+      })
+      .finally(() => {
+        if (this.state.executionInspectionCardId === id) {
+          this.state.executionInspectionLoading = false;
+          this.requestUpdate();
+        }
+      });
+  }
+
+  private steerCardExecution(id: string, message: string) {
+    if (!message.trim()) {
+      return;
+    }
+    void this.mutate(
+      async () => {
+        await this.gateway.request("flowboard.cards.execution.steer", { id, message });
+        this.refreshCardExecution(id);
+      },
+      { closeModal: false },
+    );
+  }
+
+  private abortCardExecution(id: string) {
+    if (!window.confirm(i18n.t("flowboardProject.stopExecutionConfirm"))) {
+      return;
+    }
+    void this.mutate(
+      async () => {
+        await this.gateway.request("flowboard.cards.execution.abort", { id });
+        this.refreshCardExecution(id);
+      },
+      { closeModal: false },
+    );
+  }
+
   private createSourceReference(id: string, data: Record<string, string>) {
     void this.mutate(async () => {
       await this.gateway.request("flowboard.cards.sources.create", { id, ...data });
@@ -684,6 +866,11 @@ class FlowboardProjectHost extends LitElement {
       hideDocument: (id, hidden) => this.hideDocument(id, hidden),
       deleteDocument: (id) => this.deleteDocument(id),
       updateCardDelivery: (id, data) => this.updateCardDelivery(id, data),
+      prepareCardExecution: (id) => this.prepareCardExecution(id),
+      startCardExecution: (id) => this.startCardExecution(id),
+      refreshCardExecution: (id) => this.refreshCardExecution(id),
+      steerCardExecution: (id, message) => this.steerCardExecution(id, message),
+      abortCardExecution: (id) => this.abortCardExecution(id),
       createSourceReference: (id, data) => this.createSourceReference(id, data),
       updateSourceReference: (id, data) => this.updateSourceReference(id, data),
       deleteSourceReference: (id, sourceReferenceId) =>

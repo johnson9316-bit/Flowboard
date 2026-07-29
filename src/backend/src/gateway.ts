@@ -1,12 +1,23 @@
 // Flowboard plugin module implements gateway behavior.
 import type { OpenClawPluginApi } from "../api.js";
+import { resolveDefaultAgentId } from "openclaw/plugin-sdk/agent-runtime";
 import { redactClaimToken } from "./card-redaction.js";
+import {
+  abortFlowboardCardExecution,
+  inspectFlowboardCardExecution,
+  prepareFlowboardCardExecution,
+  startFlowboardCardExecution,
+  steerFlowboardCardExecution,
+  type FlowboardCardExecutionOptions,
+} from "./card-execution.js";
 import {
   assertNoCursorAdvance,
   createFlowboardDispatchHandler,
   listFlowboardCards,
   readId,
   respondError,
+  resolveGatewayFlowboardWorkspaceAccess,
+  type GatewayMethodContext,
 } from "./gateway-helpers.js";
 import {
   registerFlowboardWorkspaceBoardMethod,
@@ -16,6 +27,7 @@ import {
 } from "./gateway-workspace-methods.js";
 import { registerFlowboardProjectGatewayMethods } from "./gateway-project-methods.js";
 import { FlowboardStore } from "./store.js";
+import { resolveAgentFlowboardWorkspaceRuntime } from "./workspace-access.js";
 
 const READ_SCOPE = "operator.read" as const;
 const WRITE_SCOPE = "operator.write" as const;
@@ -77,6 +89,40 @@ export function registerFlowboardGatewayMethods(params: {
     store,
     redactCard: redactClaimToken,
   });
+  const sandbox = (api.runtime as unknown as {
+    sandbox?: {
+      prepareWorkspaceAuthority?: Parameters<
+        typeof resolveAgentFlowboardWorkspaceRuntime
+      >[0]["prepareSandboxWorkspaceAuthority"];
+    };
+  }).sandbox;
+  const executionOptions = (request: GatewayMethodContext): FlowboardCardExecutionOptions => {
+    const config = request.context.getRuntimeConfig();
+    return {
+      runtime: api.runtime,
+      workspaceAccess: resolveGatewayFlowboardWorkspaceAccess({
+        context: request.context,
+        client: request.client,
+      }),
+      defaultAgentId: resolveDefaultAgentId(config),
+      resolveAgentWorkspaceRuntime: (
+        agentId,
+        sessionKey,
+        workspaceDir,
+        modelProvider,
+        modelId,
+      ) =>
+        resolveAgentFlowboardWorkspaceRuntime({
+          config,
+          agentId,
+          sessionKey,
+          workspaceDir,
+          modelProvider,
+          modelId,
+          prepareSandboxWorkspaceAuthority: sandbox?.prepareWorkspaceAuthority,
+        }),
+    };
+  };
 
   api.registerGatewayMethod(
     "flowboard.cards.list",
@@ -88,6 +134,96 @@ export function registerFlowboardGatewayMethods(params: {
       }
     },
     { scope: READ_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.prepare",
+    async (request) => {
+      try {
+        request.respond(
+          true,
+          await prepareFlowboardCardExecution({
+            store,
+            id: request.params.id,
+            options: executionOptions(request),
+          }),
+        );
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: READ_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.inspect",
+    async (request) => {
+      try {
+        const result = await inspectFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          runtime: api.runtime,
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: READ_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.start",
+    async (request) => {
+      try {
+        const result = await startFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          expectedUpdatedAt: request.params.expectedUpdatedAt,
+          options: executionOptions(request),
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.steer",
+    async (request) => {
+      try {
+        const result = await steerFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          message: request.params.message,
+          runtime: api.runtime,
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.abort",
+    async (request) => {
+      try {
+        const result = await abortFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          reason: request.params.reason,
+          runtime: api.runtime,
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
   );
 
   api.registerGatewayMethod(

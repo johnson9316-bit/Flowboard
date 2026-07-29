@@ -763,6 +763,103 @@
   margin: 0;
 }
 
+.flowboard-project__execution-section {
+  gap: 12px;
+}
+
+.flowboard-project__execution-heading,
+.flowboard-project__execution-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.flowboard-project__execution-state {
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.flowboard-project__execution-facts {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.flowboard-project__execution-facts div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.flowboard-project__execution-facts dt,
+.flowboard-project__execution-facts dd {
+  font-size: 12px;
+  margin: 0;
+}
+
+.flowboard-project__execution-facts dt {
+  color: var(--muted);
+}
+
+.flowboard-project__execution-facts dd {
+  overflow-wrap: anywhere;
+}
+
+.flowboard-project__execution-preview {
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px;
+}
+
+.flowboard-project__execution-preview summary {
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.flowboard-project__execution-preview pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 9px 0 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 9px;
+  white-space: pre-wrap;
+}
+
+.flowboard-project__execution-steer {
+  display: grid;
+  gap: 8px;
+}
+
+.flowboard-project__execution-steer label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.flowboard-project__execution-steer textarea {
+  min-height: 70px;
+}
+
+.flowboard-project__execution-error {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .flowboard-project__delivery-form,
 .flowboard-project__source-reference,
 .flowboard-project__evidence-form,
@@ -987,6 +1084,11 @@
   .flowboard-project__modal-grid,
   .flowboard-project__evidence-form {
     grid-template-columns: 1fr;
+  }
+
+  .flowboard-project__execution-facts div {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
 
   .flowboard-project__settings-form .flowboard-project__wide-field,

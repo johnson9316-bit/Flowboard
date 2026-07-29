@@ -72,6 +72,9 @@ describe("Flowboard M2 Gateway methods", () => {
       "flowboard.cards.sources.reorder",
       "flowboard.cards.moveMilestone",
       "flowboard.cards.moveProject",
+      "flowboard.cards.execution.start",
+      "flowboard.cards.execution.steer",
+      "flowboard.cards.execution.abort",
     ];
     for (const name of writes) {
       expect(registrations.get(name)?.options.scope).toBe("operator.write");
@@ -79,6 +82,12 @@ describe("Flowboard M2 Gateway methods", () => {
     expect(registrations.get("flowboard.projects.get")?.options.scope).toBe("operator.read");
     expect(registrations.get("flowboard.projects.documents.list")?.options.scope).toBe("operator.read");
     expect(registrations.get("flowboard.projects.documents.read")?.options.scope).toBe(
+      "operator.read",
+    );
+    expect(registrations.get("flowboard.cards.execution.prepare")?.options.scope).toBe(
+      "operator.read",
+    );
+    expect(registrations.get("flowboard.cards.execution.inspect")?.options.scope).toBe(
       "operator.read",
     );
 

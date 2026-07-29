@@ -6,6 +6,7 @@ import type {
   FlowboardDeliveryImplementationState,
   FlowboardDeliveryReleaseState,
   FlowboardDeliveryVerificationState,
+  FlowboardExecution,
   FlowboardMilestone,
   FlowboardPriority,
   FlowboardProjectDocument,
@@ -75,6 +76,7 @@ export type FlowboardProjectModal =
   | { kind: "milestone"; milestone?: FlowboardMilestone }
   | { kind: "document"; document?: FlowboardProjectDocument }
   | { kind: "card-detail"; cardId: string }
+  | { kind: "execution-start"; cardId: string }
   | {
       kind: "move-project";
       cardId: string;
@@ -82,6 +84,32 @@ export type FlowboardProjectModal =
       milestoneId?: string;
       targetProject?: FlowboardProjectView;
     };
+
+export type FlowboardCardExecutionPreparation = {
+  cardId: string;
+  expectedUpdatedAt: number;
+  active: boolean;
+  agentId: string;
+  defaultProvider?: string;
+  defaultModel?: string;
+  sourceCheckout: string;
+  baseBranch?: string;
+  worktreeName: string;
+  promptPreview: string;
+  execution: FlowboardExecution | null;
+};
+
+export type FlowboardCardExecutionInspection = {
+  card: FlowboardCard;
+  active: boolean;
+  execution: FlowboardExecution | null;
+  sessionKey?: string;
+  runId?: string;
+  taskId?: string;
+  session?: unknown;
+  preview?: unknown;
+  task?: unknown;
+};
 
 export type FlowboardProjectUiState = {
   loading: boolean;
@@ -95,6 +123,14 @@ export type FlowboardProjectUiState = {
   documentPreview: FlowboardProjectDocumentRead | null;
   documentPreviewLoading: boolean;
   documentPreviewError: string | null;
+  executionPreparationCardId: string | null;
+  executionPreparation: FlowboardCardExecutionPreparation | null;
+  executionPreparationLoading: boolean;
+  executionPreparationError: string | null;
+  executionInspectionCardId: string | null;
+  executionInspection: FlowboardCardExecutionInspection | null;
+  executionInspectionLoading: boolean;
+  executionInspectionError: string | null;
   selectedProjectId: string | null;
   screen: "overview" | "board" | "settings" | "documents";
   modal: FlowboardProjectModal | null;
@@ -134,6 +170,11 @@ export type FlowboardProjectViewController = {
   hideDocument: (id: string, hidden: boolean) => void;
   deleteDocument: (id: string) => void;
   updateCardDelivery: (id: string, data: Record<string, string>) => void;
+  prepareCardExecution: (id: string) => void;
+  startCardExecution: (id: string) => void;
+  refreshCardExecution: (id: string) => void;
+  steerCardExecution: (id: string, message: string) => void;
+  abortCardExecution: (id: string) => void;
   createSourceReference: (id: string, data: Record<string, string>) => void;
   updateSourceReference: (id: string, data: Record<string, string>) => void;
   deleteSourceReference: (id: string, sourceReferenceId: string) => void;
@@ -157,6 +198,14 @@ export function createFlowboardProjectUiState(): FlowboardProjectUiState {
     documentPreview: null,
     documentPreviewLoading: false,
     documentPreviewError: null,
+    executionPreparationCardId: null,
+    executionPreparation: null,
+    executionPreparationLoading: false,
+    executionPreparationError: null,
+    executionInspectionCardId: null,
+    executionInspection: null,
+    executionInspectionLoading: false,
+    executionInspectionError: null,
     selectedProjectId: null,
     screen: "overview",
     modal: null,
@@ -177,6 +226,52 @@ function boardId(card: FlowboardCard): string {
 
 function isArchivedCard(card: FlowboardCard): boolean {
   return Boolean(card.metadata?.archivedAt);
+}
+
+function hasActiveCardExecution(card: FlowboardCard): boolean {
+  return (
+    card.execution?.status === "running" ||
+    Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"))
+  );
+}
+
+function inspectionForCard(
+  state: FlowboardProjectUiState,
+  cardId: string,
+): FlowboardCardExecutionInspection | null {
+  return state.executionInspectionCardId === cardId ? state.executionInspection : null;
+}
+
+function executionValue(value: unknown): string {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+export function flowboardNativeChatHref(sessionKey: string, pathname?: string): string {
+  let currentPath = "/";
+  if (typeof window !== "undefined") {
+    currentPath = window.location.pathname;
+    try {
+      if (window.parent !== window) {
+        currentPath = window.parent.location.pathname || currentPath;
+      }
+    } catch {
+      // Cross-origin embeds keep their own route as the safe fallback.
+    }
+  }
+  const path = pathname ?? currentPath;
+  const pluginIndex = path.indexOf("/plugin");
+  const basePath = pluginIndex >= 0 ? path.slice(0, pluginIndex) : "";
+  return `${basePath || ""}/chat?session=${encodeURIComponent(sessionKey)}`;
 }
 
 function milestoneLabel(milestone: FlowboardMilestone): string {
@@ -1034,6 +1129,7 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
               )}
           </select>
         </label>
+        ${renderExecutionSection(controller, card)}
         ${renderDeliverySection(controller, card)}
         ${renderSourceReferenceSection(controller, card)}
         ${renderEvidenceSection(controller, card)}
@@ -1073,6 +1169,132 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
         </button>
       </footer>
     </div>
+  `;
+}
+
+function renderExecutionSection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+  const { state } = controller;
+  const projectArchived = Boolean(state.project?.board.archivedAt);
+  const inspection = inspectionForCard(state, card.id);
+  const active = inspection?.active ?? hasActiveCardExecution(card);
+  const sessionKey = inspection?.sessionKey ?? card.execution?.sessionKey ?? card.sessionKey;
+  const runId = inspection?.runId ?? card.execution?.runId ?? card.runId;
+  const taskId = inspection?.taskId ?? card.taskId;
+  const workspace = card.metadata?.automation?.workspace;
+  const inspectionError =
+    state.executionInspectionCardId === card.id ? state.executionInspectionError : null;
+  const inspectionLoading =
+    state.executionInspectionCardId === card.id && state.executionInspectionLoading;
+
+  return html`
+    <section class="flowboard-project__detail-section flowboard-project__execution-section">
+      <div class="flowboard-project__execution-heading">
+        <h3>${t("flowboardProject.execution")}</h3>
+        ${active
+          ? html`
+              <button
+                class="flowboard-project__icon-button"
+                type="button"
+                title=${t("flowboardProject.refreshExecution")}
+                aria-label=${t("flowboardProject.refreshExecution")}
+                ?disabled=${inspectionLoading}
+                @click=${() => controller.refreshCardExecution(card.id)}
+              >&#8635;</button>
+            `
+          : nothing}
+      </div>
+      ${active
+        ? html`
+            <p class="flowboard-project__execution-state">
+              ${t("flowboardProject.executionRunning")}
+            </p>
+            <dl class="flowboard-project__execution-facts">
+              ${sessionKey
+                ? html`<div><dt>${t("flowboardProject.executionSession")}</dt><dd>${sessionKey}</dd></div>`
+                : nothing}
+              ${runId
+                ? html`<div><dt>${t("flowboardProject.executionRun")}</dt><dd>${runId}</dd></div>`
+                : nothing}
+              ${taskId
+                ? html`<div><dt>${t("flowboardProject.executionTask")}</dt><dd>${taskId}</dd></div>`
+                : nothing}
+              ${workspace?.kind === "worktree" && workspace.path
+                ? html`<div><dt>${t("flowboardProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
+                : nothing}
+            </dl>
+            ${inspectionLoading
+              ? html`<p class="flowboard-project__detail-empty">${t(
+                  "flowboardProject.refreshingExecution",
+                )}</p>`
+              : nothing}
+            ${inspectionError
+              ? html`<p class="flowboard-project__execution-error">${inspectionError}</p>`
+              : nothing}
+            ${inspection?.preview
+              ? html`
+                  <details class="flowboard-project__execution-preview">
+                    <summary>${t("flowboardProject.executionSessionPreview")}</summary>
+                    <pre>${executionValue(inspection.preview)}</pre>
+                  </details>
+                `
+              : nothing}
+            ${inspection?.task
+              ? html`
+                  <details class="flowboard-project__execution-preview">
+                    <summary>${t("flowboardProject.executionTaskState")}</summary>
+                    <pre>${executionValue(inspection.task)}</pre>
+                  </details>
+                `
+              : nothing}
+            <div class="flowboard-project__execution-actions">
+              ${sessionKey
+                ? html`
+                    <a class="btn" href=${flowboardNativeChatHref(sessionKey)} target="_top">
+                      ${t("flowboardProject.openNativeChat")}
+                    </a>
+                  `
+                : nothing}
+              <button
+                class="btn btn--danger"
+                type="button"
+                ?disabled=${state.busy}
+                @click=${() => controller.abortCardExecution(card.id)}
+              >
+                ${t("flowboardProject.stopExecution")}
+              </button>
+            </div>
+            <form
+              class="flowboard-project__execution-steer"
+              @submit=${(event: SubmitEvent) => {
+                event.preventDefault();
+                controller.steerCardExecution(card.id, readForm(event).message ?? "");
+              }}
+            >
+              <label>
+                ${t("flowboardProject.steerInstruction")}
+                <textarea
+                  name="message"
+                  required
+                  placeholder=${t("flowboardProject.steerInstructionPlaceholder")}
+                ></textarea>
+              </label>
+              <button class="btn" type="submit" ?disabled=${state.busy}>
+                ${t("flowboardProject.steerExecution")}
+              </button>
+            </form>
+          `
+        : html`
+            <p class="flowboard-project__detail-empty">${t("flowboardProject.executionIdle")}</p>
+            <button
+              class="btn btn--primary"
+              type="button"
+              ?disabled=${state.busy || !controller.connected || isArchivedCard(card) || projectArchived}
+              @click=${() => controller.prepareCardExecution(card.id)}
+            >
+              ${t("flowboardProject.startExecution")}
+            </button>
+          `}
+    </section>
   `;
 }
 
@@ -1383,6 +1605,79 @@ function renderMoveProjectModal(
   `;
 }
 
+function renderExecutionStartModal(
+  controller: FlowboardProjectViewController,
+  modal: Extract<FlowboardProjectModal, { kind: "execution-start" }>,
+) {
+  const card = controller.state.project?.cards.find((candidate) => candidate.id === modal.cardId);
+  if (!card) {
+    return nothing;
+  }
+  const preparation =
+    controller.state.executionPreparationCardId === card.id
+      ? controller.state.executionPreparation
+      : null;
+  const loading =
+    controller.state.executionPreparationCardId === card.id &&
+    controller.state.executionPreparationLoading;
+  const error =
+    controller.state.executionPreparationCardId === card.id
+      ? controller.state.executionPreparationError
+      : null;
+  const model =
+    preparation?.defaultProvider && preparation.defaultModel
+      ? `${preparation.defaultProvider}/${preparation.defaultModel}`
+      : preparation?.defaultModel ?? preparation?.defaultProvider;
+  return html`
+    <section class="flowboard-project__modal-panel flowboard-project__execution-confirmation">
+      <header><h2>${t("flowboardProject.startExecution")}</h2></header>
+      <p class="flowboard-project__move-card-title">${card.title}</p>
+      ${loading
+        ? html`<p class="flowboard-project__detail-empty">${t(
+            "flowboardProject.preparingExecution",
+          )}</p>`
+        : error
+          ? html`<p class="flowboard-project__execution-error">${error}</p>`
+          : preparation
+            ? html`
+                ${card.status === "done"
+                  ? html`<p class="callout">${t("flowboardProject.executionDoneNotice")}</p>`
+                  : nothing}
+                <p class="callout">${t("flowboardProject.executionWorktreeNotice")}</p>
+                <dl class="flowboard-project__execution-facts">
+                  <div><dt>${t("flowboardProject.executionAgent")}</dt><dd>${preparation.agentId}</dd></div>
+                  ${model
+                    ? html`<div><dt>${t("flowboardProject.executionModel")}</dt><dd>${model}</dd></div>`
+                    : nothing}
+                  <div><dt>${t("flowboardProject.executionSource")}</dt><dd>${preparation.sourceCheckout}</dd></div>
+                  ${preparation.baseBranch
+                    ? html`<div><dt>${t("flowboardProject.executionBaseBranch")}</dt><dd>${preparation.baseBranch}</dd></div>`
+                    : nothing}
+                  <div><dt>${t("flowboardProject.executionWorktree")}</dt><dd>${preparation.worktreeName}</dd></div>
+                </dl>
+                <details class="flowboard-project__execution-preview" open>
+                  <summary>${t("flowboardProject.executionPromptPreview")}</summary>
+                  <pre>${preparation.promptPreview}</pre>
+                </details>
+              `
+            : nothing}
+      <footer>
+        <button class="btn" type="button" @click=${controller.closeModal}>
+          ${t("common.cancel")}
+        </button>
+        <button
+          class="btn btn--primary"
+          type="button"
+          ?disabled=${!preparation || loading || controller.state.busy}
+          @click=${() => controller.startCardExecution(card.id)}
+        >
+          ${t("flowboardProject.confirmStartExecution")}
+        </button>
+      </footer>
+    </section>
+  `;
+}
+
 function renderModal(controller: FlowboardProjectViewController) {
   const { modal, project } = controller.state;
   if (!modal) {
@@ -1400,6 +1695,13 @@ function renderModal(controller: FlowboardProjectViewController) {
           ${renderCardDetail(controller, card)}
         </openclaw-modal-dialog>`
       : nothing;
+  }
+  if (modal.kind === "execution-start") {
+    return html`
+      <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
+        ${renderExecutionStartModal(controller, modal)}
+      </openclaw-modal-dialog>
+    `;
   }
   if (modal.kind === "move-project") {
     return html`

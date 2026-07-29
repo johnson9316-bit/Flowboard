@@ -71,6 +71,105 @@ function assertClaimIdentity(claim: FlowboardClaim, input: FlowboardHeartbeatInp
 }
 
 export class FlowboardWorkflowStore extends FlowboardPromoteStore {
+  async claimExecution(
+    id: string,
+    input: { ownerId?: unknown; expectedUpdatedAt?: unknown; ttlSeconds?: unknown },
+  ): Promise<{ card: FlowboardCard; token: string }> {
+    const ownerId = normalizeBoundedString(input.ownerId, undefined, 120, "claim owner");
+    if (!ownerId) {
+      throw new Error("claim ownerId is required.");
+    }
+    if (
+      typeof input.expectedUpdatedAt !== "number" ||
+      !Number.isSafeInteger(input.expectedUpdatedAt) ||
+      input.expectedUpdatedAt < 0
+    ) {
+      throw new Error("expectedUpdatedAt is required.");
+    }
+    const ttlSeconds =
+      typeof input.ttlSeconds === "number" && Number.isFinite(input.ttlSeconds)
+        ? Math.max(1, Math.trunc(input.ttlSeconds))
+        : undefined;
+    return await this.enqueueMutation(async () => {
+      const existing = await this.get(id);
+      if (!existing) {
+        throw new Error(`card not found: ${id}`);
+      }
+      if (existing.updatedAt !== input.expectedUpdatedAt) {
+        throw new Error("card changed since execution was prepared.");
+      }
+      if (existing.metadata?.archivedAt) {
+        throw new Error("card is archived.");
+      }
+      if (await this.isProjectArchived(cardBoardId(existing))) {
+        throw new Error("project is archived and cannot start new work.");
+      }
+      if (
+        existing.execution?.status === "running" ||
+        existing.metadata?.attempts?.some((attempt) => attempt.status === "running")
+      ) {
+        throw new Error("card already has an active execution.");
+      }
+      const now = Date.now();
+      const existingClaim = existing.metadata?.claim;
+      if (
+        existingClaim &&
+        (isFutureDateTimestampMs(existingClaim.expiresAt, { nowMs: now }) ||
+          !isFlowboardClaimReclaimable(existingClaim, now))
+      ) {
+        throw new Error(`card already claimed by ${existingClaim.ownerId}.`);
+      }
+      const token = randomUUID();
+      const expiresAt = addFlowboardDurationMs(
+        now,
+        ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS,
+      );
+      const card = await this.updateCard(id, {
+        metadata: {
+          ...clearDiagnostics(existing.metadata, ["stranded_ready"]),
+          claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt },
+        },
+      });
+      return { card, token };
+    });
+  }
+
+  async stopExecution(
+    id: string,
+    input: { expectedRunId?: unknown; reason?: unknown } = {},
+  ): Promise<FlowboardCard> {
+    return await this.enqueueMutation(async () => {
+      const existing = await this.get(id);
+      if (!existing) {
+        throw new Error(`card not found: ${id}`);
+      }
+      const expectedRunId = normalizeOptionalString(input.expectedRunId);
+      const runId = cardRunId(existing);
+      if (expectedRunId && expectedRunId !== runId) {
+        throw new Error("card execution changed before it could be stopped.");
+      }
+      if (existing.execution?.status !== "running") {
+        throw new Error("card has no active execution.");
+      }
+      const now = Date.now();
+      const reason =
+        normalizeBoundedString(input.reason, undefined, 1000, "stop reason") ??
+        "Flowboard execution stopped by operator.";
+      return await this.updateCard(id, {
+        execution: { ...existing.execution, status: "blocked", updatedAt: now },
+        metadata: {
+          ...existing.metadata,
+          claim: undefined,
+          attempts: closeRunningAttempts(existing.metadata?.attempts, now, "stopped", reason),
+          comments: [
+            ...(existing.metadata?.comments ?? []),
+            { id: randomUUID(), body: reason, createdAt: now },
+          ].slice(-MAX_CARD_COMMENTS),
+        },
+      });
+    });
+  }
+
   async claim(
     id: string,
     input: FlowboardClaimInput,

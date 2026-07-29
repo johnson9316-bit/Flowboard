@@ -71,7 +71,6 @@ export function syncExecutionAttemptMetadata(
   if (!execution) {
     return metadata;
   }
-  const attemptStatus = executionAttemptStatus(execution);
   const attempts = [...(metadata.attempts ?? [])];
   const key = execution.runId ?? execution.sessionKey ?? execution.id;
   const existingIndex = attempts.findIndex(
@@ -80,6 +79,12 @@ export function syncExecutionAttemptMetadata(
       (!execution.runId && attempt.id === key),
   );
   const existingAttempt = existingIndex >= 0 ? attempts[existingIndex] : undefined;
+  // An operator stop leaves the execution record blocked while preserving the
+  // attempt's more precise stopped outcome.
+  const attemptStatus =
+    execution.status === "blocked" && existingAttempt?.status === "stopped"
+      ? "stopped"
+      : executionAttemptStatus(execution);
   const nextAttempt: FlowboardRunAttempt = {
     id: existingAttempt?.id ?? key,
     status: attemptStatus,

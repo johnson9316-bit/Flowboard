@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 let createFlowboardProjectUiState: typeof import("../ui/src/pages/projects/project-view.ts")["createFlowboardProjectUiState"];
 let reorderVisibleItemIds: typeof import("../ui/src/pages/projects/project-view.ts")["reorderVisibleItemIds"];
+let flowboardNativeChatHref: typeof import("../ui/src/pages/projects/project-view.ts")["flowboardNativeChatHref"];
 
 beforeAll(async () => {
   class HTMLElementShim {}
@@ -14,7 +15,7 @@ beforeAll(async () => {
       },
     },
   });
-  ({ createFlowboardProjectUiState, reorderVisibleItemIds } = await import(
+  ({ createFlowboardProjectUiState, reorderVisibleItemIds, flowboardNativeChatHref } = await import(
     "../ui/src/pages/projects/project-view.ts"
   ));
 });
@@ -29,6 +30,8 @@ describe("Flowboard M2 project UI state", () => {
       draggedCardId: null,
       showArchivedProjects: false,
       showHiddenDocuments: false,
+      executionPreparation: null,
+      executionInspection: null,
     });
   });
 
@@ -42,5 +45,14 @@ describe("Flowboard M2 project UI state", () => {
       "first",
     ]);
     expect(reorderVisibleItemIds(allItems, visibleItems, "first", -1)).toBeUndefined();
+  });
+
+  it("builds a native Chat link below the current Control UI base path", () => {
+    expect(flowboardNativeChatHref("agent:main:subagent:flowboard-alpha-card", "/plugin")).toBe(
+      "/chat?session=agent%3Amain%3Asubagent%3Aflowboard-alpha-card",
+    );
+    expect(flowboardNativeChatHref("session with spaces", "/control/plugin")).toBe(
+      "/control/chat?session=session%20with%20spaces",
+    );
   });
 });

@@ -180,7 +180,7 @@ var cli_exports = {};
 __export(cli_exports, {
   registerFlowboardCli: () => registerFlowboardCli
 });
-import { formatErrorMessage as formatErrorMessage3 } from "openclaw/plugin-sdk/error-runtime";
+import { formatErrorMessage as formatErrorMessage4 } from "openclaw/plugin-sdk/error-runtime";
 import { addGatewayClientOptions, callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
 import { parseStrictPositiveInteger as parseStrictPositiveInteger2 } from "openclaw/plugin-sdk/number-runtime";
 import { getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
@@ -244,7 +244,7 @@ async function callFlowboardGateway(method, options, params) {
   });
 }
 function isGatewayUnavailableError(error) {
-  const message = formatErrorMessage3(error).toLowerCase();
+  const message = formatErrorMessage4(error).toLowerCase();
   if ([
     "econnrefused",
     "econnreset",
@@ -471,17 +471,13 @@ import {
 
 // src/backend/src/gateway.ts
 init_card_redaction();
+import { resolveDefaultAgentId as resolveDefaultAgentId2 } from "openclaw/plugin-sdk/agent-runtime";
 
-// src/backend/src/gateway-helpers.ts
-init_contract();
+// src/backend/src/card-execution.ts
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { formatErrorMessage as formatErrorMessage2 } from "openclaw/plugin-sdk/error-runtime";
-import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
-
-// src/backend/src/dispatcher.ts
-import path from "node:path";
-import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
-import { isFutureDateTimestampMs } from "openclaw/plugin-sdk/number-runtime";
-import { canonicalPathFromExistingAncestor as canonicalPathFromExistingAncestor3 } from "openclaw/plugin-sdk/security-runtime";
+import { canonicalPathFromExistingAncestor as canonicalPathFromExistingAncestor4 } from "openclaw/plugin-sdk/security-runtime";
 
 // src/backend/src/dispatcher-workspace.ts
 import { canonicalPathFromExistingAncestor as canonicalPathFromExistingAncestor2 } from "openclaw/plugin-sdk/security-runtime";
@@ -862,6 +858,12 @@ async function assertRestrictedFlowboardTarget(params) {
   }
   await assertCanonicalFlowboardRootAccess(params.root, targetRuntime.workspaceAccess);
 }
+
+// src/backend/src/dispatcher.ts
+import path from "node:path";
+import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
+import { isFutureDateTimestampMs } from "openclaw/plugin-sdk/number-runtime";
+import { canonicalPathFromExistingAncestor as canonicalPathFromExistingAncestor3 } from "openclaw/plugin-sdk/security-runtime";
 
 // src/backend/src/store-card-helpers.ts
 init_contract();
@@ -2062,13 +2064,13 @@ function syncExecutionAttemptMetadata(metadata, execution, now) {
   if (!execution) {
     return metadata;
   }
-  const attemptStatus = executionAttemptStatus(execution);
   const attempts = [...metadata.attempts ?? []];
   const key = execution.runId ?? execution.sessionKey ?? execution.id;
   const existingIndex = attempts.findIndex(
     (attempt) => execution.runId && attempt.runId === execution.runId || !execution.runId && attempt.id === key
   );
   const existingAttempt = existingIndex >= 0 ? attempts[existingIndex] : void 0;
+  const attemptStatus = execution.status === "blocked" && existingAttempt?.status === "stopped" ? "stopped" : executionAttemptStatus(execution);
   const nextAttempt = {
     id: existingAttempt?.id ?? key,
     status: attemptStatus,
@@ -2572,6 +2574,17 @@ function compareNotifications(a, b) {
 // src/backend/src/dispatcher.ts
 var DEFAULT_DISPATCH_MAX_STARTS = 3;
 var DEFAULT_DISPATCH_OWNER = "flowboard-dispatcher";
+async function createManagedFlowboardWorktree(params) {
+  return await params.worktrees.create({
+    repoRoot: params.repoRoot,
+    name: params.name,
+    ...params.baseRef ? { baseRef: params.baseRef } : {},
+    // This host release has a fixed managed-worktree owner enum. Card IDs
+    // remain globally unique and Flowboard data stays in its own SQLite namespace.
+    ownerKind: "workboard",
+    ownerId: params.ownerId
+  });
+}
 var pendingFlowboardDispatches = /* @__PURE__ */ new WeakMap();
 function normalizePositiveInteger2(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : fallback;
@@ -2632,13 +2645,11 @@ async function materializeWorkspace(params) {
   if (!params.worktrees) {
     throw new Error("managed worktree runtime is unavailable");
   }
-  const worktree = await params.worktrees.create({
+  const worktree = await createManagedFlowboardWorktree({
+    worktrees: params.worktrees,
     repoRoot: canonicalSourcePath,
     name: managedWorktreeName(params.card.id),
     ...sourceBranch ? { baseRef: sourceBranch } : {},
-    // This host release has a fixed managed-worktree owner enum. Card IDs
-    // remain globally unique and flowboard data stays in its own SQLite namespace.
-    ownerKind: "workboard",
     ownerId: params.card.id
   });
   let cwd;
@@ -2979,11 +2990,429 @@ async function runFlowboardDispatch(params) {
   };
 }
 
+// src/backend/src/card-execution.ts
+var execFileAsync = promisify(execFile);
+var PREVIEW_LIMIT = 6;
+var PREVIEW_MAX_CHARS = 600;
+var CLAIM_TOKEN_PLACEHOLDER = "[generated after confirmation]";
+var executionLocks = /* @__PURE__ */ new WeakMap();
+function readOptionalString(value, maxLength = 4e3) {
+  if (typeof value !== "string") {
+    return void 0;
+  }
+  const normalized = value.trim();
+  return normalized && normalized.length <= maxLength ? normalized : void 0;
+}
+function activeExecution(card) {
+  return card.execution?.status === "running" || Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"));
+}
+async function withCardExecutionLock(store, cardId, action) {
+  const locks = executionLocks.get(store) ?? /* @__PURE__ */ new Map();
+  executionLocks.set(store, locks);
+  const previous = locks.get(cardId) ?? Promise.resolve();
+  let release;
+  const current = previous.then(
+    async () => await new Promise((resolve) => {
+      release = resolve;
+    })
+  );
+  locks.set(cardId, current);
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release?.();
+    if (locks.get(cardId) === current) {
+      locks.delete(cardId);
+    }
+  }
+}
+async function gitCheckout(path5) {
+  try {
+    const { stdout } = await execFileAsync("git", ["-C", path5, "rev-parse", "--show-toplevel"], {
+      encoding: "utf8",
+      maxBuffer: 16 * 1024
+    });
+    const root = stdout.trim();
+    if (!root) {
+      throw new Error("git did not return a repository root");
+    }
+    const canonicalRoot = await canonicalPathFromExistingAncestor4(root);
+    const branchResult = await execFileAsync(
+      "git",
+      ["-C", canonicalRoot, "symbolic-ref", "--quiet", "--short", "HEAD"],
+      { encoding: "utf8", maxBuffer: 16 * 1024 }
+    ).catch(() => ({ stdout: "" }));
+    const branch = branchResult.stdout.trim();
+    return { root: canonicalRoot, ...branch ? { branch } : {} };
+  } catch (error) {
+    throw new Error(
+      `execution requires a local Git checkout: ${formatErrorMessage2(error)}`,
+      { cause: error }
+    );
+  }
+}
+async function resolveWorkspaceAccess(card, currentAccess) {
+  const callerAccess = await canonicalizeFlowboardWorkspaceAccess(currentAccess);
+  const persisted = card.metadata?.automation?.workspaceAccess;
+  const workspaceAccess = persisted ? intersectFlowboardWorkspaceAccess(
+    await canonicalizeFlowboardWorkspaceAccess(persisted),
+    callerAccess
+  ) : callerAccess;
+  if (!workspaceAccess.unrestricted && !workspaceAccess.writable) {
+    throw new Error("card workspace access is read-only; execution requires write access.");
+  }
+  return workspaceAccess;
+}
+async function resolveExecutionSource(store, card, currentAccess) {
+  const workspaceAccess = await resolveWorkspaceAccess(card, currentAccess);
+  const cardWorkspace = card.metadata?.automation?.workspace;
+  if (cardWorkspace?.kind === "scratch") {
+    throw new Error("card workspace is scratch; select a local Git checkout before execution.");
+  }
+  const { boards } = await store.listBoards();
+  const sourceWorkspace = cardWorkspace ?? boards.find((board) => board.id === cardBoardId(card))?.defaultWorkspace;
+  if (!sourceWorkspace || sourceWorkspace.kind === "scratch") {
+    throw new Error("card has no local Git checkout; set a card or project workspace first.");
+  }
+  const sourcePath = await assertFlowboardWorkspaceSourceAccess(sourceWorkspace, workspaceAccess);
+  if (!sourcePath) {
+    throw new Error("card workspace path is required.");
+  }
+  const checkout = await gitCheckout(sourcePath);
+  const checkedRoot = await assertFlowboardWorkspaceSourceAccess(
+    { kind: "dir", path: checkout.root },
+    workspaceAccess
+  );
+  if (!checkedRoot) {
+    throw new Error("Git checkout root is unavailable.");
+  }
+  return {
+    sourceCheckout: checkedRoot,
+    ...sourceWorkspace.sourceBranch || checkout.branch ? { baseBranch: sourceWorkspace.sourceBranch ?? checkout.branch } : {},
+    sourceWorkspace,
+    workspaceAccess
+  };
+}
+async function ensureTargetCanRun(params) {
+  if (params.source.workspaceAccess.unrestricted) {
+    return;
+  }
+  await assertRestrictedFlowboardTarget({
+    root: params.source.sourceCheckout,
+    agentId: params.card.agentId ?? params.options.defaultAgentId,
+    sessionKey: params.sessionKey,
+    modelProvider: params.options.runtime.agent.defaults.provider,
+    modelId: params.options.runtime.agent.defaults.model,
+    resolveAgentWorkspaceRuntime: params.options.resolveAgentWorkspaceRuntime
+  });
+}
+function promptPreview(params) {
+  return buildWorkerPrompt({
+    card: params.card,
+    context: params.context,
+    ownerId: params.ownerId,
+    token: CLAIM_TOKEN_PLACEHOLDER
+  });
+}
+function redactExecutionText(value, token) {
+  let next = value;
+  if (token) {
+    next = next.replaceAll(token, "[redacted]");
+  }
+  return next.replace(/Claim token:\s*\S+/giu, "Claim token: [redacted]");
+}
+function redactExecutionPayload(value, token) {
+  if (typeof value === "string") {
+    return redactExecutionText(value, token);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactExecutionPayload(entry, token));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        redactExecutionPayload(entry, token)
+      ])
+    );
+  }
+  return value;
+}
+function taskIdFromRuntime(runtime, sessionKey, runId) {
+  try {
+    const task = runtime.tasks.runs.bindSession({ sessionKey }).findLatest();
+    return task?.runId === runId ? readOptionalString(task.taskId, 200) : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function resolveCard(store, id) {
+  const cardId = readOptionalString(id, 200);
+  if (!cardId) {
+    throw new Error("id is required.");
+  }
+  const card = await store.get(cardId);
+  if (!card) {
+    throw new Error(`card not found: ${cardId}`);
+  }
+  return card;
+}
+async function prepareFlowboardCardExecution(params) {
+  const card = await resolveCard(params.store, params.id);
+  if (card.metadata?.archivedAt) {
+    throw new Error("card is archived.");
+  }
+  if (await params.store.isProjectArchived(cardBoardId(card))) {
+    throw new Error("project is archived and cannot start new work.");
+  }
+  const sessionKey = buildSessionKey(card);
+  const source = await resolveExecutionSource(params.store, card, params.options.workspaceAccess);
+  await ensureTargetCanRun({ card, source, options: params.options, sessionKey });
+  const ownerId = card.agentId ?? params.options.defaultAgentId;
+  const context = await params.store.buildWorkerContext(card.id);
+  return {
+    cardId: card.id,
+    expectedUpdatedAt: card.updatedAt,
+    active: activeExecution(card),
+    agentId: ownerId,
+    defaultProvider: params.options.runtime.agent.defaults.provider,
+    defaultModel: params.options.runtime.agent.defaults.model,
+    sourceCheckout: source.sourceCheckout,
+    ...source.baseBranch ? { baseBranch: source.baseBranch } : {},
+    worktreeName: managedWorktreeName(card.id),
+    promptPreview: promptPreview({ card, context, ownerId }),
+    execution: card.execution ?? null
+  };
+}
+async function startFlowboardCardExecution(params) {
+  const card = await resolveCard(params.store, params.id);
+  return await withCardExecutionLock(params.store, card.id, async () => {
+    const latest = await resolveCard(params.store, card.id);
+    const sessionKey = buildSessionKey(latest);
+    const source = await resolveExecutionSource(
+      params.store,
+      latest,
+      params.options.workspaceAccess
+    );
+    await ensureTargetCanRun({ card: latest, source, options: params.options, sessionKey });
+    const ownerId = latest.agentId ?? params.options.defaultAgentId;
+    const expectedUpdatedAt = typeof params.expectedUpdatedAt === "number" ? params.expectedUpdatedAt : void 0;
+    let claimToken;
+    let materializedWorkspace;
+    let runStarted = false;
+    const previousWorkspace = latest.metadata?.automation?.workspace;
+    try {
+      const claimed = await params.store.claimExecution(latest.id, {
+        ownerId,
+        expectedUpdatedAt,
+        ttlSeconds: latest.metadata?.automation?.maxRuntimeSeconds
+      });
+      claimToken = claimed.token;
+      const worktree = await createManagedFlowboardWorktree({
+        worktrees: params.options.runtime.worktrees,
+        repoRoot: source.sourceCheckout,
+        name: managedWorktreeName(latest.id),
+        ...source.baseBranch ? { baseRef: source.baseBranch } : {},
+        ownerId: latest.id
+      });
+      let worktreePath;
+      try {
+        worktreePath = await canonicalPathFromExistingAncestor4(worktree.path);
+      } catch (error) {
+        const removed = await params.options.runtime.worktrees.removeIfLossless({ path: worktree.path }).catch(() => false);
+        if (!removed) {
+          throw new Error(`${formatErrorMessage2(error)}; managed worktree cleanup failed`, {
+            cause: error
+          });
+        }
+        throw error;
+      }
+      materializedWorkspace = {
+        kind: "worktree",
+        path: worktreePath,
+        branch: worktree.branch,
+        sourcePath: source.sourceCheckout,
+        ...source.baseBranch ? { sourceBranch: source.baseBranch } : {}
+      };
+      await params.store.update(latest.id, {
+        workspace: materializedWorkspace,
+        workspaceAccess: source.workspaceAccess
+      });
+      await ensureTargetCanRun({
+        card: await resolveCard(params.store, latest.id),
+        source: { ...source, sourceCheckout: worktreePath },
+        options: params.options,
+        sessionKey
+      });
+      const current = await resolveCard(params.store, latest.id);
+      const context = await params.store.buildWorkerContext(current.id);
+      const run = await params.options.runtime.subagent.run({
+        sessionKey,
+        message: buildWorkerPrompt({
+          card: current,
+          context,
+          ownerId,
+          token: claimToken
+        }),
+        lane: `flowboard:${cardBoardId(current)}:${current.id}`,
+        idempotencyKey: `flowboard:execution:${current.id}:${claimed.card.updatedAt}`,
+        lightContext: true,
+        deliver: false,
+        cwd: worktreePath
+      });
+      runStarted = true;
+      const now = Date.now();
+      const taskId = taskIdFromRuntime(params.options.runtime, sessionKey, run.runId);
+      const updated = await params.store.update(current.id, {
+        sessionKey,
+        runId: run.runId,
+        ...taskId ? { taskId } : {},
+        execution: buildExecution({
+          card: current,
+          sessionKey,
+          runId: run.runId,
+          now
+        }),
+        workspace: materializedWorkspace,
+        workspaceAccess: source.workspaceAccess
+      });
+      await params.store.addWorkerLog(
+        updated.id,
+        {
+          level: "info",
+          message: `Card execution started subagent run ${run.runId}.`,
+          sessionKey,
+          runId: run.runId
+        },
+        { ownerId, token: claimToken }
+      ).catch(() => void 0);
+      return {
+        card: updated,
+        sessionKey,
+        runId: run.runId,
+        ...taskId ? { taskId } : {},
+        worktreePath,
+        branch: worktree.branch
+      };
+    } catch (error) {
+      if (!runStarted && materializedWorkspace?.path) {
+        await params.options.runtime.worktrees.removeIfLossless({ path: materializedWorkspace.path }).catch(() => false);
+        await params.store.update(latest.id, { workspace: previousWorkspace ?? source.sourceWorkspace }).catch(() => void 0);
+      }
+      if (claimToken && !runStarted) {
+        await params.store.releaseClaim(latest.id, { ownerId, token: claimToken }).catch(() => void 0);
+      }
+      throw error;
+    }
+  });
+}
+async function inspectFlowboardCardExecution(params) {
+  const card = await resolveCard(params.store, params.id);
+  const sessionKey = card.execution?.sessionKey ?? card.sessionKey;
+  const runId = card.execution?.runId ?? card.runId;
+  const active = activeExecution(card);
+  if (!active || !sessionKey || !runId) {
+    return { card, active: false, execution: card.execution ?? null };
+  }
+  const token = card.metadata?.claim?.token;
+  const [describe, preview, task] = await Promise.all([
+    params.runtime.gateway.request("sessions.describe", { key: sessionKey }).catch((error) => ({ error: formatErrorMessage2(error) })),
+    params.runtime.gateway.request("sessions.preview", {
+      keys: [sessionKey],
+      limit: PREVIEW_LIMIT,
+      maxChars: PREVIEW_MAX_CHARS
+    }).catch((error) => ({ error: formatErrorMessage2(error) })),
+    card.taskId ? params.runtime.gateway.request("tasks.get", { taskId: card.taskId }).catch((error) => ({ error: formatErrorMessage2(error) })) : Promise.resolve(void 0)
+  ]);
+  return {
+    card,
+    active: true,
+    execution: card.execution,
+    sessionKey,
+    runId,
+    ...card.taskId ? { taskId: card.taskId } : {},
+    session: redactExecutionPayload(describe, token),
+    preview: redactExecutionPayload(preview, token),
+    ...task ? { task: redactExecutionPayload(task, token) } : {}
+  };
+}
+async function steerFlowboardCardExecution(params) {
+  const card = await resolveCard(params.store, params.id);
+  const message = readOptionalString(params.message);
+  if (!message) {
+    throw new Error("message is required.");
+  }
+  if (!activeExecution(card) || card.execution?.status !== "running") {
+    throw new Error("card has no active Flowboard execution.");
+  }
+  const sessionKey = card.execution.sessionKey ?? card.sessionKey;
+  if (!sessionKey) {
+    throw new Error("active execution has no session.");
+  }
+  const response = await params.runtime.gateway.request("sessions.steer", {
+    key: sessionKey,
+    message
+  });
+  const nextRunId = readOptionalString(response.runId, 200);
+  let updated = card;
+  if (nextRunId) {
+    const taskId = taskIdFromRuntime(params.runtime, sessionKey, nextRunId);
+    updated = await params.store.update(card.id, {
+      runId: nextRunId,
+      ...taskId ? { taskId } : {},
+      execution: { ...card.execution, runId: nextRunId, updatedAt: Date.now() }
+    });
+  }
+  return { card: updated, response: redactExecutionPayload(response, card.metadata?.claim?.token) };
+}
+async function abortFlowboardCardExecution(params) {
+  const card = await resolveCard(params.store, params.id);
+  if (!activeExecution(card) || card.execution?.status !== "running") {
+    throw new Error("card has no active Flowboard execution.");
+  }
+  const sessionKey = card.execution.sessionKey ?? card.sessionKey;
+  const runId = card.execution.runId ?? card.runId;
+  const reason = readOptionalString(params.reason, 1e3) ?? "Flowboard execution stopped by operator.";
+  let control;
+  if (sessionKey && runId) {
+    try {
+      control = await params.runtime.gateway.request("sessions.abort", { key: sessionKey, runId });
+    } catch (sessionError) {
+      if (!card.taskId) {
+        throw sessionError;
+      }
+      control = await params.runtime.gateway.request("tasks.cancel", {
+        taskId: card.taskId,
+        reason
+      });
+    }
+  } else if (card.taskId) {
+    control = await params.runtime.gateway.request("tasks.cancel", {
+      taskId: card.taskId,
+      reason
+    });
+  } else {
+    throw new Error("active execution has no controllable session or task.");
+  }
+  const stopped = await params.store.stopExecution(card.id, {
+    ...runId ? { expectedRunId: runId } : {},
+    reason
+  });
+  return {
+    card: stopped,
+    control: redactExecutionPayload(control, card.metadata?.claim?.token)
+  };
+}
+
 // src/backend/src/gateway-helpers.ts
+init_contract();
+import { formatErrorMessage as formatErrorMessage3 } from "openclaw/plugin-sdk/error-runtime";
+import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
 function respondError(respond, error) {
   respond(false, void 0, {
     code: "flowboard_error",
-    message: formatErrorMessage2(error)
+    message: formatErrorMessage3(error)
   });
 }
 function readId(params) {
@@ -6606,6 +7035,81 @@ function assertClaimIdentity(claim, input) {
   }
 }
 var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
+  async claimExecution(id, input) {
+    const ownerId = normalizeBoundedString(input.ownerId, void 0, 120, "claim owner");
+    if (!ownerId) {
+      throw new Error("claim ownerId is required.");
+    }
+    if (typeof input.expectedUpdatedAt !== "number" || !Number.isSafeInteger(input.expectedUpdatedAt) || input.expectedUpdatedAt < 0) {
+      throw new Error("expectedUpdatedAt is required.");
+    }
+    const ttlSeconds = typeof input.ttlSeconds === "number" && Number.isFinite(input.ttlSeconds) ? Math.max(1, Math.trunc(input.ttlSeconds)) : void 0;
+    return await this.enqueueMutation(async () => {
+      const existing = await this.get(id);
+      if (!existing) {
+        throw new Error(`card not found: ${id}`);
+      }
+      if (existing.updatedAt !== input.expectedUpdatedAt) {
+        throw new Error("card changed since execution was prepared.");
+      }
+      if (existing.metadata?.archivedAt) {
+        throw new Error("card is archived.");
+      }
+      if (await this.isProjectArchived(cardBoardId(existing))) {
+        throw new Error("project is archived and cannot start new work.");
+      }
+      if (existing.execution?.status === "running" || existing.metadata?.attempts?.some((attempt) => attempt.status === "running")) {
+        throw new Error("card already has an active execution.");
+      }
+      const now = Date.now();
+      const existingClaim = existing.metadata?.claim;
+      if (existingClaim && (isFutureDateTimestampMs2(existingClaim.expiresAt, { nowMs: now }) || !isFlowboardClaimReclaimable(existingClaim, now))) {
+        throw new Error(`card already claimed by ${existingClaim.ownerId}.`);
+      }
+      const token = randomUUID7();
+      const expiresAt = addFlowboardDurationMs(
+        now,
+        ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS
+      );
+      const card = await this.updateCard(id, {
+        metadata: {
+          ...clearDiagnostics(existing.metadata, ["stranded_ready"]),
+          claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt }
+        }
+      });
+      return { card, token };
+    });
+  }
+  async stopExecution(id, input = {}) {
+    return await this.enqueueMutation(async () => {
+      const existing = await this.get(id);
+      if (!existing) {
+        throw new Error(`card not found: ${id}`);
+      }
+      const expectedRunId = normalizeOptionalString(input.expectedRunId);
+      const runId = cardRunId(existing);
+      if (expectedRunId && expectedRunId !== runId) {
+        throw new Error("card execution changed before it could be stopped.");
+      }
+      if (existing.execution?.status !== "running") {
+        throw new Error("card has no active execution.");
+      }
+      const now = Date.now();
+      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "stop reason") ?? "Flowboard execution stopped by operator.";
+      return await this.updateCard(id, {
+        execution: { ...existing.execution, status: "blocked", updatedAt: now },
+        metadata: {
+          ...existing.metadata,
+          claim: void 0,
+          attempts: closeRunningAttempts(existing.metadata?.attempts, now, "stopped", reason),
+          comments: [
+            ...existing.metadata?.comments ?? [],
+            { id: randomUUID7(), body: reason, createdAt: now }
+          ].slice(-MAX_CARD_COMMENTS)
+        }
+      });
+    });
+  }
   async claim(id, input, options = {}) {
     const ownerId = normalizeBoundedString(input.ownerId, void 0, 120, "claim owner");
     if (!ownerId) {
@@ -8169,6 +8673,27 @@ function registerFlowboardGatewayMethods(params) {
     store,
     redactCard: redactClaimToken
   });
+  const sandbox = api.runtime.sandbox;
+  const executionOptions = (request) => {
+    const config = request.context.getRuntimeConfig();
+    return {
+      runtime: api.runtime,
+      workspaceAccess: resolveGatewayFlowboardWorkspaceAccess({
+        context: request.context,
+        client: request.client
+      }),
+      defaultAgentId: resolveDefaultAgentId2(config),
+      resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => resolveAgentFlowboardWorkspaceRuntime({
+        config,
+        agentId,
+        sessionKey,
+        workspaceDir,
+        modelProvider,
+        modelId,
+        prepareSandboxWorkspaceAuthority: sandbox?.prepareWorkspaceAuthority
+      })
+    };
+  };
   api.registerGatewayMethod(
     "flowboard.cards.list",
     async ({ params: requestParams, respond }) => {
@@ -8179,6 +8704,91 @@ function registerFlowboardGatewayMethods(params) {
       }
     },
     { scope: READ_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.prepare",
+    async (request) => {
+      try {
+        request.respond(
+          true,
+          await prepareFlowboardCardExecution({
+            store,
+            id: request.params.id,
+            options: executionOptions(request)
+          })
+        );
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: READ_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.inspect",
+    async (request) => {
+      try {
+        const result = await inspectFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          runtime: api.runtime
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: READ_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.start",
+    async (request) => {
+      try {
+        const result = await startFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          expectedUpdatedAt: request.params.expectedUpdatedAt,
+          options: executionOptions(request)
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.steer",
+    async (request) => {
+      try {
+        const result = await steerFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          message: request.params.message,
+          runtime: api.runtime
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.execution.abort",
+    async (request) => {
+      try {
+        const result = await abortFlowboardCardExecution({
+          store,
+          id: request.params.id,
+          reason: request.params.reason,
+          runtime: api.runtime
+        });
+        request.respond(true, { ...result, card: redactClaimToken(result.card) });
+      } catch (error) {
+        respondError(request.respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.changes.wait",

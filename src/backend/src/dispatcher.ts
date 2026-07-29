@@ -31,6 +31,24 @@ const DEFAULT_DISPATCH_OWNER = "flowboard-dispatcher";
 export type FlowboardSubagentRuntime = Pick<PluginRuntime["subagent"], "run">;
 export type FlowboardWorktreeRuntime = PluginRuntime["worktrees"];
 
+export async function createManagedFlowboardWorktree(params: {
+  worktrees: FlowboardWorktreeRuntime;
+  repoRoot: string;
+  name: string;
+  baseRef?: string;
+  ownerId: string;
+}) {
+  return await params.worktrees.create({
+    repoRoot: params.repoRoot,
+    name: params.name,
+    ...(params.baseRef ? { baseRef: params.baseRef } : {}),
+    // This host release has a fixed managed-worktree owner enum. Card IDs
+    // remain globally unique and Flowboard data stays in its own SQLite namespace.
+    ownerKind: "workboard",
+    ownerId: params.ownerId,
+  });
+}
+
 type FlowboardDispatchStartOptions = {
   maxStarts?: number;
   model?: string;
@@ -95,14 +113,14 @@ function cardHasActiveClaim(card: FlowboardCard, now: number): boolean {
   return Boolean(claim && isFutureDateTimestampMs(claim.expiresAt, { nowMs: now }));
 }
 
-function buildSessionKey(card: FlowboardCard): string {
+export function buildSessionKey(card: FlowboardCard): string {
   const boardId = sanitizeSessionSegment(cardBoardId(card), "default");
   const cardId = sanitizeSessionSegment(card.id, "card");
   const suffix = `subagent:flowboard-${boardId}-${cardId}`;
   return card.agentId ? `agent:${sanitizeSessionSegment(card.agentId, "agent")}:${suffix}` : suffix;
 }
 
-function buildExecution(params: {
+export function buildExecution(params: {
   card: FlowboardCard;
   sessionKey: string;
   runId: string;
@@ -156,13 +174,11 @@ async function materializeWorkspace(params: {
   if (!params.worktrees) {
     throw new Error("managed worktree runtime is unavailable");
   }
-  const worktree = await params.worktrees.create({
+  const worktree = await createManagedFlowboardWorktree({
+    worktrees: params.worktrees,
     repoRoot: canonicalSourcePath,
     name: managedWorktreeName(params.card.id),
     ...(sourceBranch ? { baseRef: sourceBranch } : {}),
-    // This host release has a fixed managed-worktree owner enum. Card IDs
-    // remain globally unique and flowboard data stays in its own SQLite namespace.
-    ownerKind: "workboard",
     ownerId: params.card.id,
   });
   let cwd: string;
@@ -193,7 +209,7 @@ async function materializeWorkspace(params: {
   };
 }
 
-function buildWorkerPrompt(params: {
+export function buildWorkerPrompt(params: {
   card: FlowboardCard;
   context: string;
   ownerId: string;
