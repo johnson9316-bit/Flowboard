@@ -16,6 +16,15 @@ type LocaleLoadRecovery = {
   onUnrecoverableLocaleLoad?: (locale: Locale) => void;
 };
 type LocaleTranslationLoader = (locale: Locale) => Promise<TranslationMap | null>;
+type SetLocaleOptions = {
+  persist?: boolean;
+};
+
+const FLOWBOARD_LOCALE_STORAGE_KEY = "flowboard.i18n.locale";
+
+function resolveFlowboardLocale(value: string | null | undefined): Locale {
+  return value?.trim().toLowerCase().startsWith("zh") ? "zh-CN" : DEFAULT_LOCALE;
+}
 
 export { SUPPORTED_LOCALES, isSupportedLocale };
 
@@ -43,7 +52,7 @@ class I18nManager {
       return null;
     }
     try {
-      return storage.getItem("openclaw.i18n.locale");
+      return storage.getItem(FLOWBOARD_LOCALE_STORAGE_KEY);
     } catch {
       return null;
     }
@@ -55,7 +64,7 @@ class I18nManager {
       return;
     }
     try {
-      storage.setItem("openclaw.i18n.locale", locale);
+      storage.setItem(FLOWBOARD_LOCALE_STORAGE_KEY, locale);
     } catch {
       // Ignore storage write failures in private/blocked contexts.
     }
@@ -63,12 +72,12 @@ class I18nManager {
 
   private resolveInitialLocale(): Locale {
     const saved = this.readStoredLocale();
-    if (isSupportedLocale(saved)) {
-      return saved;
+    if (saved) {
+      return resolveFlowboardLocale(saved);
     }
     const language =
       typeof globalThis.navigator?.language === "string" ? globalThis.navigator.language : null;
-    return resolveNavigatorLocale(language ?? "");
+    return resolveFlowboardLocale(resolveNavigatorLocale(language ?? ""));
   }
 
   private loadLocale() {
@@ -86,11 +95,11 @@ class I18nManager {
     return this.locale;
   }
 
-  public async setLocale(locale: Locale) {
-    return this.applyLocale(locale, false);
+  public async setLocale(locale: Locale, options: SetLocaleOptions = {}) {
+    return this.applyLocale(resolveFlowboardLocale(locale), false, options.persist !== false);
   }
 
-  private async applyLocale(locale: Locale, retrying: boolean) {
+  private async applyLocale(locale: Locale, retrying: boolean, persist: boolean) {
     const requestGeneration = ++this.localeRequestGeneration;
     const needsTranslationLoad = locale !== DEFAULT_LOCALE && !this.translations[locale];
     if (this.locale === locale && !needsTranslationLoad) {
@@ -114,7 +123,12 @@ class I18nManager {
         if (isCurrentRequest) {
           this.pendingLocale = locale;
         }
-        if (retrying && isCurrentRequest && this.localeLoadRecovery?.isUnrecoverableError(e)) {
+        if (
+          retrying &&
+          persist &&
+          isCurrentRequest &&
+          this.localeLoadRecovery?.isUnrecoverableError(e)
+        ) {
           this.persistLocale(locale);
           this.localeLoadRecovery.onUnrecoverableLocaleLoad?.(locale);
         }
@@ -128,7 +142,9 @@ class I18nManager {
     }
     this.pendingLocale = null;
     this.locale = locale;
-    this.persistLocale(locale);
+    if (persist) {
+      this.persistLocale(locale);
+    }
     this.notify();
   }
 
@@ -138,7 +154,7 @@ class I18nManager {
     }
     const target = this.pendingLocale;
     this.pendingLocale = null;
-    void this.applyLocale(target, true);
+    void this.applyLocale(target, true, true);
   }
 
   public setLocaleLoadRecovery(recovery: LocaleLoadRecovery | undefined): void {

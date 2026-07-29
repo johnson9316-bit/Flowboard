@@ -1,5 +1,5 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
   --bg: #17191d;
   --bg-elevated: #20242a;
   --panel: #20242a;
@@ -17,6 +17,26 @@
   --ease-out: ease-out;
 }
 
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f5f7fa;
+    --bg-elevated: #ffffff;
+    --panel: #ffffff;
+    --panel-strong: #eef2f6;
+    --text: #18212b;
+    --muted: #5d6a79;
+    --border: #d5dde7;
+    --border-strong: #aab7c6;
+    --accent: #1772a8;
+    --accent-foreground: #ffffff;
+    --danger: #b73b42;
+    --warn: #94621b;
+    --info: #1772a8;
+    --success: #2f7b50;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -25,7 +45,7 @@ html,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body, Inter, ui-sans-serif, system-ui, sans-serif);
   margin: 0;
   min-height: 100%;
 }
@@ -110,7 +130,7 @@ button:disabled {
 .btn--primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #07131c;
+  color: var(--accent-foreground, #07131c);
 }
 
 .callout {

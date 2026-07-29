@@ -6,6 +6,7 @@ import type {
   FlowboardStatus,
 } from "../../src/contract/index.ts";
 import { FlowboardGatewayClient, type FlowboardGatewayState } from "./gateway-client.ts";
+import { startFlowboardHostSync } from "./host-context.ts";
 import { i18n } from "./i18n/index.ts";
 import {
   createFlowboardProjectUiState,
@@ -57,6 +58,7 @@ class FlowboardProjectHost extends LitElement {
   private changeCursor: ChangeCursor | undefined;
   private refreshGeneration = 0;
   private unsubscribeI18n?: () => void;
+  private stopHostSync?: () => void;
   private readonly state: FlowboardProjectUiState = createFlowboardProjectUiState();
   private readonly gateway = new FlowboardGatewayClient({
     onState: (state) => this.handleGatewayState(state),
@@ -75,6 +77,12 @@ class FlowboardProjectHost extends LitElement {
     super.connectedCallback();
     this.stopped = false;
     this.unsubscribeI18n = i18n.subscribe(() => this.requestUpdate());
+    this.stopHostSync = startFlowboardHostSync({
+      onLocale: (locale) => {
+        document.documentElement.lang = locale;
+        void i18n.setLocale(locale, { persist: false });
+      },
+    });
     document.addEventListener("visibilitychange", this.handleVisibilityChange);
     this.gateway.start();
   }
@@ -85,6 +93,8 @@ class FlowboardProjectHost extends LitElement {
     this.refreshGeneration += 1;
     this.unsubscribeI18n?.();
     this.unsubscribeI18n = undefined;
+    this.stopHostSync?.();
+    this.stopHostSync = undefined;
     document.removeEventListener("visibilitychange", this.handleVisibilityChange);
     this.gateway.stop();
     super.disconnectedCallback();
