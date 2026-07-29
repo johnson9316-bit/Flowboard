@@ -96,6 +96,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       if (guarded.metadata?.archivedAt) {
         throw new Error("card is archived.");
       }
+      if (await this.isProjectArchived(cardBoardId(guarded))) {
+        throw new Error("project is archived and cannot start new work.");
+      }
       const expectedAuthority = options.expectedAuthority;
       if (
         expectedAuthority &&

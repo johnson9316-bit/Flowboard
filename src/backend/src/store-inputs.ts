@@ -25,6 +25,7 @@ type FlowboardCardInput = {
   position?: unknown;
   tenant?: unknown;
   boardId?: unknown;
+  milestoneId?: unknown;
   createdByCardId?: unknown;
   idempotencyKey?: unknown;
   skills?: unknown;
@@ -39,7 +40,9 @@ type FlowboardCardInput = {
   parents?: unknown;
 };
 
-export type FlowboardCardPatch = Partial<FlowboardCardInput>;
+export type FlowboardCardPatch = Partial<
+  Omit<FlowboardCardInput, "boardId" | "milestoneId" | "position">
+>;
 export type FlowboardCommentInput = { body?: unknown };
 export type FlowboardLinkInput = {
   type?: unknown;
@@ -158,9 +161,64 @@ export type FlowboardBoardInput = {
   description?: unknown;
   icon?: unknown;
   color?: unknown;
+  position?: unknown;
+  version?: unknown;
+  currentObjective?: unknown;
+  coreValue?: unknown;
+  sourceOfTruth?: unknown;
+  repositoryUrl?: unknown;
+  planningPath?: unknown;
+  homepageUrl?: unknown;
   defaultWorkspace?: unknown;
   orchestration?: unknown;
   archived?: unknown;
+};
+export type FlowboardProjectCreateInput = FlowboardBoardInput & {
+  initialMilestoneTitle?: unknown;
+};
+export type FlowboardMilestoneCreateInput = {
+  boardId?: unknown;
+  title?: unknown;
+  description?: unknown;
+  color?: unknown;
+  position?: unknown;
+};
+export type FlowboardMilestoneUpdateInput = {
+  title?: unknown;
+  description?: unknown;
+  color?: unknown;
+};
+export type FlowboardMilestoneReorderInput = {
+  boardId?: unknown;
+  milestoneIds?: unknown;
+};
+export type FlowboardProjectDocumentCreateInput = {
+  boardId?: unknown;
+  key?: unknown;
+  section?: unknown;
+  type?: unknown;
+  title?: unknown;
+  summary?: unknown;
+  target?: unknown;
+  content?: unknown;
+  position?: unknown;
+};
+export type FlowboardProjectDocumentUpdateInput = Omit<
+  FlowboardProjectDocumentCreateInput,
+  "boardId" | "key" | "section"
+>;
+export type FlowboardProjectDocumentReorderInput = {
+  boardId?: unknown;
+  documentIds?: unknown;
+};
+export type FlowboardMoveMilestoneInput = {
+  milestoneId?: unknown;
+  position?: unknown;
+};
+export type FlowboardMoveProjectInput = {
+  boardId?: unknown;
+  milestoneId?: unknown;
+  position?: unknown;
 };
 export type FlowboardSpecifyInput = FlowboardCardPatch & {
   summary?: unknown;

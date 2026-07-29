@@ -77,6 +77,14 @@
       "flowboard_worker_log",
       "flowboard_protocol_violation",
       "flowboard_unblock",
+      "flowboard_projects",
+      "flowboard_project_create",
+      "flowboard_project_read",
+      "flowboard_milestone_create",
+      "flowboard_move_milestone",
+      "flowboard_move_project",
+      "flowboard_project_documents",
+      "flowboard_project_document_create",
       "flowboard_move"
     ]
   },
@@ -182,6 +190,30 @@
       "optional": true
     },
     "flowboard_unblock": {
+      "optional": true
+    },
+    "flowboard_projects": {
+      "optional": true
+    },
+    "flowboard_project_create": {
+      "optional": true
+    },
+    "flowboard_project_read": {
+      "optional": true
+    },
+    "flowboard_milestone_create": {
+      "optional": true
+    },
+    "flowboard_move_milestone": {
+      "optional": true
+    },
+    "flowboard_move_project": {
+      "optional": true
+    },
+    "flowboard_project_documents": {
+      "optional": true
+    },
+    "flowboard_project_document_create": {
       "optional": true
     },
     "flowboard_move": {

@@ -49,9 +49,16 @@ export function registerFlowboardWorkspaceCardMethods(params: WorkspaceGatewayMe
       const { params: requestParams, respond } = request;
       try {
         const input = withoutFlowboardWorkspaceAccess(requestParams);
-        const access = await resolveGatewayWorkspaceMutationAccess(request, input);
+        const project = await store.getProject(input.boardId);
+        const inputWithProjectWorkspace =
+          input.workspace === undefined && project.board.defaultWorkspace
+            ? { ...input, workspace: project.board.defaultWorkspace }
+            : input;
+        const access = await resolveGatewayWorkspaceMutationAccess(request, inputWithProjectWorkspace);
         respond(true, {
-          card: redactCard(await store.create(withFlowboardWorkspaceAccess(input, access))),
+          card: redactCard(
+            await store.create(withFlowboardWorkspaceAccess(inputWithProjectWorkspace, access)),
+          ),
         });
       } catch (error) {
         respondError(respond, error);

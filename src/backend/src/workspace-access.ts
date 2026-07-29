@@ -77,6 +77,14 @@ export const FLOWBOARD_TOOL_NAMES = [
   "flowboard_protocol_violation",
   "flowboard_unblock",
   "flowboard_move",
+  "flowboard_projects",
+  "flowboard_project_create",
+  "flowboard_project_read",
+  "flowboard_milestone_create",
+  "flowboard_move_milestone",
+  "flowboard_move_project",
+  "flowboard_project_documents",
+  "flowboard_project_document_create",
 ] as const;
 
 export const FLOWBOARD_REQUIRED_WORKER_TOOLS = [

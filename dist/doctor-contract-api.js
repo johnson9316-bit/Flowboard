@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 3;
+var SCHEMA_VERSION = 4;
 var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var FLOWBOARD_SQLITE_DIR_MODE = 448;
 var FLOWBOARD_SQLITE_FILE_MODE = 384;
@@ -100,6 +100,14 @@ var FLOWBOARD_SCHEMA_SQL = `
       description TEXT,
       icon TEXT,
       color TEXT,
+      position REAL,
+      version TEXT,
+      current_objective TEXT,
+      core_value TEXT,
+      source_of_truth TEXT,
+      repository_url TEXT,
+      planning_path TEXT,
+      homepage_url TEXT,
       default_workspace_json TEXT,
       orchestration_json TEXT,
       created_at INTEGER NOT NULL,
@@ -119,6 +127,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT,
       task_id TEXT,
       source_url TEXT,
+      milestone_id TEXT,
       position REAL NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -162,6 +171,8 @@ var FLOWBOARD_SCHEMA_SQL = `
       at INTEGER NOT NULL,
       from_status TEXT,
       to_status TEXT,
+      from_milestone_id TEXT,
+      to_milestone_id TEXT,
       session_key TEXT,
       run_id TEXT
     ) STRICT;
@@ -301,6 +312,42 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_milestones (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      color TEXT,
+      position REAL NOT NULL,
+      state TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      archived_at INTEGER
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_milestones_board_position_idx
+      ON flowboard_milestones(board_id, position);
+
+    CREATE TABLE IF NOT EXISTS flowboard_project_documents (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      document_key TEXT NOT NULL,
+      section TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      target TEXT,
+      content TEXT,
+      position REAL NOT NULL,
+      hidden_at INTEGER,
+      system INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(board_id, document_key)
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_project_documents_board_section_position_idx
+      ON flowboard_project_documents(board_id, section, position);
   `;
 function ensureFlowboardSchema(db) {
   db.exec(FLOWBOARD_SCHEMA_SQL);
@@ -310,6 +357,21 @@ function ensureFlowboardSchema(db) {
     "lifecycle_status_source_updated_at",
     "lifecycle_status_source_updated_at INTEGER"
   );
+  ensureColumn(db, "flowboard_cards", "milestone_id", "milestone_id TEXT");
+  ensureColumn(db, "flowboard_card_events", "from_milestone_id", "from_milestone_id TEXT");
+  ensureColumn(db, "flowboard_card_events", "to_milestone_id", "to_milestone_id TEXT");
+  ensureColumn(db, "flowboard_boards", "position", "position REAL");
+  ensureColumn(db, "flowboard_boards", "version", "version TEXT");
+  ensureColumn(db, "flowboard_boards", "current_objective", "current_objective TEXT");
+  ensureColumn(db, "flowboard_boards", "core_value", "core_value TEXT");
+  ensureColumn(db, "flowboard_boards", "source_of_truth", "source_of_truth TEXT");
+  ensureColumn(db, "flowboard_boards", "repository_url", "repository_url TEXT");
+  ensureColumn(db, "flowboard_boards", "planning_path", "planning_path TEXT");
+  ensureColumn(db, "flowboard_boards", "homepage_url", "homepage_url TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
+      ON flowboard_cards(board_id, milestone_id, position);
+  `);
   const migrationId = `schema-${SCHEMA_VERSION}`;
   const current = db.prepare("SELECT 1 AS found FROM flowboard_schema_migrations WHERE id = ?").get(migrationId);
   if (!current) {
@@ -381,6 +443,8 @@ function readEvents(db, cardId) {
     };
     const fromStatus = stringValue(row, "from_status");
     const toStatus = stringValue(row, "to_status");
+    const fromMilestoneId = stringValue(row, "from_milestone_id");
+    const toMilestoneId = stringValue(row, "to_milestone_id");
     const sessionKey = stringValue(row, "session_key");
     const runId = stringValue(row, "run_id");
     if (fromStatus) {
@@ -388,6 +452,12 @@ function readEvents(db, cardId) {
     }
     if (toStatus) {
       event.toStatus = toStatus;
+    }
+    if (fromMilestoneId) {
+      event.fromMilestoneId = fromMilestoneId;
+    }
+    if (toMilestoneId) {
+      event.toMilestoneId = toMilestoneId;
     }
     if (sessionKey) {
       event.sessionKey = sessionKey;
@@ -651,6 +721,7 @@ function readCard(db, row) {
     ...stringValue(row, "run_id") ? { runId: stringValue(row, "run_id") } : {},
     ...stringValue(row, "task_id") ? { taskId: stringValue(row, "task_id") } : {},
     ...stringValue(row, "source_url") ? { sourceUrl: stringValue(row, "source_url") } : {},
+    ...stringValue(row, "milestone_id") ? { milestoneId: stringValue(row, "milestone_id") } : {},
     ...readExecution(row) ? { execution: readExecution(row) } : {},
     ...numberValue(row, "started_at") !== void 0 ? { startedAt: numberValue(row, "started_at") } : {},
     ...numberValue(row, "completed_at") !== void 0 ? { completedAt: numberValue(row, "completed_at") } : {},
@@ -678,14 +749,14 @@ function insertCard(db, card) {
     `
       INSERT INTO flowboard_cards (
         id, board_id, title, notes, status, priority, agent_id, session_key, run_id, task_id,
-        source_url, position, created_at, updated_at, started_at, completed_at,
+        source_url, milestone_id, position, created_at, updated_at, started_at, completed_at,
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
         execution_model, execution_session_key, execution_run_id, execution_started_at,
         execution_updated_at, automation_json, claim_json, template_id, archived_at, stale_json,
         lifecycle_status_source_updated_at, failure_count
       ) VALUES (
         @id, @board_id, @title, @notes, @status, @priority, @agent_id, @session_key, @run_id,
-        @task_id, @source_url, @position, @created_at, @updated_at, @started_at, @completed_at,
+        @task_id, @source_url, @milestone_id, @position, @created_at, @updated_at, @started_at, @completed_at,
         @execution_id, @execution_kind, @execution_engine, @execution_mode, @execution_status,
         @execution_model, @execution_session_key, @execution_run_id, @execution_started_at,
         @execution_updated_at, @automation_json, @claim_json, @template_id, @archived_at,
@@ -702,6 +773,7 @@ function insertCard(db, card) {
         run_id = excluded.run_id,
         task_id = excluded.task_id,
         source_url = excluded.source_url,
+        milestone_id = excluded.milestone_id,
         position = excluded.position,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
@@ -737,6 +809,7 @@ function insertCard(db, card) {
     run_id: bindNull(card.runId),
     task_id: bindNull(card.taskId),
     source_url: bindNull(card.sourceUrl),
+    milestone_id: bindNull(card.milestoneId),
     position: card.position,
     created_at: card.createdAt,
     updated_at: card.updatedAt,
@@ -771,8 +844,8 @@ function insertCard(db, card) {
     db.prepare(
       `
         INSERT INTO flowboard_card_events
-          (id, card_id, ordinal, kind, at, from_status, to_status, session_key, run_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, card_id, ordinal, kind, at, from_status, to_status, from_milestone_id, to_milestone_id, session_key, run_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
       event.id,
@@ -782,6 +855,8 @@ function insertCard(db, card) {
       event.at,
       bindNull(event.fromStatus),
       bindNull(event.toStatus),
+      bindNull(event.fromMilestoneId),
+      bindNull(event.toMilestoneId),
       bindNull(event.sessionKey),
       bindNull(event.runId)
     );
@@ -1026,14 +1101,24 @@ var FlowboardSqliteBoardStore = class {
     this.db.prepare(
       `
           INSERT INTO flowboard_boards (
-            id, name, description, icon, color, default_workspace_json, orchestration_json,
+            id, name, description, icon, color, position, version, current_objective, core_value,
+            source_of_truth, repository_url, planning_path, homepage_url,
+            default_workspace_json, orchestration_json,
             created_at, updated_at, archived_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
             icon = excluded.icon,
             color = excluded.color,
+            position = excluded.position,
+            version = excluded.version,
+            current_objective = excluded.current_objective,
+            core_value = excluded.core_value,
+            source_of_truth = excluded.source_of_truth,
+            repository_url = excluded.repository_url,
+            planning_path = excluded.planning_path,
+            homepage_url = excluded.homepage_url,
             default_workspace_json = excluded.default_workspace_json,
             orchestration_json = excluded.orchestration_json,
             created_at = excluded.created_at,
@@ -1046,6 +1131,14 @@ var FlowboardSqliteBoardStore = class {
       bindNull(board.description),
       bindNull(board.icon),
       bindNull(board.color),
+      bindNull(board.position),
+      bindNull(board.version),
+      bindNull(board.currentObjective),
+      bindNull(board.coreValue),
+      bindNull(board.sourceOfTruth),
+      bindNull(board.repositoryUrl),
+      bindNull(board.planningPath),
+      bindNull(board.homepageUrl),
       jsonValue(board.defaultWorkspace),
       jsonValue(board.orchestration),
       board.createdAt,
@@ -1068,6 +1161,14 @@ var FlowboardSqliteBoardStore = class {
         ...stringValue(row, "description") ? { description: stringValue(row, "description") } : {},
         ...stringValue(row, "icon") ? { icon: stringValue(row, "icon") } : {},
         ...stringValue(row, "color") ? { color: stringValue(row, "color") } : {},
+        ...numberValue(row, "position") !== void 0 ? { position: numberValue(row, "position") } : {},
+        ...stringValue(row, "version") ? { version: stringValue(row, "version") } : {},
+        ...stringValue(row, "current_objective") ? { currentObjective: stringValue(row, "current_objective") } : {},
+        ...stringValue(row, "core_value") ? { coreValue: stringValue(row, "core_value") } : {},
+        ...stringValue(row, "source_of_truth") ? { sourceOfTruth: stringValue(row, "source_of_truth") } : {},
+        ...stringValue(row, "repository_url") ? { repositoryUrl: stringValue(row, "repository_url") } : {},
+        ...stringValue(row, "planning_path") ? { planningPath: stringValue(row, "planning_path") } : {},
+        ...stringValue(row, "homepage_url") ? { homepageUrl: stringValue(row, "homepage_url") } : {},
         ...defaultWorkspace ? { defaultWorkspace } : {},
         ...orchestration ? { orchestration } : {},
         createdAt: requiredNumber(row, "created_at"),
@@ -1091,6 +1192,159 @@ var FlowboardSqliteBoardStore = class {
       }
     }
     return entries;
+  }
+};
+function readMilestone(row) {
+  return {
+    id: requiredString(row, "id"),
+    boardId: requiredString(row, "board_id"),
+    title: requiredString(row, "title"),
+    position: requiredNumber(row, "position"),
+    state: requiredString(row, "state"),
+    createdAt: requiredNumber(row, "created_at"),
+    updatedAt: requiredNumber(row, "updated_at"),
+    ...stringValue(row, "description") ? { description: stringValue(row, "description") } : {},
+    ...stringValue(row, "color") ? { color: stringValue(row, "color") } : {},
+    ...numberValue(row, "completed_at") !== void 0 ? { completedAt: numberValue(row, "completed_at") } : {},
+    ...numberValue(row, "archived_at") !== void 0 ? { archivedAt: numberValue(row, "archived_at") } : {}
+  };
+}
+var FlowboardSqliteMilestoneStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async register(key, value) {
+    if (value.version !== 1 || value.milestone.id !== key) {
+      throw new Error("invalid flowboard milestone payload");
+    }
+    const milestone = value.milestone;
+    this.db.prepare(
+      `
+          INSERT INTO flowboard_milestones (
+            id, board_id, title, description, color, position, state, created_at, updated_at,
+            completed_at, archived_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            board_id = excluded.board_id,
+            title = excluded.title,
+            description = excluded.description,
+            color = excluded.color,
+            position = excluded.position,
+            state = excluded.state,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at,
+            completed_at = excluded.completed_at,
+            archived_at = excluded.archived_at
+        `
+    ).run(
+      milestone.id,
+      milestone.boardId,
+      milestone.title,
+      bindNull(milestone.description),
+      bindNull(milestone.color),
+      milestone.position,
+      milestone.state,
+      milestone.createdAt,
+      milestone.updatedAt,
+      bindNull(milestone.completedAt),
+      bindNull(milestone.archivedAt)
+    );
+  }
+  async lookup(key) {
+    const row = this.db.prepare("SELECT * FROM flowboard_milestones WHERE id = ?").get(key);
+    return row ? { version: 1, milestone: readMilestone(row) } : void 0;
+  }
+  async delete(key) {
+    const result = this.db.prepare("DELETE FROM flowboard_milestones WHERE id = ?").run(key);
+    return result.changes > 0;
+  }
+  async entries() {
+    return this.db.prepare("SELECT * FROM flowboard_milestones ORDER BY board_id ASC, position ASC, id ASC").all().map((row) => ({
+      key: requiredString(row, "id"),
+      value: { version: 1, milestone: readMilestone(row) }
+    }));
+  }
+};
+function readProjectDocument(row) {
+  return {
+    id: requiredString(row, "id"),
+    boardId: requiredString(row, "board_id"),
+    key: requiredString(row, "document_key"),
+    section: requiredString(row, "section"),
+    type: requiredString(row, "type"),
+    title: requiredString(row, "title"),
+    position: requiredNumber(row, "position"),
+    createdAt: requiredNumber(row, "created_at"),
+    updatedAt: requiredNumber(row, "updated_at"),
+    ...stringValue(row, "summary") ? { summary: stringValue(row, "summary") } : {},
+    ...stringValue(row, "target") ? { target: stringValue(row, "target") } : {},
+    ...stringValue(row, "content") ? { content: stringValue(row, "content") } : {},
+    ...numberValue(row, "hidden_at") !== void 0 ? { hiddenAt: numberValue(row, "hidden_at") } : {},
+    ...numberValue(row, "system") === 1 ? { system: true } : {}
+  };
+}
+var FlowboardSqliteProjectDocumentStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async register(key, value) {
+    if (value.version !== 1 || value.document.id !== key) {
+      throw new Error("invalid flowboard project document payload");
+    }
+    const document = value.document;
+    this.db.prepare(
+      `
+          INSERT INTO flowboard_project_documents (
+            id, board_id, document_key, section, type, title, summary, target, content, position,
+            hidden_at, system, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            board_id = excluded.board_id,
+            document_key = excluded.document_key,
+            section = excluded.section,
+            type = excluded.type,
+            title = excluded.title,
+            summary = excluded.summary,
+            target = excluded.target,
+            content = excluded.content,
+            position = excluded.position,
+            hidden_at = excluded.hidden_at,
+            system = excluded.system,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at
+        `
+    ).run(
+      document.id,
+      document.boardId,
+      document.key,
+      document.section,
+      document.type,
+      document.title,
+      bindNull(document.summary),
+      bindNull(document.target),
+      bindNull(document.content),
+      document.position,
+      bindNull(document.hiddenAt),
+      document.system ? 1 : 0,
+      document.createdAt,
+      document.updatedAt
+    );
+  }
+  async lookup(key) {
+    const row = this.db.prepare("SELECT * FROM flowboard_project_documents WHERE id = ?").get(key);
+    return row ? { version: 1, document: readProjectDocument(row) } : void 0;
+  }
+  async delete(key) {
+    const result = this.db.prepare("DELETE FROM flowboard_project_documents WHERE id = ?").run(key);
+    return result.changes > 0;
+  }
+  async entries() {
+    return this.db.prepare(
+      "SELECT * FROM flowboard_project_documents ORDER BY board_id ASC, section ASC, position ASC, id ASC"
+    ).all().map((row) => ({
+      key: requiredString(row, "id"),
+      value: { version: 1, document: readProjectDocument(row) }
+    }));
   }
 };
 var FlowboardSqliteSubscriptionStore = class {
@@ -1261,6 +1515,8 @@ function createFlowboardSqliteStores(options = {}) {
   return {
     cards: new FlowboardSqliteCardStore(db),
     boards: new FlowboardSqliteBoardStore(db),
+    milestones: new FlowboardSqliteMilestoneStore(db),
+    documents: new FlowboardSqliteProjectDocumentStore(db),
     subscriptions: new FlowboardSqliteSubscriptionStore(db),
     attachments: new FlowboardSqliteAttachmentStore(db),
     // This connection-local primitive changes only after another connection commits.

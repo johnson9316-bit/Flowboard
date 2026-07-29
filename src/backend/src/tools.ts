@@ -91,6 +91,7 @@ function summarizeCard(card: FlowboardCard) {
     agentId: card.agentId,
     tenant: card.metadata?.automation?.tenant,
     boardId: card.metadata?.automation?.boardId ?? "default",
+    milestoneId: card.milestoneId,
     parents: card.metadata?.links
       ?.filter((link) => link.type === "parent" && link.targetCardId)
       .map((link) => link.targetCardId),
@@ -268,6 +269,9 @@ export function createFlowboardTools(params: {
           ),
           tenant: Type.Optional(Type.String({ description: "Soft tenant namespace." })),
           boardId: Type.Optional(Type.String({ description: "Soft board namespace." })),
+          milestoneId: Type.Optional(
+            Type.String({ description: "Active milestone id; omit for the Unassigned column." }),
+          ),
           createdByCardId: Type.Optional(
             Type.String({ description: "Parent card that created this card." }),
           ),
@@ -616,6 +620,147 @@ export function createFlowboardTools(params: {
       },
     },
     createFlowboardMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
+    {
+      name: "flowboard_projects",
+      label: "Flowboard Projects",
+      description: "List Flowboard projects and their card summaries.",
+      parameters: Type.Object(
+        {
+          includeArchived: Type.Optional(Type.Boolean()),
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) =>
+        jsonResult(await store.listProjects(rawParams as Record<string, unknown>)),
+    },
+    {
+      name: "flowboard_project_create",
+      label: "Flowboard Project Create",
+      description: "Create a Flowboard project with its first milestone and standard documents.",
+      parameters: Type.Object(
+        {
+          id: Type.String({ description: "Stable project id." }),
+          name: Type.String({ description: "Project name." }),
+          initialMilestoneTitle: Type.String({ description: "First milestone title." }),
+          description: Type.Optional(Type.String()),
+          color: Type.Optional(Type.String()),
+          repositoryUrl: Type.Optional(Type.String()),
+          planningPath: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) =>
+        jsonResult({ project: await store.createProject(rawParams as Record<string, unknown>) }),
+    },
+    {
+      name: "flowboard_project_read",
+      label: "Flowboard Project Read",
+      description: "Read one Flowboard project's settings, milestones, and cards.",
+      parameters: Type.Object({ id: Type.String() }, { additionalProperties: false }),
+      execute: async (_toolCallId, rawParams) =>
+        jsonResult({
+          project: await store.getProject(readStringParam(rawParams as Record<string, unknown>, "id", {
+            required: true,
+          })),
+        }),
+    },
+    {
+      name: "flowboard_milestone_create",
+      label: "Flowboard Milestone Create",
+      description: "Create an active milestone column in a Flowboard project.",
+      parameters: Type.Object(
+        {
+          boardId: Type.String(),
+          title: Type.String(),
+          description: Type.Optional(Type.String()),
+          color: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) =>
+        jsonResult({ milestone: await store.createMilestone(rawParams as Record<string, unknown>) }),
+    },
+    {
+      name: "flowboard_move_milestone",
+      label: "Flowboard Move Milestone",
+      description: "Move a card between milestone columns without changing its execution status.",
+      parameters: Type.Object(
+        {
+          id: cardIdField(),
+          milestoneId: Type.Optional(
+            Type.String({ description: "Target milestone id; omit to move into Unassigned." }),
+          ),
+          position: Type.Optional(Type.Number()),
+          token: ScopedClaimTokenField,
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) => {
+        const { record, id } = await readScopedCardToolParams(rawParams);
+        return redactedCardResult(await store.moveMilestone(id, record));
+      },
+    },
+    {
+      name: "flowboard_move_project",
+      label: "Flowboard Move Project",
+      description: "Move a card to another active project while retaining its execution history.",
+      parameters: Type.Object(
+        {
+          id: cardIdField(),
+          boardId: Type.String({ description: "Target project id." }),
+          milestoneId: Type.Optional(Type.String()),
+          position: Type.Optional(Type.Number()),
+          token: ScopedClaimTokenField,
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) => {
+        const { record, id } = await readScopedCardToolParams(rawParams);
+        return redactedCardResult(await store.moveProject(id, record));
+      },
+    },
+    {
+      name: "flowboard_project_documents",
+      label: "Flowboard Project Documents",
+      description: "List a project's long-lived context documents.",
+      parameters: Type.Object(
+        {
+          boardId: Type.String(),
+          includeHidden: Type.Optional(Type.Boolean()),
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) => {
+        const record = rawParams as Record<string, unknown>;
+        return jsonResult(
+          await store.listProjectDocuments(record.boardId, {
+            includeHidden: record.includeHidden,
+          }),
+        );
+      },
+    },
+    {
+      name: "flowboard_project_document_create",
+      label: "Flowboard Project Document Create",
+      description: "Add a typed project document without reading files or secrets.",
+      parameters: Type.Object(
+        {
+          boardId: Type.String(),
+          key: Type.String(),
+          section: Type.String({ description: "project, codebase, environment, or knowledge." }),
+          type: Type.String({ description: "markdown, json, link, path, or secret_ref." }),
+          title: Type.String(),
+          summary: Type.Optional(Type.String()),
+          target: Type.Optional(Type.String()),
+          content: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+      execute: async (_toolCallId, rawParams) =>
+        jsonResult({
+          document: await store.createProjectDocument(rawParams as Record<string, unknown>),
+        }),
+    },
     {
       name: "flowboard_boards",
       label: "Flowboard Boards",

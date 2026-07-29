@@ -14,6 +14,7 @@ import {
   registerFlowboardWorkspaceCardMethods,
   registerFlowboardWorkspaceWorkflowMethods,
 } from "./gateway-workspace-methods.js";
+import { registerFlowboardProjectGatewayMethods } from "./gateway-project-methods.js";
 import { FlowboardStore } from "./store.js";
 
 const READ_SCOPE = "operator.read" as const;
@@ -108,6 +109,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   registerFlowboardWorkspaceCardMethods({ api, store, redactCard: redactClaimToken });
+  registerFlowboardProjectGatewayMethods({ api, store, redactCard: redactClaimToken });
 
   api.registerGatewayMethod(
     "flowboard.cards.move",

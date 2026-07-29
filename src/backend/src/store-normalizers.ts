@@ -103,6 +103,32 @@ export function normalizeBoardMetadata(
   );
   const icon = normalizeBoundedString(input.icon, fallback?.icon, 40, "board icon");
   const color = normalizeBoundedString(input.color, fallback?.color, 40, "board color");
+  const position = Object.hasOwn(input, "position")
+    ? normalizePosition(input.position, fallback?.position ?? 0)
+    : fallback?.position;
+  const version = normalizeBoundedString(input.version, fallback?.version, 120, "project version");
+  const currentObjective = normalizeBoundedString(
+    input.currentObjective,
+    fallback?.currentObjective,
+    2000,
+    "current objective",
+  );
+  const coreValue = normalizeBoundedString(input.coreValue, fallback?.coreValue, 2000, "core value");
+  const sourceOfTruth = Object.hasOwn(input, "sourceOfTruth")
+    ? normalizeExternalUrl(input.sourceOfTruth, fallback?.sourceOfTruth, "source of truth")
+    : fallback?.sourceOfTruth;
+  const repositoryUrl = Object.hasOwn(input, "repositoryUrl")
+    ? normalizeExternalUrl(input.repositoryUrl, fallback?.repositoryUrl, "repository URL")
+    : fallback?.repositoryUrl;
+  const planningPath = normalizeBoundedString(
+    input.planningPath,
+    fallback?.planningPath,
+    2000,
+    "planning path",
+  );
+  const homepageUrl = Object.hasOwn(input, "homepageUrl")
+    ? normalizeExternalUrl(input.homepageUrl, fallback?.homepageUrl, "homepage URL")
+    : fallback?.homepageUrl;
   const defaultWorkspace = Object.hasOwn(input, "defaultWorkspace")
     ? normalizeWorkspace(input.defaultWorkspace, fallback?.defaultWorkspace)
     : fallback?.defaultWorkspace;
@@ -120,6 +146,14 @@ export function normalizeBoardMetadata(
     ...(description ? { description } : {}),
     ...(icon ? { icon } : {}),
     ...(color ? { color } : {}),
+    ...(position !== undefined ? { position } : {}),
+    ...(version ? { version } : {}),
+    ...(currentObjective ? { currentObjective } : {}),
+    ...(coreValue ? { coreValue } : {}),
+    ...(sourceOfTruth ? { sourceOfTruth } : {}),
+    ...(repositoryUrl ? { repositoryUrl } : {}),
+    ...(planningPath ? { planningPath } : {}),
+    ...(homepageUrl ? { homepageUrl } : {}),
     ...(defaultWorkspace ? { defaultWorkspace } : {}),
     ...(orchestration ? { orchestration } : {}),
     createdAt: fallback?.createdAt ?? now,
@@ -269,6 +303,27 @@ export function normalizeBoundedString(
     throw new Error(`${fieldName} must be ${maxLength} characters or fewer.`);
   }
   return normalized;
+}
+
+export function normalizeExternalUrl(
+  value: unknown,
+  fallback: string | undefined,
+  fieldName: string,
+): string | undefined {
+  const normalized = normalizeBoundedString(value, fallback, 2000, fieldName);
+  if (!normalized) {
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error(`${fieldName} must be a valid http or https URL.`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`${fieldName} must be a valid http or https URL.`);
+  }
+  return parsed.toString();
 }
 
 export function normalizeStatus(value: unknown, fallback: FlowboardStatus): FlowboardStatus {
@@ -578,6 +633,18 @@ function normalizeEvent(value: unknown): FlowboardEvent | null {
     FLOWBOARD_STATUSES.includes(record.toStatus as FlowboardStatus)
       ? (record.toStatus as FlowboardStatus)
       : undefined;
+  const fromMilestoneId = normalizeBoundedString(
+    record.fromMilestoneId,
+    undefined,
+    120,
+    "event source milestone",
+  );
+  const toMilestoneId = normalizeBoundedString(
+    record.toMilestoneId,
+    undefined,
+    120,
+    "event target milestone",
+  );
   const sessionKey = normalizeOptionalString(record.sessionKey);
   const runId = normalizeOptionalString(record.runId);
   return {
@@ -586,6 +653,8 @@ function normalizeEvent(value: unknown): FlowboardEvent | null {
     at,
     ...(fromStatus ? { fromStatus } : {}),
     ...(toStatus ? { toStatus } : {}),
+    ...(fromMilestoneId ? { fromMilestoneId } : {}),
+    ...(toMilestoneId ? { toMilestoneId } : {}),
     ...(sessionKey ? { sessionKey } : {}),
     ...(runId ? { runId } : {}),
   };

@@ -4,7 +4,9 @@ import type { FlowboardAttachment, FlowboardCard } from "../../contract/index.js
 import type {
   PersistedFlowboardAttachment,
   PersistedFlowboardBoard,
+  PersistedFlowboardMilestone,
   PersistedFlowboardNotificationSubscription,
+  PersistedFlowboardProjectDocument,
   FlowboardKeyedStore,
 } from "./persistence-types.js";
 import { createFlowboardSqliteStores } from "./sqlite-store.js";
@@ -39,12 +41,12 @@ import {
   normalizeTimestamp,
   trimMetadataToBudget,
 } from "./store-normalizers.js";
-import { FlowboardNotificationStore } from "./store-notifications.js";
+import { FlowboardProjectStore } from "./store-projects.js";
 
 export type { FlowboardDispatchResult } from "./store-inputs.js";
 
 // Capability layers split review boundaries only; the core still owns persistence and mutation order.
-export class FlowboardStore extends FlowboardNotificationStore {
+export class FlowboardStore extends FlowboardProjectStore {
   private async shouldAutoOrchestrate(card: FlowboardCard): Promise<boolean> {
     if (
       card.status !== "triage" ||
@@ -69,6 +71,9 @@ export class FlowboardStore extends FlowboardNotificationStore {
       const orchestrated: FlowboardCard[] = [];
       const orchestratedByBoard = new Map<string, number>();
       for (const card of await this.list({ boardId })) {
+        if (await this.isProjectArchived(cardBoardId(card))) {
+          continue;
+        }
         // Archived cards remain readable and restorable, but must never re-enter automation.
         if (card.metadata?.archivedAt) {
           continue;
@@ -279,6 +284,14 @@ export class FlowboardStore extends FlowboardNotificationStore {
           namespace: "flowboard.boards",
           maxEntries: 200,
         }) as FlowboardKeyedStore<PersistedFlowboardBoard>,
+        milestones: openKeyedStore({
+          namespace: "flowboard.milestones",
+          maxEntries: 2000,
+        }) as FlowboardKeyedStore<PersistedFlowboardMilestone>,
+        documents: openKeyedStore({
+          namespace: "flowboard.project-documents",
+          maxEntries: 4000,
+        }) as FlowboardKeyedStore<PersistedFlowboardProjectDocument>,
         subscriptions: openKeyedStore({
           namespace: "flowboard.notify",
           maxEntries: 2000,
@@ -295,6 +308,8 @@ export class FlowboardStore extends FlowboardNotificationStore {
     const stores = createFlowboardSqliteStores();
     return new FlowboardStore(stores.cards, {
       boards: stores.boards,
+      milestones: stores.milestones,
+      documents: stores.documents,
       subscriptions: stores.subscriptions,
       attachments: stores.attachments,
       dataVersion: stores.dataVersion,

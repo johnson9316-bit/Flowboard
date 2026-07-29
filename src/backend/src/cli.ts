@@ -68,8 +68,9 @@ function isFlowboardStatus(value: string): value is FlowboardStatus {
 
 function formatCardLine(card: FlowboardCard): string {
   const boardId = card.metadata?.automation?.boardId ?? "default";
+  const milestone = card.milestoneId ? `/${card.milestoneId.slice(0, 8)}` : "/unassigned";
   const agent = card.agentId ? ` ${card.agentId}` : "";
-  return `${card.id.slice(0, 8)}  ${card.status.padEnd(8)}  ${card.priority.padEnd(6)}  ${boardId}${agent}  ${card.title}`;
+  return `${card.id.slice(0, 8)}  ${card.status.padEnd(8)}  ${card.priority.padEnd(6)}  ${boardId}${milestone}${agent}  ${card.title}`;
 }
 
 function redactDispatchResult(result: FlowboardDispatchResult): FlowboardDispatchResult {
@@ -180,6 +181,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
     .option("--priority <priority>", "Priority", "normal")
     .option("--agent <id>", "Assigned agent id")
     .option("--board <id>", "Board id")
+    .option("--milestone <id>", "Milestone id; omit for Unassigned")
     .option("--labels <items>", "Comma-separated labels")
     .option("--json", "Print JSON", false)
     .action(
@@ -191,6 +193,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
           priority?: string;
           agent?: string;
           board?: string;
+          milestone?: string;
           labels?: string;
         },
       ) => {
@@ -201,6 +204,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
           priority: options.priority,
           agentId: options.agent,
           boardId: options.board,
+          milestoneId: options.milestone,
           labels: splitLabels(options.labels),
           workspaceAccess: { unrestricted: true },
         });
@@ -230,6 +234,129 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
         if (card.notes) {
           writeLine(card.notes);
         }
+      }
+    });
+
+  const project = flowboard.command("project").description("Manage Flowboard projects");
+  project
+    .command("list")
+    .option("--archived", "Include archived projects")
+    .option("--json", "Print JSON", false)
+    .action(async (options: JsonOptions & { archived?: boolean }) => {
+      const result = await params.store.listProjects({ includeArchived: options.archived });
+      if (options.json) {
+        writeJson(result);
+        return;
+      }
+      for (const entry of result.projects) {
+        writeLine(`${entry.id}  ${entry.name ?? entry.id}${entry.archivedAt ? "  archived" : ""}`);
+      }
+    });
+  project
+    .command("create")
+    .argument("<id>", "Project id")
+    .argument("<name...>", "Project name")
+    .requiredOption("--milestone <title>", "Initial milestone title")
+    .option("--json", "Print JSON", false)
+    .action(async (id: string, name: string[], options: JsonOptions & { milestone: string }) => {
+      const projectView = await params.store.createProject({
+        id,
+        name: name.join(" "),
+        initialMilestoneTitle: options.milestone,
+      });
+      if (options.json) {
+        writeJson({ project: projectView });
+      } else {
+        writeLine(`Created project ${projectView.board.id} with ${projectView.milestones[0]?.title}`);
+      }
+    });
+  project
+    .command("show")
+    .argument("<id>", "Project id")
+    .option("--json", "Print JSON", false)
+    .action(async (id: string, options: JsonOptions) => {
+      const projectView = await params.store.getProject(id);
+      if (options.json) {
+        writeJson({ project: projectView });
+      } else {
+        writeLine(`${projectView.board.name ?? projectView.board.id} (${projectView.board.id})`);
+        for (const milestone of projectView.milestones) {
+          writeLine(`- ${milestone.state.padEnd(9)} ${milestone.title}`);
+        }
+      }
+    });
+  project
+    .command("archive")
+    .argument("<id>", "Project id")
+    .action(async (id: string) => {
+      const result = await params.store.archiveProject(id);
+      writeLine(
+        `Archived ${result.board.id}${result.runningCards.length ? `; ${result.runningCards.length} running cards remain` : ""}`,
+      );
+    });
+  project
+    .command("restore")
+    .argument("<id>", "Project id")
+    .action(async (id: string) => {
+      const result = await params.store.archiveProject(id, false);
+      writeLine(`Restored ${result.board.id}`);
+    });
+
+  const milestone = project.command("milestone").description("Manage project milestones");
+  milestone
+    .command("list")
+    .argument("<project>", "Project id")
+    .option("--json", "Print JSON", false)
+    .action(async (boardId: string, options: JsonOptions) => {
+      const result = await params.store.listMilestones(boardId);
+      if (options.json) {
+        writeJson(result);
+        return;
+      }
+      for (const entry of result.milestones) {
+        writeLine(`${entry.id.slice(0, 8)}  ${entry.state.padEnd(9)}  ${entry.title}`);
+      }
+    });
+  milestone
+    .command("create")
+    .argument("<project>", "Project id")
+    .argument("<title...>", "Milestone title")
+    .action(async (boardId: string, title: string[]) => {
+      const created = await params.store.createMilestone({ boardId, title: title.join(" ") });
+      writeLine(`Created milestone ${created.id.slice(0, 8)} ${created.title}`);
+    });
+  milestone
+    .command("move-card")
+    .argument("<id>", "Card id or prefix")
+    .requiredOption("--milestone <id>", "Target milestone id; use unassigned to clear")
+    .action(async (id: string, options: { milestone: string }) => {
+      const cards = await params.store.list();
+      const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+      if (!card) {
+        throw new Error(error);
+      }
+      const updated = await params.store.moveMilestone(card.id, {
+        milestoneId: options.milestone === "unassigned" ? undefined : options.milestone,
+      });
+      writeLine(formatCardLine(updated));
+    });
+
+  const docs = project.command("docs").description("Manage project documents");
+  docs
+    .command("list")
+    .argument("<project>", "Project id")
+    .option("--hidden", "Include hidden documents")
+    .option("--json", "Print JSON", false)
+    .action(async (boardId: string, options: JsonOptions & { hidden?: boolean }) => {
+      const result = await params.store.listProjectDocuments(boardId, {
+        includeHidden: options.hidden,
+      });
+      if (options.json) {
+        writeJson(result);
+        return;
+      }
+      for (const document of result.documents) {
+        writeLine(`${document.section.padEnd(12)} ${document.key.padEnd(20)} ${document.title}`);
       }
     });
 

@@ -35,7 +35,7 @@ var init_card_redaction = __esm({
 function isValidFlowboardBoardId(value) {
   return typeof value === "string" && FLOWBOARD_BOARD_ID_PATTERN.test(value);
 }
-var FLOWBOARD_STATUSES, FLOWBOARD_PRIORITIES, FLOWBOARD_EXECUTION_MODES, FLOWBOARD_EXECUTION_STATUSES, FLOWBOARD_EVENT_KINDS, FLOWBOARD_ATTEMPT_STATUSES, FLOWBOARD_LINK_TYPES, FLOWBOARD_PROOF_STATUSES, FLOWBOARD_TEMPLATE_IDS, FLOWBOARD_DIAGNOSTIC_KINDS, FLOWBOARD_DIAGNOSTIC_SEVERITIES, FLOWBOARD_NOTIFICATION_KINDS, FLOWBOARD_BOARD_ID_PATTERN;
+var FLOWBOARD_STATUSES, FLOWBOARD_PRIORITIES, FLOWBOARD_EXECUTION_MODES, FLOWBOARD_EXECUTION_STATUSES, FLOWBOARD_EVENT_KINDS, FLOWBOARD_ATTEMPT_STATUSES, FLOWBOARD_LINK_TYPES, FLOWBOARD_PROOF_STATUSES, FLOWBOARD_TEMPLATE_IDS, FLOWBOARD_DIAGNOSTIC_KINDS, FLOWBOARD_DIAGNOSTIC_SEVERITIES, FLOWBOARD_NOTIFICATION_KINDS, FLOWBOARD_MILESTONE_STATES, FLOWBOARD_PROJECT_DOCUMENT_SECTIONS, FLOWBOARD_PROJECT_DOCUMENT_TYPES, FLOWBOARD_BOARD_ID_PATTERN;
 var init_contract = __esm({
   "src/contract/index.ts"() {
     "use strict";
@@ -63,6 +63,7 @@ var init_contract = __esm({
       "created",
       "edited",
       "moved",
+      "milestone_moved",
       "linked",
       "specified",
       "decomposed",
@@ -111,6 +112,20 @@ var init_contract = __esm({
     ];
     FLOWBOARD_DIAGNOSTIC_SEVERITIES = ["warning", "error", "critical"];
     FLOWBOARD_NOTIFICATION_KINDS = ["completed", "failed", "stale"];
+    FLOWBOARD_MILESTONE_STATES = ["active", "completed", "archived"];
+    FLOWBOARD_PROJECT_DOCUMENT_SECTIONS = [
+      "project",
+      "codebase",
+      "environment",
+      "knowledge"
+    ];
+    FLOWBOARD_PROJECT_DOCUMENT_TYPES = [
+      "markdown",
+      "json",
+      "link",
+      "path",
+      "secret_ref"
+    ];
     FLOWBOARD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
   }
 });
@@ -177,8 +192,9 @@ function isFlowboardStatus2(value) {
 }
 function formatCardLine2(card) {
   const boardId = card.metadata?.automation?.boardId ?? "default";
+  const milestone = card.milestoneId ? `/${card.milestoneId.slice(0, 8)}` : "/unassigned";
   const agent = card.agentId ? ` ${card.agentId}` : "";
-  return `${card.id.slice(0, 8)}  ${card.status.padEnd(8)}  ${card.priority.padEnd(6)}  ${boardId}${agent}  ${card.title}`;
+  return `${card.id.slice(0, 8)}  ${card.status.padEnd(8)}  ${card.priority.padEnd(6)}  ${boardId}${milestone}${agent}  ${card.title}`;
 }
 function redactDispatchResult(result) {
   return {
@@ -246,7 +262,7 @@ function registerFlowboardCli(params) {
       writeCards(cards, options);
     }
   );
-  flowboard.command("create").argument("<title...>", "Card title").description("Create a Flowboard card").option("--notes <text>", "Card notes").option("--status <status>", "Initial status", "todo").option("--priority <priority>", "Priority", "normal").option("--agent <id>", "Assigned agent id").option("--board <id>", "Board id").option("--labels <items>", "Comma-separated labels").option("--json", "Print JSON", false).action(
+  flowboard.command("create").argument("<title...>", "Card title").description("Create a Flowboard card").option("--notes <text>", "Card notes").option("--status <status>", "Initial status", "todo").option("--priority <priority>", "Priority", "normal").option("--agent <id>", "Assigned agent id").option("--board <id>", "Board id").option("--milestone <id>", "Milestone id; omit for Unassigned").option("--labels <items>", "Comma-separated labels").option("--json", "Print JSON", false).action(
     async (title, options) => {
       const card = await params.store.create({
         title: title.join(" "),
@@ -255,6 +271,7 @@ function registerFlowboardCli(params) {
         priority: options.priority,
         agentId: options.agent,
         boardId: options.board,
+        milestoneId: options.milestone,
         labels: splitLabels(options.labels),
         workspaceAccess: { unrestricted: true }
       });
@@ -278,6 +295,89 @@ function registerFlowboardCli(params) {
       if (card.notes) {
         writeLine(card.notes);
       }
+    }
+  });
+  const project = flowboard.command("project").description("Manage Flowboard projects");
+  project.command("list").option("--archived", "Include archived projects").option("--json", "Print JSON", false).action(async (options) => {
+    const result = await params.store.listProjects({ includeArchived: options.archived });
+    if (options.json) {
+      writeJson(result);
+      return;
+    }
+    for (const entry of result.projects) {
+      writeLine(`${entry.id}  ${entry.name ?? entry.id}${entry.archivedAt ? "  archived" : ""}`);
+    }
+  });
+  project.command("create").argument("<id>", "Project id").argument("<name...>", "Project name").requiredOption("--milestone <title>", "Initial milestone title").option("--json", "Print JSON", false).action(async (id, name, options) => {
+    const projectView = await params.store.createProject({
+      id,
+      name: name.join(" "),
+      initialMilestoneTitle: options.milestone
+    });
+    if (options.json) {
+      writeJson({ project: projectView });
+    } else {
+      writeLine(`Created project ${projectView.board.id} with ${projectView.milestones[0]?.title}`);
+    }
+  });
+  project.command("show").argument("<id>", "Project id").option("--json", "Print JSON", false).action(async (id, options) => {
+    const projectView = await params.store.getProject(id);
+    if (options.json) {
+      writeJson({ project: projectView });
+    } else {
+      writeLine(`${projectView.board.name ?? projectView.board.id} (${projectView.board.id})`);
+      for (const milestone2 of projectView.milestones) {
+        writeLine(`- ${milestone2.state.padEnd(9)} ${milestone2.title}`);
+      }
+    }
+  });
+  project.command("archive").argument("<id>", "Project id").action(async (id) => {
+    const result = await params.store.archiveProject(id);
+    writeLine(
+      `Archived ${result.board.id}${result.runningCards.length ? `; ${result.runningCards.length} running cards remain` : ""}`
+    );
+  });
+  project.command("restore").argument("<id>", "Project id").action(async (id) => {
+    const result = await params.store.archiveProject(id, false);
+    writeLine(`Restored ${result.board.id}`);
+  });
+  const milestone = project.command("milestone").description("Manage project milestones");
+  milestone.command("list").argument("<project>", "Project id").option("--json", "Print JSON", false).action(async (boardId, options) => {
+    const result = await params.store.listMilestones(boardId);
+    if (options.json) {
+      writeJson(result);
+      return;
+    }
+    for (const entry of result.milestones) {
+      writeLine(`${entry.id.slice(0, 8)}  ${entry.state.padEnd(9)}  ${entry.title}`);
+    }
+  });
+  milestone.command("create").argument("<project>", "Project id").argument("<title...>", "Milestone title").action(async (boardId, title) => {
+    const created = await params.store.createMilestone({ boardId, title: title.join(" ") });
+    writeLine(`Created milestone ${created.id.slice(0, 8)} ${created.title}`);
+  });
+  milestone.command("move-card").argument("<id>", "Card id or prefix").requiredOption("--milestone <id>", "Target milestone id; use unassigned to clear").action(async (id, options) => {
+    const cards = await params.store.list();
+    const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+    if (!card) {
+      throw new Error(error);
+    }
+    const updated = await params.store.moveMilestone(card.id, {
+      milestoneId: options.milestone === "unassigned" ? void 0 : options.milestone
+    });
+    writeLine(formatCardLine2(updated));
+  });
+  const docs = project.command("docs").description("Manage project documents");
+  docs.command("list").argument("<project>", "Project id").option("--hidden", "Include hidden documents").option("--json", "Print JSON", false).action(async (boardId, options) => {
+    const result = await params.store.listProjectDocuments(boardId, {
+      includeHidden: options.hidden
+    });
+    if (options.json) {
+      writeJson(result);
+      return;
+    }
+    for (const document of result.documents) {
+      writeLine(`${document.section.padEnd(12)} ${document.key.padEnd(20)} ${document.title}`);
     }
   });
   flowboard.command("move").argument("<id>", "Card id or prefix").description("Move a Flowboard card to another status").requiredOption("--status <status>", "Target status").option("--json", "Print JSON", false).action(async (id, options) => {
@@ -409,7 +509,15 @@ var FLOWBOARD_TOOL_NAMES = [
   "flowboard_worker_log",
   "flowboard_protocol_violation",
   "flowboard_unblock",
-  "flowboard_move"
+  "flowboard_move",
+  "flowboard_projects",
+  "flowboard_project_create",
+  "flowboard_project_read",
+  "flowboard_milestone_create",
+  "flowboard_move_milestone",
+  "flowboard_move_project",
+  "flowboard_project_documents",
+  "flowboard_project_document_create"
 ];
 var FLOWBOARD_REQUIRED_WORKER_TOOLS = [
   "flowboard_heartbeat",
@@ -812,6 +920,24 @@ function normalizeBoardMetadata(input, fallback, now = Date.now()) {
   );
   const icon = normalizeBoundedString(input.icon, fallback?.icon, 40, "board icon");
   const color = normalizeBoundedString(input.color, fallback?.color, 40, "board color");
+  const position = Object.hasOwn(input, "position") ? normalizePosition(input.position, fallback?.position ?? 0) : fallback?.position;
+  const version = normalizeBoundedString(input.version, fallback?.version, 120, "project version");
+  const currentObjective = normalizeBoundedString(
+    input.currentObjective,
+    fallback?.currentObjective,
+    2e3,
+    "current objective"
+  );
+  const coreValue = normalizeBoundedString(input.coreValue, fallback?.coreValue, 2e3, "core value");
+  const sourceOfTruth = Object.hasOwn(input, "sourceOfTruth") ? normalizeExternalUrl(input.sourceOfTruth, fallback?.sourceOfTruth, "source of truth") : fallback?.sourceOfTruth;
+  const repositoryUrl = Object.hasOwn(input, "repositoryUrl") ? normalizeExternalUrl(input.repositoryUrl, fallback?.repositoryUrl, "repository URL") : fallback?.repositoryUrl;
+  const planningPath = normalizeBoundedString(
+    input.planningPath,
+    fallback?.planningPath,
+    2e3,
+    "planning path"
+  );
+  const homepageUrl = Object.hasOwn(input, "homepageUrl") ? normalizeExternalUrl(input.homepageUrl, fallback?.homepageUrl, "homepage URL") : fallback?.homepageUrl;
   const defaultWorkspace = Object.hasOwn(input, "defaultWorkspace") ? normalizeWorkspace(input.defaultWorkspace, fallback?.defaultWorkspace) : fallback?.defaultWorkspace;
   const orchestration = Object.hasOwn(input, "orchestration") ? normalizeOrchestration(input.orchestration, fallback?.orchestration) : fallback?.orchestration;
   const archivedAt = Object.hasOwn(input, "archived") ? input.archived === false ? void 0 : now : fallback?.archivedAt;
@@ -821,6 +947,14 @@ function normalizeBoardMetadata(input, fallback, now = Date.now()) {
     ...description ? { description } : {},
     ...icon ? { icon } : {},
     ...color ? { color } : {},
+    ...position !== void 0 ? { position } : {},
+    ...version ? { version } : {},
+    ...currentObjective ? { currentObjective } : {},
+    ...coreValue ? { coreValue } : {},
+    ...sourceOfTruth ? { sourceOfTruth } : {},
+    ...repositoryUrl ? { repositoryUrl } : {},
+    ...planningPath ? { planningPath } : {},
+    ...homepageUrl ? { homepageUrl } : {},
     ...defaultWorkspace ? { defaultWorkspace } : {},
     ...orchestration ? { orchestration } : {},
     createdAt: fallback?.createdAt ?? now,
@@ -947,6 +1081,22 @@ function normalizeBoundedString(value, fallback, maxLength, fieldName) {
     throw new Error(`${fieldName} must be ${maxLength} characters or fewer.`);
   }
   return normalized;
+}
+function normalizeExternalUrl(value, fallback, fieldName) {
+  const normalized = normalizeBoundedString(value, fallback, 2e3, fieldName);
+  if (!normalized) {
+    return void 0;
+  }
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error(`${fieldName} must be a valid http or https URL.`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`${fieldName} must be a valid http or https URL.`);
+  }
+  return parsed.toString();
 }
 function normalizeStatus(value, fallback) {
   if (typeof value !== "string" || !value.trim()) {
@@ -1168,6 +1318,18 @@ function normalizeEvent(value) {
   }
   const fromStatus = typeof record.fromStatus === "string" && FLOWBOARD_STATUSES.includes(record.fromStatus) ? record.fromStatus : void 0;
   const toStatus = typeof record.toStatus === "string" && FLOWBOARD_STATUSES.includes(record.toStatus) ? record.toStatus : void 0;
+  const fromMilestoneId = normalizeBoundedString(
+    record.fromMilestoneId,
+    void 0,
+    120,
+    "event source milestone"
+  );
+  const toMilestoneId = normalizeBoundedString(
+    record.toMilestoneId,
+    void 0,
+    120,
+    "event target milestone"
+  );
   const sessionKey = normalizeOptionalString(record.sessionKey);
   const runId = normalizeOptionalString(record.runId);
   return {
@@ -1176,6 +1338,8 @@ function normalizeEvent(value) {
     at,
     ...fromStatus ? { fromStatus } : {},
     ...toStatus ? { toStatus } : {},
+    ...fromMilestoneId ? { fromMilestoneId } : {},
+    ...toMilestoneId ? { toMilestoneId } : {},
     ...sessionKey ? { sessionKey } : {},
     ...runId ? { runId } : {}
   };
@@ -2513,7 +2677,12 @@ async function runFlowboardDispatch(params) {
   const started = [];
   const startFailures = [];
   const cards = await params.store.list();
-  const candidates = await params.store.list({ boardId });
+  const candidates = [];
+  for (const candidate of await params.store.list({ boardId })) {
+    if (!await params.store.isProjectArchived(cardBoardId(candidate))) {
+      candidates.push(candidate);
+    }
+  }
   const ownerOverride = params.options?.ownerId?.trim() || void 0;
   const startedOwners = /* @__PURE__ */ new Set();
   const maxAttempts = maxStarts * 2;
@@ -2853,9 +3022,13 @@ function registerFlowboardWorkspaceCardMethods(params) {
       const { params: requestParams, respond } = request;
       try {
         const input = withoutFlowboardWorkspaceAccess(requestParams);
-        const access = await resolveGatewayWorkspaceMutationAccess(request, input);
+        const project = await store.getProject(input.boardId);
+        const inputWithProjectWorkspace = input.workspace === void 0 && project.board.defaultWorkspace ? { ...input, workspace: project.board.defaultWorkspace } : input;
+        const access = await resolveGatewayWorkspaceMutationAccess(request, inputWithProjectWorkspace);
         respond(true, {
-          card: redactCard(await store.create(withFlowboardWorkspaceAccess(input, access)))
+          card: redactCard(
+            await store.create(withFlowboardWorkspaceAccess(inputWithProjectWorkspace, access))
+          )
         });
       } catch (error) {
         respondError(respond, error);
@@ -2966,8 +3139,302 @@ function registerFlowboardWorkspaceWorkflowMethods(params) {
   );
 }
 
+// src/backend/src/gateway-project-methods.ts
+var READ_SCOPE = "operator.read";
+var WRITE_SCOPE2 = "operator.write";
+async function assertProjectWorkspaceAccess(request, value) {
+  const access = await canonicalizeFlowboardWorkspaceAccess(
+    resolveGatewayFlowboardWorkspaceAccess({
+      context: request.context,
+      client: request.client
+    })
+  );
+  await assertFlowboardWorkspaceMutationAccess(value, access);
+}
+function registerFlowboardProjectGatewayMethods(params) {
+  const { api, store, redactCard } = params;
+  api.registerGatewayMethod(
+    "flowboard.projects.list",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.listProjects(requestParams));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: READ_SCOPE }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.get",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { project: await store.getProject(requestParams.id) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: READ_SCOPE }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.create",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        await assertProjectWorkspaceAccess(request, requestParams);
+        respond(true, { project: await store.createProject(requestParams) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.update",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        await assertProjectWorkspaceAccess(request, requestParams);
+        respond(true, { project: await store.updateProject(requestParams) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.reorder",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.reorderProjects(requestParams.ids));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.archive",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(
+          true,
+          await store.archiveProject(requestParams.id, requestParams.archived === false ? false : true)
+        );
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.restore",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.archiveProject(requestParams.id, false));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.list",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.listMilestones(requestParams.boardId));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: READ_SCOPE }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.create",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { milestone: await store.createMilestone(requestParams) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.update",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { milestone: await store.updateMilestone(readId(requestParams), requestParams) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.reorder",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.reorderMilestones(requestParams));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.complete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { milestone: await store.completeMilestone(readId(requestParams)) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.archive",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { milestone: await store.archiveMilestone(readId(requestParams)) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.milestones.restore",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { milestone: await store.restoreMilestone(readId(requestParams)) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.list",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(
+          true,
+          await store.listProjectDocuments(requestParams.boardId, {
+            includeHidden: requestParams.includeHidden
+          })
+        );
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: READ_SCOPE }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.create",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, { document: await store.createProjectDocument(requestParams) });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.update",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(
+          true,
+          { document: await store.updateProjectDocument(readId(requestParams), requestParams) }
+        );
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.reorder",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.reorderProjectDocuments(requestParams));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.hide",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(
+          true,
+          { document: await store.hideProjectDocument(readId(requestParams), true) }
+        );
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.restore",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(
+          true,
+          { document: await store.hideProjectDocument(readId(requestParams), false) }
+        );
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, await store.deleteProjectDocument(readId(requestParams)));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.moveMilestone",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.moveMilestone(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.moveProject",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.moveProject(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+}
+
 // src/backend/src/store.ts
-import { randomUUID as randomUUID8 } from "node:crypto";
+import { randomUUID as randomUUID9 } from "node:crypto";
 
 // src/backend/src/sqlite-store.ts
 import fs from "node:fs";
@@ -2976,7 +3443,7 @@ import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 3;
+var SCHEMA_VERSION = 4;
 var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var FLOWBOARD_SQLITE_DIR_MODE = 448;
 var FLOWBOARD_SQLITE_FILE_MODE = 384;
@@ -3071,6 +3538,14 @@ var FLOWBOARD_SCHEMA_SQL = `
       description TEXT,
       icon TEXT,
       color TEXT,
+      position REAL,
+      version TEXT,
+      current_objective TEXT,
+      core_value TEXT,
+      source_of_truth TEXT,
+      repository_url TEXT,
+      planning_path TEXT,
+      homepage_url TEXT,
       default_workspace_json TEXT,
       orchestration_json TEXT,
       created_at INTEGER NOT NULL,
@@ -3090,6 +3565,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT,
       task_id TEXT,
       source_url TEXT,
+      milestone_id TEXT,
       position REAL NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -3133,6 +3609,8 @@ var FLOWBOARD_SCHEMA_SQL = `
       at INTEGER NOT NULL,
       from_status TEXT,
       to_status TEXT,
+      from_milestone_id TEXT,
+      to_milestone_id TEXT,
       session_key TEXT,
       run_id TEXT
     ) STRICT;
@@ -3272,6 +3750,42 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_milestones (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      color TEXT,
+      position REAL NOT NULL,
+      state TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      archived_at INTEGER
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_milestones_board_position_idx
+      ON flowboard_milestones(board_id, position);
+
+    CREATE TABLE IF NOT EXISTS flowboard_project_documents (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      document_key TEXT NOT NULL,
+      section TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      target TEXT,
+      content TEXT,
+      position REAL NOT NULL,
+      hidden_at INTEGER,
+      system INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(board_id, document_key)
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_project_documents_board_section_position_idx
+      ON flowboard_project_documents(board_id, section, position);
   `;
 function ensureFlowboardSchema(db) {
   db.exec(FLOWBOARD_SCHEMA_SQL);
@@ -3281,6 +3795,21 @@ function ensureFlowboardSchema(db) {
     "lifecycle_status_source_updated_at",
     "lifecycle_status_source_updated_at INTEGER"
   );
+  ensureColumn(db, "flowboard_cards", "milestone_id", "milestone_id TEXT");
+  ensureColumn(db, "flowboard_card_events", "from_milestone_id", "from_milestone_id TEXT");
+  ensureColumn(db, "flowboard_card_events", "to_milestone_id", "to_milestone_id TEXT");
+  ensureColumn(db, "flowboard_boards", "position", "position REAL");
+  ensureColumn(db, "flowboard_boards", "version", "version TEXT");
+  ensureColumn(db, "flowboard_boards", "current_objective", "current_objective TEXT");
+  ensureColumn(db, "flowboard_boards", "core_value", "core_value TEXT");
+  ensureColumn(db, "flowboard_boards", "source_of_truth", "source_of_truth TEXT");
+  ensureColumn(db, "flowboard_boards", "repository_url", "repository_url TEXT");
+  ensureColumn(db, "flowboard_boards", "planning_path", "planning_path TEXT");
+  ensureColumn(db, "flowboard_boards", "homepage_url", "homepage_url TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
+      ON flowboard_cards(board_id, milestone_id, position);
+  `);
   const migrationId = `schema-${SCHEMA_VERSION}`;
   const current = db.prepare("SELECT 1 AS found FROM flowboard_schema_migrations WHERE id = ?").get(migrationId);
   if (!current) {
@@ -3352,6 +3881,8 @@ function readEvents(db, cardId) {
     };
     const fromStatus = stringValue(row, "from_status");
     const toStatus = stringValue(row, "to_status");
+    const fromMilestoneId = stringValue(row, "from_milestone_id");
+    const toMilestoneId = stringValue(row, "to_milestone_id");
     const sessionKey = stringValue(row, "session_key");
     const runId = stringValue(row, "run_id");
     if (fromStatus) {
@@ -3359,6 +3890,12 @@ function readEvents(db, cardId) {
     }
     if (toStatus) {
       event.toStatus = toStatus;
+    }
+    if (fromMilestoneId) {
+      event.fromMilestoneId = fromMilestoneId;
+    }
+    if (toMilestoneId) {
+      event.toMilestoneId = toMilestoneId;
     }
     if (sessionKey) {
       event.sessionKey = sessionKey;
@@ -3622,6 +4159,7 @@ function readCard(db, row) {
     ...stringValue(row, "run_id") ? { runId: stringValue(row, "run_id") } : {},
     ...stringValue(row, "task_id") ? { taskId: stringValue(row, "task_id") } : {},
     ...stringValue(row, "source_url") ? { sourceUrl: stringValue(row, "source_url") } : {},
+    ...stringValue(row, "milestone_id") ? { milestoneId: stringValue(row, "milestone_id") } : {},
     ...readExecution(row) ? { execution: readExecution(row) } : {},
     ...numberValue(row, "started_at") !== void 0 ? { startedAt: numberValue(row, "started_at") } : {},
     ...numberValue(row, "completed_at") !== void 0 ? { completedAt: numberValue(row, "completed_at") } : {},
@@ -3649,14 +4187,14 @@ function insertCard(db, card) {
     `
       INSERT INTO flowboard_cards (
         id, board_id, title, notes, status, priority, agent_id, session_key, run_id, task_id,
-        source_url, position, created_at, updated_at, started_at, completed_at,
+        source_url, milestone_id, position, created_at, updated_at, started_at, completed_at,
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
         execution_model, execution_session_key, execution_run_id, execution_started_at,
         execution_updated_at, automation_json, claim_json, template_id, archived_at, stale_json,
         lifecycle_status_source_updated_at, failure_count
       ) VALUES (
         @id, @board_id, @title, @notes, @status, @priority, @agent_id, @session_key, @run_id,
-        @task_id, @source_url, @position, @created_at, @updated_at, @started_at, @completed_at,
+        @task_id, @source_url, @milestone_id, @position, @created_at, @updated_at, @started_at, @completed_at,
         @execution_id, @execution_kind, @execution_engine, @execution_mode, @execution_status,
         @execution_model, @execution_session_key, @execution_run_id, @execution_started_at,
         @execution_updated_at, @automation_json, @claim_json, @template_id, @archived_at,
@@ -3673,6 +4211,7 @@ function insertCard(db, card) {
         run_id = excluded.run_id,
         task_id = excluded.task_id,
         source_url = excluded.source_url,
+        milestone_id = excluded.milestone_id,
         position = excluded.position,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
@@ -3708,6 +4247,7 @@ function insertCard(db, card) {
     run_id: bindNull(card.runId),
     task_id: bindNull(card.taskId),
     source_url: bindNull(card.sourceUrl),
+    milestone_id: bindNull(card.milestoneId),
     position: card.position,
     created_at: card.createdAt,
     updated_at: card.updatedAt,
@@ -3742,8 +4282,8 @@ function insertCard(db, card) {
     db.prepare(
       `
         INSERT INTO flowboard_card_events
-          (id, card_id, ordinal, kind, at, from_status, to_status, session_key, run_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, card_id, ordinal, kind, at, from_status, to_status, from_milestone_id, to_milestone_id, session_key, run_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
       event.id,
@@ -3753,6 +4293,8 @@ function insertCard(db, card) {
       event.at,
       bindNull(event.fromStatus),
       bindNull(event.toStatus),
+      bindNull(event.fromMilestoneId),
+      bindNull(event.toMilestoneId),
       bindNull(event.sessionKey),
       bindNull(event.runId)
     );
@@ -3997,14 +4539,24 @@ var FlowboardSqliteBoardStore = class {
     this.db.prepare(
       `
           INSERT INTO flowboard_boards (
-            id, name, description, icon, color, default_workspace_json, orchestration_json,
+            id, name, description, icon, color, position, version, current_objective, core_value,
+            source_of_truth, repository_url, planning_path, homepage_url,
+            default_workspace_json, orchestration_json,
             created_at, updated_at, archived_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
             icon = excluded.icon,
             color = excluded.color,
+            position = excluded.position,
+            version = excluded.version,
+            current_objective = excluded.current_objective,
+            core_value = excluded.core_value,
+            source_of_truth = excluded.source_of_truth,
+            repository_url = excluded.repository_url,
+            planning_path = excluded.planning_path,
+            homepage_url = excluded.homepage_url,
             default_workspace_json = excluded.default_workspace_json,
             orchestration_json = excluded.orchestration_json,
             created_at = excluded.created_at,
@@ -4017,6 +4569,14 @@ var FlowboardSqliteBoardStore = class {
       bindNull(board.description),
       bindNull(board.icon),
       bindNull(board.color),
+      bindNull(board.position),
+      bindNull(board.version),
+      bindNull(board.currentObjective),
+      bindNull(board.coreValue),
+      bindNull(board.sourceOfTruth),
+      bindNull(board.repositoryUrl),
+      bindNull(board.planningPath),
+      bindNull(board.homepageUrl),
       jsonValue(board.defaultWorkspace),
       jsonValue(board.orchestration),
       board.createdAt,
@@ -4039,6 +4599,14 @@ var FlowboardSqliteBoardStore = class {
         ...stringValue(row, "description") ? { description: stringValue(row, "description") } : {},
         ...stringValue(row, "icon") ? { icon: stringValue(row, "icon") } : {},
         ...stringValue(row, "color") ? { color: stringValue(row, "color") } : {},
+        ...numberValue(row, "position") !== void 0 ? { position: numberValue(row, "position") } : {},
+        ...stringValue(row, "version") ? { version: stringValue(row, "version") } : {},
+        ...stringValue(row, "current_objective") ? { currentObjective: stringValue(row, "current_objective") } : {},
+        ...stringValue(row, "core_value") ? { coreValue: stringValue(row, "core_value") } : {},
+        ...stringValue(row, "source_of_truth") ? { sourceOfTruth: stringValue(row, "source_of_truth") } : {},
+        ...stringValue(row, "repository_url") ? { repositoryUrl: stringValue(row, "repository_url") } : {},
+        ...stringValue(row, "planning_path") ? { planningPath: stringValue(row, "planning_path") } : {},
+        ...stringValue(row, "homepage_url") ? { homepageUrl: stringValue(row, "homepage_url") } : {},
         ...defaultWorkspace ? { defaultWorkspace } : {},
         ...orchestration ? { orchestration } : {},
         createdAt: requiredNumber(row, "created_at"),
@@ -4062,6 +4630,159 @@ var FlowboardSqliteBoardStore = class {
       }
     }
     return entries;
+  }
+};
+function readMilestone(row) {
+  return {
+    id: requiredString(row, "id"),
+    boardId: requiredString(row, "board_id"),
+    title: requiredString(row, "title"),
+    position: requiredNumber(row, "position"),
+    state: requiredString(row, "state"),
+    createdAt: requiredNumber(row, "created_at"),
+    updatedAt: requiredNumber(row, "updated_at"),
+    ...stringValue(row, "description") ? { description: stringValue(row, "description") } : {},
+    ...stringValue(row, "color") ? { color: stringValue(row, "color") } : {},
+    ...numberValue(row, "completed_at") !== void 0 ? { completedAt: numberValue(row, "completed_at") } : {},
+    ...numberValue(row, "archived_at") !== void 0 ? { archivedAt: numberValue(row, "archived_at") } : {}
+  };
+}
+var FlowboardSqliteMilestoneStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async register(key, value) {
+    if (value.version !== 1 || value.milestone.id !== key) {
+      throw new Error("invalid flowboard milestone payload");
+    }
+    const milestone = value.milestone;
+    this.db.prepare(
+      `
+          INSERT INTO flowboard_milestones (
+            id, board_id, title, description, color, position, state, created_at, updated_at,
+            completed_at, archived_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            board_id = excluded.board_id,
+            title = excluded.title,
+            description = excluded.description,
+            color = excluded.color,
+            position = excluded.position,
+            state = excluded.state,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at,
+            completed_at = excluded.completed_at,
+            archived_at = excluded.archived_at
+        `
+    ).run(
+      milestone.id,
+      milestone.boardId,
+      milestone.title,
+      bindNull(milestone.description),
+      bindNull(milestone.color),
+      milestone.position,
+      milestone.state,
+      milestone.createdAt,
+      milestone.updatedAt,
+      bindNull(milestone.completedAt),
+      bindNull(milestone.archivedAt)
+    );
+  }
+  async lookup(key) {
+    const row = this.db.prepare("SELECT * FROM flowboard_milestones WHERE id = ?").get(key);
+    return row ? { version: 1, milestone: readMilestone(row) } : void 0;
+  }
+  async delete(key) {
+    const result = this.db.prepare("DELETE FROM flowboard_milestones WHERE id = ?").run(key);
+    return result.changes > 0;
+  }
+  async entries() {
+    return this.db.prepare("SELECT * FROM flowboard_milestones ORDER BY board_id ASC, position ASC, id ASC").all().map((row) => ({
+      key: requiredString(row, "id"),
+      value: { version: 1, milestone: readMilestone(row) }
+    }));
+  }
+};
+function readProjectDocument(row) {
+  return {
+    id: requiredString(row, "id"),
+    boardId: requiredString(row, "board_id"),
+    key: requiredString(row, "document_key"),
+    section: requiredString(row, "section"),
+    type: requiredString(row, "type"),
+    title: requiredString(row, "title"),
+    position: requiredNumber(row, "position"),
+    createdAt: requiredNumber(row, "created_at"),
+    updatedAt: requiredNumber(row, "updated_at"),
+    ...stringValue(row, "summary") ? { summary: stringValue(row, "summary") } : {},
+    ...stringValue(row, "target") ? { target: stringValue(row, "target") } : {},
+    ...stringValue(row, "content") ? { content: stringValue(row, "content") } : {},
+    ...numberValue(row, "hidden_at") !== void 0 ? { hiddenAt: numberValue(row, "hidden_at") } : {},
+    ...numberValue(row, "system") === 1 ? { system: true } : {}
+  };
+}
+var FlowboardSqliteProjectDocumentStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async register(key, value) {
+    if (value.version !== 1 || value.document.id !== key) {
+      throw new Error("invalid flowboard project document payload");
+    }
+    const document = value.document;
+    this.db.prepare(
+      `
+          INSERT INTO flowboard_project_documents (
+            id, board_id, document_key, section, type, title, summary, target, content, position,
+            hidden_at, system, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            board_id = excluded.board_id,
+            document_key = excluded.document_key,
+            section = excluded.section,
+            type = excluded.type,
+            title = excluded.title,
+            summary = excluded.summary,
+            target = excluded.target,
+            content = excluded.content,
+            position = excluded.position,
+            hidden_at = excluded.hidden_at,
+            system = excluded.system,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at
+        `
+    ).run(
+      document.id,
+      document.boardId,
+      document.key,
+      document.section,
+      document.type,
+      document.title,
+      bindNull(document.summary),
+      bindNull(document.target),
+      bindNull(document.content),
+      document.position,
+      bindNull(document.hiddenAt),
+      document.system ? 1 : 0,
+      document.createdAt,
+      document.updatedAt
+    );
+  }
+  async lookup(key) {
+    const row = this.db.prepare("SELECT * FROM flowboard_project_documents WHERE id = ?").get(key);
+    return row ? { version: 1, document: readProjectDocument(row) } : void 0;
+  }
+  async delete(key) {
+    const result = this.db.prepare("DELETE FROM flowboard_project_documents WHERE id = ?").run(key);
+    return result.changes > 0;
+  }
+  async entries() {
+    return this.db.prepare(
+      "SELECT * FROM flowboard_project_documents ORDER BY board_id ASC, section ASC, position ASC, id ASC"
+    ).all().map((row) => ({
+      key: requiredString(row, "id"),
+      value: { version: 1, document: readProjectDocument(row) }
+    }));
   }
 };
 var FlowboardSqliteSubscriptionStore = class {
@@ -4232,6 +4953,8 @@ function createFlowboardSqliteStores(options = {}) {
   return {
     cards: new FlowboardSqliteCardStore(db),
     boards: new FlowboardSqliteBoardStore(db),
+    milestones: new FlowboardSqliteMilestoneStore(db),
+    documents: new FlowboardSqliteProjectDocumentStore(db),
     subscriptions: new FlowboardSqliteSubscriptionStore(db),
     attachments: new FlowboardSqliteAttachmentStore(db),
     // This connection-local primitive changes only after another connection commits.
@@ -4242,6 +4965,10 @@ function createFlowboardSqliteStores(options = {}) {
     }
   };
 }
+
+// src/backend/src/store-projects.ts
+init_contract();
+import { randomUUID as randomUUID8 } from "node:crypto";
 
 // src/backend/src/store-workflow.ts
 import { randomUUID as randomUUID7 } from "node:crypto";
@@ -4398,6 +5125,8 @@ var FlowboardCoreStore = class {
   changes;
   store;
   boardStore;
+  milestoneStore;
+  documentStore;
   subscriptionStore;
   attachmentStore;
   constructor(store, stores = {}) {
@@ -4405,6 +5134,12 @@ var FlowboardCoreStore = class {
     this.store = this.changes.track(store);
     this.boardStore = this.changes.track(
       stores.boards ?? store
+    );
+    this.milestoneStore = this.changes.track(
+      stores.milestones ?? store
+    );
+    this.documentStore = this.changes.track(
+      stores.documents ?? store
     );
     this.subscriptionStore = stores.subscriptions ?? store;
     this.attachmentStore = stores.attachments ?? store;
@@ -4493,6 +5228,14 @@ var FlowboardCoreStore = class {
         ...board.description ? { description: board.description } : {},
         ...board.icon ? { icon: board.icon } : {},
         ...board.color ? { color: board.color } : {},
+        ...board.position !== void 0 ? { position: board.position } : {},
+        ...board.version ? { version: board.version } : {},
+        ...board.currentObjective ? { currentObjective: board.currentObjective } : {},
+        ...board.coreValue ? { coreValue: board.coreValue } : {},
+        ...board.sourceOfTruth ? { sourceOfTruth: board.sourceOfTruth } : {},
+        ...board.repositoryUrl ? { repositoryUrl: board.repositoryUrl } : {},
+        ...board.planningPath ? { planningPath: board.planningPath } : {},
+        ...board.homepageUrl ? { homepageUrl: board.homepageUrl } : {},
         ...board.defaultWorkspace ? { defaultWorkspace: board.defaultWorkspace } : {},
         ...board.orchestration ? { orchestration: board.orchestration } : {},
         total: 0,
@@ -4536,6 +5279,10 @@ var FlowboardCoreStore = class {
         (a, b) => a.id === "default" ? -1 : b.id === "default" ? 1 : a.id.localeCompare(b.id)
       )
     };
+  }
+  async isProjectArchived(boardId) {
+    const board = await this.boardStore.lookup(boardId);
+    return Boolean(board?.version === 1 && board.board.archivedAt);
   }
   async upsertBoard(input) {
     return await this.enqueueMutation(async () => {
@@ -4676,9 +5423,12 @@ var FlowboardCoreStore = class {
       syncExecutionAttemptMetadata(metadata, execution, now)
     );
     const boardId = syncedMetadata.automation?.boardId ?? "default";
+    const milestoneId = normalizeOptionalString(input.milestoneId);
     const position = Number.isFinite(normalizedPosition) ? normalizedPosition : Math.max(
       0,
-      ...cards.filter((card2) => card2.status === status && cardBoardId(card2) === boardId).map((card2) => card2.position)
+      ...cards.filter(
+        (card2) => cardBoardId(card2) === boardId && card2.milestoneId === milestoneId
+      ).map((card2) => card2.position)
     ) + POSITION_STEP;
     let card = {
       id: randomUUID4(),
@@ -4686,6 +5436,7 @@ var FlowboardCoreStore = class {
       status,
       priority: normalizePriority(input.priority, "normal"),
       labels: normalizeLabels(input.labels),
+      ...milestoneId ? { milestoneId } : {},
       position,
       createdAt: now,
       updatedAt: now,
@@ -4769,6 +5520,7 @@ var FlowboardCoreStore = class {
     if (status !== existing.status && !hasFreshLifecycleStatusSource) {
       metadata = { ...metadata, lifecycleStatusSourceUpdatedAt: void 0 };
     }
+    const effectivePatchRecord = effectivePatch;
     const automationPatch = {};
     for (const key of [
       "tenant",
@@ -4782,8 +5534,8 @@ var FlowboardCoreStore = class {
       "maxRetries",
       "scheduledAt"
     ]) {
-      if (Object.hasOwn(effectivePatch, key) && effectivePatch[key] !== void 0) {
-        automationPatch[key] = effectivePatch[key];
+      if (Object.hasOwn(effectivePatchRecord, key) && effectivePatchRecord[key] !== void 0) {
+        automationPatch[key] = effectivePatchRecord[key];
       }
     }
     if (Object.keys(automationPatch).length > 0) {
@@ -4809,7 +5561,7 @@ var FlowboardCoreStore = class {
       sourceUrl: effectivePatch.sourceUrl === void 0 ? existing.sourceUrl : normalizeOptionalString(effectivePatch.sourceUrl),
       execution,
       metadata: effectivePatch.templateId === void 0 ? metadata : { ...metadata, templateId: normalizeTemplateId(effectivePatch.templateId) },
-      position: effectivePatch.position === void 0 ? existing.position : normalizePosition(effectivePatch.position, existing.position),
+      position: effectivePatchRecord.position === void 0 ? existing.position : normalizePosition(effectivePatchRecord.position, existing.position),
       updatedAt: now,
       ...startedAt ? { startedAt } : {},
       ...completedAt ? { completedAt } : {}
@@ -5305,7 +6057,7 @@ var FlowboardPromoteStore = class extends FlowboardEnrichmentStore {
       assertCanMutateClaimedCard(existing, scope);
       return await this.updateCard(
         id,
-        { status, position },
+        { status },
         {
           allowMetadataDependencyLinks: false,
           enforceStatusHolds: true
@@ -5369,6 +6121,9 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       const guarded = await this.promoteDependencyReady(id, now);
       if (guarded.metadata?.archivedAt) {
         throw new Error("card is archived.");
+      }
+      if (await this.isProjectArchived(cardBoardId(guarded))) {
+        throw new Error("project is archived and cannot start new work.");
       }
       const expectedAuthority = options.expectedAuthority;
       if (expectedAuthority && (guarded.status !== expectedAuthority.status || cardBoardId(guarded) !== expectedAuthority.boardId || guarded.agentId !== expectedAuthority.agentId || !isDeepStrictEqual(
@@ -5924,8 +6679,708 @@ var FlowboardNotificationStore = class extends FlowboardWorkflowStore {
   }
 };
 
+// src/backend/src/store-projects.ts
+var STANDARD_PROJECT_DOCUMENTS = [
+  { key: "project", section: "project", title: "Project Overview" },
+  { key: "config", section: "project", title: "Project Configuration" },
+  { key: "requirements", section: "project", title: "Requirements" },
+  { key: "roadmap", section: "project", title: "Roadmap" },
+  { key: "state", section: "project", title: "Current State" },
+  { key: "retrospective", section: "project", title: "Retrospective" },
+  { key: "architecture", section: "codebase", title: "Architecture" },
+  { key: "stack", section: "codebase", title: "Technology Stack" },
+  { key: "structure", section: "codebase", title: "Directory Structure" },
+  { key: "conventions", section: "codebase", title: "Coding Conventions" },
+  { key: "testing", section: "codebase", title: "Testing" },
+  { key: "integrations", section: "codebase", title: "Integrations" },
+  { key: "concerns", section: "codebase", title: "Risks and Technical Debt" },
+  { key: "dev_environment", section: "environment", title: "Development Environment" },
+  { key: "test_deploy", section: "environment", title: "Test and Deployment Environment" },
+  { key: "notes", section: "knowledge", title: "Notes" },
+  { key: "research", section: "knowledge", title: "Research" },
+  { key: "todos", section: "knowledge", title: "Todos" },
+  { key: "seeds", section: "knowledge", title: "Seeds" },
+  { key: "onboarding", section: "knowledge", title: "Onboarding" }
+];
+function isDocumentSection(value) {
+  return typeof value === "string" && FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.includes(value);
+}
+function isDocumentType(value) {
+  return typeof value === "string" && FLOWBOARD_PROJECT_DOCUMENT_TYPES.includes(value);
+}
+function normalizeDocumentKey(value, fallback) {
+  const key = normalizeBoundedString(value, fallback, 80, "document key");
+  if (!key || !/^[a-z0-9][a-z0-9._-]{0,79}$/.test(key)) {
+    throw new Error("document key must match [a-z0-9][a-z0-9._-]{0,79}.");
+  }
+  return key;
+}
+function normalizeDocumentSection(value, fallback) {
+  if (value === void 0) {
+    if (fallback) {
+      return fallback;
+    }
+    throw new Error(`document section must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
+  }
+  if (!isDocumentSection(value)) {
+    throw new Error(`document section must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
+  }
+  return value;
+}
+function normalizeDocumentType(value, fallback) {
+  if (value === void 0) {
+    if (fallback) {
+      return fallback;
+    }
+    throw new Error(`document type must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
+  }
+  if (!isDocumentType(value)) {
+    throw new Error(`document type must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
+  }
+  return value;
+}
+function normalizeDocumentBody(input, type, fallback) {
+  const target = type === "link" ? normalizeExternalUrl(input.target, fallback?.target, "document URL") : type === "path" || type === "secret_ref" ? normalizeBoundedString(input.target, fallback?.target, 2e3, "document target") : void 0;
+  const content = type === "markdown" || type === "json" ? normalizeBoundedString(input.content, fallback?.content, 2e4, "document content") : void 0;
+  if ((type === "link" || type === "path" || type === "secret_ref") && !target) {
+    throw new Error(`${type} documents require a target.`);
+  }
+  if (type === "path" && (target?.includes("\0") || target?.includes("\n"))) {
+    throw new Error("document path contains unsupported characters.");
+  }
+  if (type === "json" && content) {
+    try {
+      JSON.parse(content);
+    } catch {
+      throw new Error("document JSON must be valid.");
+    }
+  }
+  return {
+    ...target ? { target } : {},
+    ...content ? { content } : {}
+  };
+}
+function boardRunningCards(cards) {
+  return cards.filter(
+    (card) => card.status === "running" || card.execution?.status === "running" || card.metadata?.attempts?.some((attempt) => attempt.status === "running")
+  );
+}
+var FlowboardProjectStore = class extends FlowboardNotificationStore {
+  async ensureBoardDirect(boardId, now = Date.now()) {
+    const existing = await this.boardStore.lookup(boardId);
+    if (existing?.version === 1) {
+      return existing.board;
+    }
+    const board = normalizeBoardMetadata({ id: boardId }, void 0, now);
+    await this.boardStore.register(board.id, { version: 1, board });
+    return board;
+  }
+  async ensureProjectDocumentsDirect(boardId, now = Date.now()) {
+    const existingKeys = new Set(
+      (await this.documentStore.entries()).map((entry) => entry.value).filter(
+        (entry) => entry?.version === 1 && entry.document?.boardId === boardId
+      ).map((entry) => entry.document.key)
+    );
+    for (const [position, item] of STANDARD_PROJECT_DOCUMENTS.entries()) {
+      if (existingKeys.has(item.key)) {
+        continue;
+      }
+      const document = {
+        id: randomUUID8(),
+        boardId,
+        key: item.key,
+        section: item.section,
+        type: "markdown",
+        title: item.title,
+        position: (position + 1) * POSITION_STEP,
+        system: true,
+        createdAt: now,
+        updatedAt: now
+      };
+      await this.documentStore.register(document.id, { version: 1, document });
+    }
+  }
+  async ensureProjectDirect(boardId, now = Date.now()) {
+    const board = await this.ensureBoardDirect(boardId, now);
+    await this.ensureProjectDocumentsDirect(boardId, now);
+    return board;
+  }
+  async assertProjectCanReceiveCards(boardId) {
+    const board = await this.boardStore.lookup(boardId);
+    if (board?.version === 1 && board.board.archivedAt) {
+      throw new Error("project is archived and cannot receive cards.");
+    }
+  }
+  async isProjectArchived(boardId) {
+    const board = await this.boardStore.lookup(boardId);
+    return Boolean(board?.version === 1 && board.board.archivedAt);
+  }
+  async listProjects(params = {}) {
+    const includeArchived = params.includeArchived === true;
+    const { boards } = await this.listBoards();
+    return {
+      projects: boards.filter((board) => includeArchived || !board.archivedAt).toSorted(
+        (left, right) => (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) || left.id.localeCompare(right.id)
+      )
+    };
+  }
+  async getProject(id) {
+    const boardId = normalizeBoardIdRequired(id);
+    return await this.enqueueMutation(async () => {
+      const board = await this.ensureProjectDirect(boardId);
+      const milestones = await this.listMilestonesDirect(boardId);
+      const cards = await this.list({ boardId });
+      return { board, milestones, cards };
+    });
+  }
+  async createProject(input) {
+    return await this.enqueueMutation(async () => {
+      const boardId = normalizeBoardIdRequired(input.id);
+      if (await this.boardStore.lookup(boardId)) {
+        throw new Error(`project already exists: ${boardId}`);
+      }
+      if ((await this.list({ boardId })).length > 0) {
+        throw new Error(`project already exists through existing cards: ${boardId}`);
+      }
+      const name = normalizeTitle(input.name);
+      const initialMilestoneTitle = normalizeTitle(input.initialMilestoneTitle);
+      const existingBoards = await this.listBoards();
+      const maxPosition = Math.max(
+        0,
+        ...existingBoards.boards.map((board2) => board2.position ?? 0)
+      );
+      const board = normalizeBoardMetadata(
+        {
+          ...input,
+          id: boardId,
+          name,
+          position: input.position ?? maxPosition + POSITION_STEP
+        },
+        void 0
+      );
+      const milestone = this.createMilestoneRecord(
+        boardId,
+        {
+          title: initialMilestoneTitle,
+          description: void 0,
+          color: void 0,
+          position: POSITION_STEP
+        },
+        Date.now()
+      );
+      await this.boardStore.register(board.id, { version: 1, board });
+      try {
+        await this.milestoneStore.register(milestone.id, { version: 1, milestone });
+        await this.ensureProjectDocumentsDirect(boardId, milestone.createdAt);
+      } catch (error) {
+        for (const entry of await this.documentStore.entries()) {
+          if (entry.value?.version === 1 && entry.value.document.boardId === boardId) {
+            await this.documentStore.delete(entry.key);
+          }
+        }
+        await this.milestoneStore.delete(milestone.id);
+        await this.boardStore.delete(board.id);
+        throw error;
+      }
+      return {
+        board,
+        milestones: [milestone],
+        cards: []
+      };
+    });
+  }
+  async updateProject(input) {
+    return await this.enqueueMutation(async () => {
+      const boardId = normalizeBoardIdRequired(input.id);
+      const existing = await this.boardStore.lookup(boardId);
+      if (!existing && (await this.list({ boardId })).length === 0 && boardId !== "default") {
+        throw new Error(`project not found: ${boardId}`);
+      }
+      if (!existing) {
+        await this.ensureProjectDirect(boardId);
+      }
+      const board = normalizeBoardMetadata({ ...input, id: boardId }, existing?.board);
+      await this.boardStore.register(boardId, { version: 1, board });
+      await this.ensureProjectDocumentsDirect(boardId, board.updatedAt);
+      return board;
+    });
+  }
+  async reorderProjects(ids) {
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== "string")) {
+      throw new Error("project ids are required.");
+    }
+    return await this.enqueueMutation(async () => {
+      const seen = /* @__PURE__ */ new Set();
+      const boards = [];
+      for (const rawId of ids) {
+        const boardId = normalizeBoardIdRequired(rawId);
+        if (seen.has(boardId)) {
+          throw new Error("project ids must not contain duplicates.");
+        }
+        seen.add(boardId);
+        const entry = await this.boardStore.lookup(boardId);
+        if (!entry?.board) {
+          throw new Error(`project not found: ${boardId}`);
+        }
+        boards.push(entry.board);
+      }
+      const now = Date.now();
+      const updated = boards.map(
+        (board, index) => normalizeBoardMetadata(
+          { ...board, id: board.id, position: (index + 1) * POSITION_STEP },
+          board,
+          now
+        )
+      );
+      for (const board of updated) {
+        await this.boardStore.register(board.id, { version: 1, board });
+      }
+      return { projects: updated };
+    });
+  }
+  async archiveProject(id, archived = true) {
+    const boardId = normalizeBoardIdRequired(id);
+    return await this.enqueueMutation(async () => {
+      const existing = await this.boardStore.lookup(boardId);
+      const board = normalizeBoardMetadata(
+        { id: boardId, archived },
+        existing?.board
+      );
+      await this.boardStore.register(boardId, { version: 1, board });
+      return {
+        board,
+        runningCards: archived === false ? [] : boardRunningCards(await this.list({ boardId }))
+      };
+    });
+  }
+  async listMilestones(boardId) {
+    return { milestones: await this.listMilestonesDirect(normalizeBoardIdRequired(boardId)) };
+  }
+  async listMilestonesDirect(boardId) {
+    return (await this.milestoneStore.entries()).map((entry) => entry.value).filter(
+      (entry) => entry?.version === 1 && entry.milestone?.boardId === boardId
+    ).map((entry) => entry.milestone).toSorted((left, right) => left.position - right.position || left.createdAt - right.createdAt);
+  }
+  createMilestoneRecord(boardId, input, now) {
+    const title = normalizeTitle(input.title);
+    const description = normalizeBoundedString(input.description, void 0, 2e3, "milestone description");
+    const color = normalizeBoundedString(input.color, void 0, 40, "milestone color");
+    return {
+      id: randomUUID8(),
+      boardId,
+      title,
+      position: normalizePosition(input.position, POSITION_STEP),
+      state: "active",
+      createdAt: now,
+      updatedAt: now,
+      ...description ? { description } : {},
+      ...color ? { color } : {}
+    };
+  }
+  async createMilestone(input) {
+    return await this.enqueueMutation(async () => {
+      const boardId = normalizeBoardIdRequired(input.boardId);
+      await this.assertProjectCanReceiveCards(boardId);
+      await this.ensureProjectDirect(boardId);
+      const existing = await this.listMilestonesDirect(boardId);
+      const position = input.position === void 0 ? Math.max(0, ...existing.map((milestone2) => milestone2.position)) + POSITION_STEP : input.position;
+      const milestone = this.createMilestoneRecord(boardId, { ...input, position }, Date.now());
+      await this.milestoneStore.register(milestone.id, { version: 1, milestone });
+      return milestone;
+    });
+  }
+  async updateMilestone(id, input) {
+    return await this.enqueueMutation(async () => {
+      const existing = await this.milestoneStore.lookup(id.trim());
+      if (!existing?.milestone) {
+        throw new Error(`milestone not found: ${id}`);
+      }
+      const milestone = existing.milestone;
+      const title = input.title === void 0 ? milestone.title : normalizeTitle(input.title);
+      const description = input.description === void 0 ? milestone.description : normalizeBoundedString(input.description, void 0, 2e3, "milestone description");
+      const color = input.color === void 0 ? milestone.color : normalizeBoundedString(input.color, void 0, 40, "milestone color");
+      const next = {
+        ...milestone,
+        title,
+        updatedAt: Date.now(),
+        ...description ? { description } : {},
+        ...color ? { color } : {}
+      };
+      if (!description) {
+        delete next.description;
+      }
+      if (!color) {
+        delete next.color;
+      }
+      await this.milestoneStore.register(next.id, { version: 1, milestone: next });
+      return next;
+    });
+  }
+  async reorderMilestones(input) {
+    const boardId = normalizeBoardIdRequired(input.boardId);
+    if (!Array.isArray(input.milestoneIds) || input.milestoneIds.length === 0 || input.milestoneIds.some((id) => typeof id !== "string")) {
+      throw new Error("milestone ids are required.");
+    }
+    return await this.enqueueMutation(async () => {
+      const existing = await this.listMilestonesDirect(boardId);
+      const ids = input.milestoneIds;
+      if (new Set(ids).size !== ids.length || ids.length !== existing.length) {
+        throw new Error("milestone ids must contain every project milestone exactly once.");
+      }
+      const byId = new Map(existing.map((milestone) => [milestone.id, milestone]));
+      const now = Date.now();
+      const milestones = ids.map((id, index) => {
+        const milestone = byId.get(id);
+        if (!milestone) {
+          throw new Error(`milestone does not belong to project: ${id}`);
+        }
+        return { ...milestone, position: (index + 1) * POSITION_STEP, updatedAt: now };
+      });
+      for (const milestone of milestones) {
+        await this.milestoneStore.register(milestone.id, { version: 1, milestone });
+      }
+      return { milestones };
+    });
+  }
+  async completeMilestone(id) {
+    return await this.enqueueMutation(async () => {
+      const entry = await this.milestoneStore.lookup(id.trim());
+      if (!entry?.milestone) {
+        throw new Error(`milestone not found: ${id}`);
+      }
+      const milestone = entry.milestone;
+      if (milestone.state !== "active") {
+        throw new Error("only active milestones can be completed.");
+      }
+      const unfinished = (await this.list({ boardId: milestone.boardId })).filter(
+        (card) => card.milestoneId === milestone.id && !card.metadata?.archivedAt && card.status !== "done"
+      );
+      if (unfinished.length > 0) {
+        throw new Error(
+          `milestone has unfinished cards: ${unfinished.map((card) => `${card.id}:${card.title}`).join(", ")}`
+        );
+      }
+      const now = Date.now();
+      const next = {
+        ...milestone,
+        state: "completed",
+        completedAt: now,
+        updatedAt: now
+      };
+      await this.milestoneStore.register(next.id, { version: 1, milestone: next });
+      return next;
+    });
+  }
+  async archiveMilestone(id) {
+    return await this.setMilestoneState(id, "archived");
+  }
+  async restoreMilestone(id) {
+    return await this.setMilestoneState(id, "active");
+  }
+  async setMilestoneState(id, state) {
+    return await this.enqueueMutation(async () => {
+      if (!FLOWBOARD_MILESTONE_STATES.includes(state)) {
+        throw new Error("invalid milestone state.");
+      }
+      const entry = await this.milestoneStore.lookup(id.trim());
+      if (!entry?.milestone) {
+        throw new Error(`milestone not found: ${id}`);
+      }
+      const now = Date.now();
+      const next = {
+        ...entry.milestone,
+        state,
+        updatedAt: now,
+        ...state === "archived" ? { archivedAt: now } : {}
+      };
+      if (state === "active") {
+        delete next.archivedAt;
+        delete next.completedAt;
+      }
+      await this.milestoneStore.register(next.id, { version: 1, milestone: next });
+      return next;
+    });
+  }
+  async moveMilestone(id, input) {
+    return await this.enqueueMutation(async () => {
+      const card = await this.get(id);
+      if (!card) {
+        throw new Error(`card not found: ${id}`);
+      }
+      const boardId = cardBoardId(card);
+      await this.assertProjectCanReceiveCards(boardId);
+      const milestoneId = normalizeOptionalString(input.milestoneId);
+      if (milestoneId) {
+        const milestone = await this.milestoneStore.lookup(milestoneId);
+        if (!milestone?.milestone || milestone.milestone.boardId !== boardId || milestone.milestone.state !== "active") {
+          throw new Error("target milestone must be an active milestone in the current project.");
+        }
+      }
+      const position = input.position === void 0 ? Math.max(
+        0,
+        ...(await this.list({ boardId })).filter((candidate) => candidate.id !== card.id && candidate.milestoneId === milestoneId).map((candidate) => candidate.position)
+      ) + POSITION_STEP : normalizePosition(input.position, card.position);
+      const next = removeUndefinedCardFields({
+        ...card,
+        ...milestoneId ? { milestoneId } : {},
+        position,
+        updatedAt: Date.now()
+      });
+      if (!milestoneId) {
+        delete next.milestoneId;
+      }
+      if (card.milestoneId !== milestoneId) {
+        next.events = appendEvent(next, {
+          kind: "milestone_moved",
+          ...card.milestoneId ? { fromMilestoneId: card.milestoneId } : {},
+          ...milestoneId ? { toMilestoneId: milestoneId } : {}
+        });
+      }
+      await this.store.register(next.id, { version: 1, card: next });
+      return next;
+    });
+  }
+  async moveProject(id, input) {
+    return await this.enqueueMutation(async () => {
+      const card = await this.get(id);
+      if (!card) {
+        throw new Error(`card not found: ${id}`);
+      }
+      const boardId = normalizeBoardIdRequired(input.boardId);
+      const targetBoard = await this.boardStore.lookup(boardId);
+      if (!targetBoard && (await this.list({ boardId })).length === 0 && boardId !== "default") {
+        throw new Error(`target project not found: ${boardId}`);
+      }
+      await this.assertProjectCanReceiveCards(boardId);
+      await this.ensureProjectDirect(boardId);
+      const milestoneId = normalizeOptionalString(input.milestoneId);
+      if (milestoneId) {
+        const milestone = await this.milestoneStore.lookup(milestoneId);
+        if (!milestone?.milestone || milestone.milestone.boardId !== boardId || milestone.milestone.state !== "active") {
+          throw new Error("target milestone must be an active milestone in the target project.");
+        }
+      }
+      const position = input.position === void 0 ? Math.max(
+        0,
+        ...(await this.list({ boardId })).filter((candidate) => candidate.id !== card.id && candidate.milestoneId === milestoneId).map((candidate) => candidate.position)
+      ) + POSITION_STEP : normalizePosition(input.position, card.position);
+      const next = removeUndefinedCardFields({
+        ...card,
+        ...milestoneId ? { milestoneId } : {},
+        position,
+        updatedAt: Date.now(),
+        metadata: {
+          ...card.metadata,
+          automation: {
+            ...card.metadata?.automation,
+            boardId
+          }
+        }
+      });
+      if (!milestoneId) {
+        delete next.milestoneId;
+      }
+      next.events = appendEvent(next, {
+        kind: "milestone_moved",
+        ...card.milestoneId ? { fromMilestoneId: card.milestoneId } : {},
+        ...milestoneId ? { toMilestoneId: milestoneId } : {}
+      });
+      await this.store.register(next.id, { version: 1, card: next });
+      return next;
+    });
+  }
+  async listProjectDocuments(boardId, options = {}) {
+    const normalizedBoardId = normalizeBoardIdRequired(boardId);
+    return await this.enqueueMutation(async () => {
+      await this.ensureProjectDirect(normalizedBoardId);
+      const documents = (await this.documentStore.entries()).map((entry) => entry.value).filter(
+        (entry) => entry?.version === 1 && entry.document?.boardId === normalizedBoardId
+      ).map((entry) => entry.document).filter((document) => options.includeHidden === true || !document.hiddenAt).toSorted(
+        (left, right) => left.section.localeCompare(right.section) || left.position - right.position || left.createdAt - right.createdAt
+      );
+      return { documents };
+    });
+  }
+  async createProjectDocument(input) {
+    return await this.enqueueMutation(async () => {
+      const boardId = normalizeBoardIdRequired(input.boardId);
+      await this.assertProjectCanReceiveCards(boardId);
+      await this.ensureProjectDirect(boardId);
+      const key = normalizeDocumentKey(input.key);
+      const section = normalizeDocumentSection(input.section);
+      const type = normalizeDocumentType(input.type);
+      const title = normalizeTitle(input.title);
+      const summary = normalizeBoundedString(input.summary, void 0, 1e3, "document summary");
+      const body = normalizeDocumentBody(input, type);
+      const entries = await this.documentStore.entries();
+      if (entries.some(
+        (entry) => entry.value?.version === 1 && entry.value.document.boardId === boardId && entry.value.document.key === key
+      )) {
+        throw new Error(`project document key already exists: ${key}`);
+      }
+      const sameSection = entries.map((entry) => entry.value).filter(
+        (entry) => entry?.version === 1 && entry.document.boardId === boardId && entry.document.section === section
+      );
+      const now = Date.now();
+      const document = {
+        id: randomUUID8(),
+        boardId,
+        key,
+        section,
+        type,
+        title,
+        position: input.position === void 0 ? Math.max(0, ...sameSection.map((entry) => entry.document.position)) + POSITION_STEP : normalizePosition(input.position, POSITION_STEP),
+        createdAt: now,
+        updatedAt: now,
+        ...summary ? { summary } : {},
+        ...body
+      };
+      await this.documentStore.register(document.id, { version: 1, document });
+      return document;
+    });
+  }
+  async updateProjectDocument(id, input) {
+    return await this.enqueueMutation(async () => {
+      const entry = await this.documentStore.lookup(id.trim());
+      if (!entry?.document) {
+        throw new Error(`project document not found: ${id}`);
+      }
+      const existing = entry.document;
+      await this.assertProjectCanReceiveCards(existing.boardId);
+      const type = normalizeDocumentType(input.type, existing.type);
+      const title = input.title === void 0 ? existing.title : normalizeTitle(input.title);
+      const summary = input.summary === void 0 ? existing.summary : normalizeBoundedString(input.summary, void 0, 1e3, "document summary");
+      const body = normalizeDocumentBody(input, type, existing);
+      const next = {
+        ...existing,
+        type,
+        title,
+        updatedAt: Date.now(),
+        ...summary ? { summary } : {},
+        ...body
+      };
+      if (!summary) {
+        delete next.summary;
+      }
+      if (!body.target) {
+        delete next.target;
+      }
+      if (!body.content) {
+        delete next.content;
+      }
+      await this.documentStore.register(next.id, { version: 1, document: next });
+      return next;
+    });
+  }
+  async hideProjectDocument(id, hidden = true) {
+    return await this.enqueueMutation(async () => {
+      const entry = await this.documentStore.lookup(id.trim());
+      if (!entry?.document) {
+        throw new Error(`project document not found: ${id}`);
+      }
+      const next = {
+        ...entry.document,
+        updatedAt: Date.now(),
+        ...hidden === false ? {} : { hiddenAt: Date.now() }
+      };
+      if (hidden === false) {
+        delete next.hiddenAt;
+      }
+      await this.documentStore.register(next.id, { version: 1, document: next });
+      return next;
+    });
+  }
+  async deleteProjectDocument(id) {
+    return await this.enqueueMutation(async () => {
+      const entry = await this.documentStore.lookup(id.trim());
+      if (!entry?.document) {
+        return { deleted: false };
+      }
+      if (entry.document.system) {
+        throw new Error("standard project documents can be hidden but not deleted.");
+      }
+      return { deleted: await this.documentStore.delete(entry.document.id) };
+    });
+  }
+  async reorderProjectDocuments(input) {
+    const boardId = normalizeBoardIdRequired(input.boardId);
+    if (!Array.isArray(input.documentIds) || input.documentIds.length === 0 || input.documentIds.some((id) => typeof id !== "string")) {
+      throw new Error("document ids are required.");
+    }
+    return await this.enqueueMutation(async () => {
+      const ids = input.documentIds;
+      if (new Set(ids).size !== ids.length) {
+        throw new Error("document ids must not contain duplicates.");
+      }
+      const entries = await Promise.all(ids.map((id) => this.documentStore.lookup(id)));
+      const documents = entries.map((entry, index) => {
+        if (!entry?.document || entry.document.boardId !== boardId) {
+          throw new Error(`project document does not belong to project: ${ids[index]}`);
+        }
+        return entry.document;
+      });
+      const section = documents[0]?.section;
+      if (!section || documents.some((document) => document.section !== section)) {
+        throw new Error("project documents can only be reordered within one section.");
+      }
+      const now = Date.now();
+      const reordered = documents.map((document, index) => ({
+        ...document,
+        position: (index + 1) * POSITION_STEP,
+        updatedAt: now
+      }));
+      for (const document of reordered) {
+        await this.documentStore.register(document.id, { version: 1, document });
+      }
+      return { documents: reordered };
+    });
+  }
+  async update(id, patch) {
+    const raw = patch;
+    if (Object.hasOwn(raw, "boardId") || Object.hasOwn(raw, "milestoneId") || Object.hasOwn(raw, "position")) {
+      throw new Error("use the dedicated project or milestone move operation for card placement.");
+    }
+    return await super.update(id, patch);
+  }
+  async deleteBoard(id) {
+    const boardId = normalizeBoardIdRequired(id);
+    if ((await this.listMilestonesDirect(boardId)).length > 0 || (await this.documentStore.entries()).some(
+      (entry) => entry.value?.version === 1 && entry.value.document.boardId === boardId
+    )) {
+      throw new Error("initialized projects cannot be permanently deleted.");
+    }
+    return await super.deleteBoard(boardId);
+  }
+  async createDirect(input, scope) {
+    const parentId = normalizeOptionalString(input.createdByCardId) ?? (Array.isArray(input.parents) ? input.parents.find(
+      (value) => typeof value === "string" && value.trim() !== ""
+    ) : void 0);
+    const parent = parentId ? await this.get(parentId) : void 0;
+    const inheritedBoardId = parent ? cardBoardId(parent) : void 0;
+    const boardId = normalizeBoardId(input.boardId, inheritedBoardId) ?? "default";
+    const milestoneId = normalizeOptionalString(input.milestoneId) ?? parent?.milestoneId;
+    await this.assertProjectCanReceiveCards(boardId);
+    const board = await this.ensureBoardDirect(boardId);
+    if (milestoneId) {
+      const milestone = await this.milestoneStore.lookup(milestoneId);
+      if (!milestone?.milestone || milestone.milestone.boardId !== boardId || milestone.milestone.state !== "active") {
+        throw new Error("milestone must be an active milestone in the target project.");
+      }
+    }
+    return await super.createDirect(
+      {
+        ...input,
+        boardId,
+        ...milestoneId ? { milestoneId } : {},
+        ...!input.workspace && board.defaultWorkspace ? { workspace: board.defaultWorkspace } : {}
+      },
+      scope
+    );
+  }
+};
+
 // src/backend/src/store.ts
-var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
+var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
   async shouldAutoOrchestrate(card) {
     if (card.status !== "triage" || card.metadata?.archivedAt || card.metadata?.workerProtocol?.state === "idle") {
       return false;
@@ -5943,6 +7398,9 @@ var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
       const orchestrated = [];
       const orchestratedByBoard = /* @__PURE__ */ new Map();
       for (const card of await this.list({ boardId })) {
+        if (await this.isProjectArchived(cardBoardId(card))) {
+          continue;
+        }
         if (card.metadata?.archivedAt) {
           continue;
         }
@@ -5969,7 +7427,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
               notifications: [
                 ...latest.metadata?.notifications ?? [],
                 {
-                  id: randomUUID8(),
+                  id: randomUUID9(),
                   kind: "failed",
                   createdAt: now,
                   sequence: this.nextNotificationSequence(now),
@@ -5993,7 +7451,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
               notifications: [
                 ...latest.metadata?.notifications ?? [],
                 {
-                  id: randomUUID8(),
+                  id: randomUUID9(),
                   kind: "failed",
                   createdAt: now,
                   sequence: this.nextNotificationSequence(now),
@@ -6117,6 +7575,14 @@ var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
           namespace: "flowboard.boards",
           maxEntries: 200
         }),
+        milestones: openKeyedStore({
+          namespace: "flowboard.milestones",
+          maxEntries: 2e3
+        }),
+        documents: openKeyedStore({
+          namespace: "flowboard.project-documents",
+          maxEntries: 4e3
+        }),
         subscriptions: openKeyedStore({
           namespace: "flowboard.notify",
           maxEntries: 2e3
@@ -6132,6 +7598,8 @@ var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
     const stores = createFlowboardSqliteStores();
     return new _FlowboardStore(stores.cards, {
       boards: stores.boards,
+      milestones: stores.milestones,
+      documents: stores.documents,
       subscriptions: stores.subscriptions,
       attachments: stores.attachments,
       dataVersion: stores.dataVersion
@@ -6140,8 +7608,8 @@ var FlowboardStore = class _FlowboardStore extends FlowboardNotificationStore {
 };
 
 // src/backend/src/gateway.ts
-var READ_SCOPE = "operator.read";
-var WRITE_SCOPE2 = "operator.write";
+var READ_SCOPE2 = "operator.read";
+var WRITE_SCOPE3 = "operator.write";
 var CHANGE_WAIT_MAX_MS = 3e4;
 var CHANGE_WAIT_DEFAULT_MS = 25e3;
 function readChangeCursor(value) {
@@ -6190,7 +7658,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.changes.wait",
@@ -6207,9 +7675,10 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   registerFlowboardWorkspaceCardMethods({ api, store, redactCard: redactClaimToken });
+  registerFlowboardProjectGatewayMethods({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
     "flowboard.cards.move",
     async ({ params: requestParams, respond }) => {
@@ -6223,7 +7692,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.delete",
@@ -6234,7 +7703,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.comment",
@@ -6247,7 +7716,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.link",
@@ -6260,7 +7729,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.linkDependency",
@@ -6278,7 +7747,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.proof",
@@ -6291,7 +7760,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.artifact",
@@ -6304,7 +7773,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.claim",
@@ -6316,7 +7785,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.heartbeat",
@@ -6329,7 +7798,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.release",
@@ -6342,7 +7811,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.promote",
@@ -6355,7 +7824,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.reassign",
@@ -6368,7 +7837,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.reclaim",
@@ -6381,7 +7850,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.complete",
@@ -6394,7 +7863,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.block",
@@ -6407,7 +7876,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.unblock",
@@ -6420,7 +7889,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   registerFlowboardWorkspaceBulkMethod({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
@@ -6432,7 +7901,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.diagnostics.refresh",
@@ -6443,17 +7912,17 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.dispatch",
     async (context) => await dispatchCards(context, { supportsMaxStarts: false }),
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.dispatchWithOptions",
     async (context) => await dispatchCards(context, { supportsMaxStarts: true }),
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.boards.list",
@@ -6464,7 +7933,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   registerFlowboardWorkspaceBoardMethod({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
@@ -6478,7 +7947,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.boards.delete",
@@ -6489,7 +7958,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.stats",
@@ -6500,7 +7969,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.runs",
@@ -6512,7 +7981,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   registerFlowboardWorkspaceWorkflowMethods({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
@@ -6524,7 +7993,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.notifications.list",
@@ -6535,7 +8004,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.notifications.delete",
@@ -6546,7 +8015,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.notifications.events",
@@ -6558,7 +8027,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.notifications.advance",
@@ -6569,7 +8038,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.attachments.list",
@@ -6581,7 +8050,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.attachments.get",
@@ -6596,7 +8065,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.attachments.add",
@@ -6609,7 +8078,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.attachments.delete",
@@ -6628,7 +8097,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.workerLog",
@@ -6641,7 +8110,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.protocolViolation",
@@ -6656,7 +8125,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.archive",
@@ -6671,7 +8140,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: WRITE_SCOPE2 }
+    { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
     "flowboard.cards.export",
@@ -6683,7 +8152,7 @@ function registerFlowboardGatewayMethods(params) {
         respondError(respond, error);
       }
     },
-    { scope: READ_SCOPE }
+    { scope: READ_SCOPE2 }
   );
 }
 
@@ -6724,14 +8193,15 @@ function createFlowboardChangeEventService(store) {
 init_contract();
 init_card_lookup();
 var ADMIN_SCOPE = "operator.admin";
-var WRITE_SCOPE3 = "operator.write";
+var WRITE_SCOPE4 = "operator.write";
 function splitArgs(input) {
   return (input ?? "").trim().split(/\s+/).filter(Boolean);
 }
 function formatCardLine(card) {
   const boardId = card.metadata?.automation?.boardId ?? "default";
+  const milestone = card.milestoneId ? `/${card.milestoneId.slice(0, 8)}` : "/unassigned";
   const agent = card.agentId ? ` @${card.agentId}` : "";
-  return `${card.id.slice(0, 8)} ${card.status.padEnd(8)} ${card.priority.padEnd(6)} [${boardId}]${agent} ${card.title}`;
+  return `${card.id.slice(0, 8)} ${card.status.padEnd(8)} ${card.priority.padEnd(6)} [${boardId}${milestone}]${agent} ${card.title}`;
 }
 function formatCardDetails(card) {
   const lines = [
@@ -6739,7 +8209,8 @@ function formatCardDetails(card) {
     `id: ${card.id}`,
     `status: ${card.status}`,
     `priority: ${card.priority}`,
-    `board: ${card.metadata?.automation?.boardId ?? "default"}`
+    `board: ${card.metadata?.automation?.boardId ?? "default"}`,
+    `milestone: ${card.milestoneId ?? "unassigned"}`
   ];
   if (card.agentId) {
     lines.push(`agent: ${card.agentId}`);
@@ -6758,13 +8229,21 @@ function formatCardDetails(card) {
 function normalizeTitle2(tokens) {
   return tokens.join(" ").trim();
 }
+function optionValue(tokens, flag) {
+  const index = tokens.indexOf(flag);
+  return index >= 0 ? tokens[index + 1] : void 0;
+}
+function withoutOption(tokens, flag) {
+  const index = tokens.indexOf(flag);
+  return index >= 0 ? [...tokens.slice(0, index), ...tokens.slice(index + 2)] : tokens;
+}
 function isFlowboardStatus(value) {
   return FLOWBOARD_STATUSES.includes(value);
 }
 function canMutateFlowboard(params) {
   const scopes = params.gatewayClientScopes;
   if (scopes) {
-    return scopes.includes(ADMIN_SCOPE) || scopes.includes(WRITE_SCOPE3);
+    return scopes.includes(ADMIN_SCOPE) || scopes.includes(WRITE_SCOPE4);
   }
   return params.senderIsOwner === true;
 }
@@ -6773,7 +8252,7 @@ function requireWriteAccess(params) {
     return void 0;
   }
   return {
-    text: `This command requires gateway scope: ${WRITE_SCOPE3}.`,
+    text: `This command requires gateway scope: ${WRITE_SCOPE4}.`,
     isError: true
   };
 }
@@ -6786,6 +8265,9 @@ async function handleFlowboardCommand(params) {
         "/flowboard show <card-id>",
         "/flowboard create <title>",
         "/flowboard move <card-id> --status <status>",
+        "/flowboard project list",
+        "/flowboard project create <id> <name> --milestone <title>",
+        "/flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
         "/flowboard dispatch"
       ].join("\n")
     };
@@ -6809,15 +8291,79 @@ async function handleFlowboardCommand(params) {
     if (accessError) {
       return accessError;
     }
-    const title = normalizeTitle2(rest);
+    const boardId = optionValue(rest, "--board");
+    const milestoneId = optionValue(rest, "--milestone");
+    const title = normalizeTitle2(withoutOption(withoutOption(rest, "--board"), "--milestone"));
     if (!title) {
       return { text: "Usage: /flowboard create <title>", isError: true };
     }
     const workspaceAccess = await canonicalizeFlowboardWorkspaceAccess(
       params.workspaceAccess ?? { unrestricted: true }
     );
-    const card = await params.store.create({ title, workspaceAccess });
+    const card = await params.store.create({ title, boardId, milestoneId, workspaceAccess });
     return { text: `Created ${card.id.slice(0, 8)} ${card.title}` };
+  }
+  if (action === "project") {
+    const accessError = requireWriteAccess(params);
+    if (accessError) {
+      return accessError;
+    }
+    const [projectAction = "list", ...projectArgs] = rest;
+    if (projectAction === "list") {
+      const projects = await params.store.listProjects();
+      return {
+        text: projects.projects.length ? projects.projects.map((project) => `${project.id} ${project.name ?? project.id}`).join("\n") : "No Flowboard projects."
+      };
+    }
+    if (projectAction === "create") {
+      const id = projectArgs[0];
+      const milestoneTitle = optionValue(projectArgs, "--milestone");
+      const name = normalizeTitle2(withoutOption(projectArgs.slice(1), "--milestone"));
+      if (!id || !name || !milestoneTitle) {
+        return {
+          text: "Usage: /flowboard project create <id> <name> --milestone <title>",
+          isError: true
+        };
+      }
+      const project = await params.store.createProject({
+        id,
+        name,
+        initialMilestoneTitle: milestoneTitle
+      });
+      return { text: `Created project ${project.board.id}.` };
+    }
+    if (projectAction === "milestone") {
+      const [milestoneAction, ...milestoneArgs] = projectArgs;
+      if (milestoneAction === "move-card") {
+        const cardId = milestoneArgs[0];
+        const milestoneId = optionValue(milestoneArgs, "--milestone");
+        if (!cardId || !milestoneId) {
+          return {
+            text: "Usage: /flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
+            isError: true
+          };
+        }
+        const { card, error } = resolveFlowboardCardByIdOrPrefix(
+          await params.store.list(),
+          cardId
+        );
+        if (!card) {
+          return { text: error, isError: true };
+        }
+        return {
+          text: formatCardLine(
+            await params.store.moveMilestone(card.id, {
+              milestoneId: milestoneId === "unassigned" ? void 0 : milestoneId
+            })
+          )
+        };
+      }
+      return {
+        text: "Usage: /flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
+        isError: true
+      };
+    }
+    return { text: `Unknown Flowboard project action: ${projectAction}`, isError: true };
   }
   if (action === "move") {
     const accessError = requireWriteAccess(params);
@@ -11385,6 +12931,7 @@ function summarizeCard(card) {
     agentId: card.agentId,
     tenant: card.metadata?.automation?.tenant,
     boardId: card.metadata?.automation?.boardId ?? "default",
+    milestoneId: card.milestoneId,
     parents: card.metadata?.links?.filter((link) => link.type === "parent" && link.targetCardId).map((link) => link.targetCardId),
     children: card.metadata?.links?.filter((link) => link.type === "child" && link.targetCardId).map((link) => link.targetCardId),
     claim: card.metadata?.claim ? {
@@ -11513,6 +13060,9 @@ function createFlowboardTools(params) {
           ),
           tenant: typebox_exports.Optional(typebox_exports.String({ description: "Soft tenant namespace." })),
           boardId: typebox_exports.Optional(typebox_exports.String({ description: "Soft board namespace." })),
+          milestoneId: typebox_exports.Optional(
+            typebox_exports.String({ description: "Active milestone id; omit for the Unassigned column." })
+          ),
           createdByCardId: typebox_exports.Optional(
             typebox_exports.String({ description: "Parent card that created this card." })
           ),
@@ -11850,6 +13400,142 @@ function createFlowboardTools(params) {
       }
     },
     createFlowboardMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
+    {
+      name: "flowboard_projects",
+      label: "Flowboard Projects",
+      description: "List Flowboard projects and their card summaries.",
+      parameters: typebox_exports.Object(
+        {
+          includeArchived: typebox_exports.Optional(typebox_exports.Boolean())
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => jsonResult(await store.listProjects(rawParams))
+    },
+    {
+      name: "flowboard_project_create",
+      label: "Flowboard Project Create",
+      description: "Create a Flowboard project with its first milestone and standard documents.",
+      parameters: typebox_exports.Object(
+        {
+          id: typebox_exports.String({ description: "Stable project id." }),
+          name: typebox_exports.String({ description: "Project name." }),
+          initialMilestoneTitle: typebox_exports.String({ description: "First milestone title." }),
+          description: typebox_exports.Optional(typebox_exports.String()),
+          color: typebox_exports.Optional(typebox_exports.String()),
+          repositoryUrl: typebox_exports.Optional(typebox_exports.String()),
+          planningPath: typebox_exports.Optional(typebox_exports.String())
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => jsonResult({ project: await store.createProject(rawParams) })
+    },
+    {
+      name: "flowboard_project_read",
+      label: "Flowboard Project Read",
+      description: "Read one Flowboard project's settings, milestones, and cards.",
+      parameters: typebox_exports.Object({ id: typebox_exports.String() }, { additionalProperties: false }),
+      execute: async (_toolCallId, rawParams) => jsonResult({
+        project: await store.getProject(readStringParam(rawParams, "id", {
+          required: true
+        }))
+      })
+    },
+    {
+      name: "flowboard_milestone_create",
+      label: "Flowboard Milestone Create",
+      description: "Create an active milestone column in a Flowboard project.",
+      parameters: typebox_exports.Object(
+        {
+          boardId: typebox_exports.String(),
+          title: typebox_exports.String(),
+          description: typebox_exports.Optional(typebox_exports.String()),
+          color: typebox_exports.Optional(typebox_exports.String())
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => jsonResult({ milestone: await store.createMilestone(rawParams) })
+    },
+    {
+      name: "flowboard_move_milestone",
+      label: "Flowboard Move Milestone",
+      description: "Move a card between milestone columns without changing its execution status.",
+      parameters: typebox_exports.Object(
+        {
+          id: cardIdField(),
+          milestoneId: typebox_exports.Optional(
+            typebox_exports.String({ description: "Target milestone id; omit to move into Unassigned." })
+          ),
+          position: typebox_exports.Optional(typebox_exports.Number()),
+          token: ScopedClaimTokenField
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => {
+        const { record, id } = await readScopedCardToolParams(rawParams);
+        return redactedCardResult(await store.moveMilestone(id, record));
+      }
+    },
+    {
+      name: "flowboard_move_project",
+      label: "Flowboard Move Project",
+      description: "Move a card to another active project while retaining its execution history.",
+      parameters: typebox_exports.Object(
+        {
+          id: cardIdField(),
+          boardId: typebox_exports.String({ description: "Target project id." }),
+          milestoneId: typebox_exports.Optional(typebox_exports.String()),
+          position: typebox_exports.Optional(typebox_exports.Number()),
+          token: ScopedClaimTokenField
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => {
+        const { record, id } = await readScopedCardToolParams(rawParams);
+        return redactedCardResult(await store.moveProject(id, record));
+      }
+    },
+    {
+      name: "flowboard_project_documents",
+      label: "Flowboard Project Documents",
+      description: "List a project's long-lived context documents.",
+      parameters: typebox_exports.Object(
+        {
+          boardId: typebox_exports.String(),
+          includeHidden: typebox_exports.Optional(typebox_exports.Boolean())
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => {
+        const record = rawParams;
+        return jsonResult(
+          await store.listProjectDocuments(record.boardId, {
+            includeHidden: record.includeHidden
+          })
+        );
+      }
+    },
+    {
+      name: "flowboard_project_document_create",
+      label: "Flowboard Project Document Create",
+      description: "Add a typed project document without reading files or secrets.",
+      parameters: typebox_exports.Object(
+        {
+          boardId: typebox_exports.String(),
+          key: typebox_exports.String(),
+          section: typebox_exports.String({ description: "project, codebase, environment, or knowledge." }),
+          type: typebox_exports.String({ description: "markdown, json, link, path, or secret_ref." }),
+          title: typebox_exports.String(),
+          summary: typebox_exports.Optional(typebox_exports.String()),
+          target: typebox_exports.Optional(typebox_exports.String()),
+          content: typebox_exports.Optional(typebox_exports.String())
+        },
+        { additionalProperties: false }
+      ),
+      execute: async (_toolCallId, rawParams) => jsonResult({
+        document: await store.createProjectDocument(rawParams)
+      })
+    },
     {
       name: "flowboard_boards",
       label: "Flowboard Boards",

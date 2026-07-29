@@ -327,7 +327,12 @@ async function runFlowboardDispatch(
   const started: FlowboardStartedRun[] = [];
   const startFailures: FlowboardStartFailure[] = [];
   const cards = await params.store.list();
-  const candidates = await params.store.list({ boardId });
+  const candidates: FlowboardCard[] = [];
+  for (const candidate of await params.store.list({ boardId })) {
+    if (!(await params.store.isProjectArchived(cardBoardId(candidate)))) {
+      candidates.push(candidate);
+    }
+  }
   const ownerOverride = params.options?.ownerId?.trim() || undefined;
   const startedOwners = new Set<string>();
   // Allow one fallback per worker slot without draining the queue during an outage.

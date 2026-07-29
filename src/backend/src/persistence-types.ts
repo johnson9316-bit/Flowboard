@@ -3,7 +3,9 @@ import type {
   FlowboardAttachment,
   FlowboardBoardMetadata,
   FlowboardCard,
+  FlowboardMilestone,
   FlowboardNotificationSubscription,
+  FlowboardProjectDocument,
 } from "../../contract/index.js";
 
 export type PersistedFlowboardCard = {
@@ -14,6 +16,16 @@ export type PersistedFlowboardCard = {
 export type PersistedFlowboardBoard = {
   version: 1;
   board: FlowboardBoardMetadata;
+};
+
+export type PersistedFlowboardMilestone = {
+  version: 1;
+  milestone: FlowboardMilestone;
+};
+
+export type PersistedFlowboardProjectDocument = {
+  version: 1;
+  document: FlowboardProjectDocument;
 };
 
 export type PersistedFlowboardNotificationSubscription = {

@@ -42,8 +42,9 @@ function splitArgs(input: string | undefined): string[] {
 
 function formatCardLine(card: FlowboardCard): string {
   const boardId = card.metadata?.automation?.boardId ?? "default";
+  const milestone = card.milestoneId ? `/${card.milestoneId.slice(0, 8)}` : "/unassigned";
   const agent = card.agentId ? ` @${card.agentId}` : "";
-  return `${card.id.slice(0, 8)} ${card.status.padEnd(8)} ${card.priority.padEnd(6)} [${boardId}]${agent} ${card.title}`;
+  return `${card.id.slice(0, 8)} ${card.status.padEnd(8)} ${card.priority.padEnd(6)} [${boardId}${milestone}]${agent} ${card.title}`;
 }
 
 function formatCardDetails(card: FlowboardCard): string {
@@ -53,6 +54,7 @@ function formatCardDetails(card: FlowboardCard): string {
     `status: ${card.status}`,
     `priority: ${card.priority}`,
     `board: ${card.metadata?.automation?.boardId ?? "default"}`,
+    `milestone: ${card.milestoneId ?? "unassigned"}`,
   ];
   if (card.agentId) {
     lines.push(`agent: ${card.agentId}`);
@@ -71,6 +73,16 @@ function formatCardDetails(card: FlowboardCard): string {
 
 function normalizeTitle(tokens: string[]): string {
   return tokens.join(" ").trim();
+}
+
+function optionValue(tokens: string[], flag: string): string | undefined {
+  const index = tokens.indexOf(flag);
+  return index >= 0 ? tokens[index + 1] : undefined;
+}
+
+function withoutOption(tokens: string[], flag: string): string[] {
+  const index = tokens.indexOf(flag);
+  return index >= 0 ? [...tokens.slice(0, index), ...tokens.slice(index + 2)] : tokens;
 }
 
 function isFlowboardStatus(value: string): value is FlowboardStatus {
@@ -125,6 +137,9 @@ async function handleFlowboardCommand(params: {
         "/flowboard show <card-id>",
         "/flowboard create <title>",
         "/flowboard move <card-id> --status <status>",
+        "/flowboard project list",
+        "/flowboard project create <id> <name> --milestone <title>",
+        "/flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
         "/flowboard dispatch",
       ].join("\n"),
     };
@@ -148,15 +163,83 @@ async function handleFlowboardCommand(params: {
     if (accessError) {
       return accessError;
     }
-    const title = normalizeTitle(rest);
+    const boardId = optionValue(rest, "--board");
+    const milestoneId = optionValue(rest, "--milestone");
+    const title = normalizeTitle(withoutOption(withoutOption(rest, "--board"), "--milestone"));
     if (!title) {
       return { text: "Usage: /flowboard create <title>", isError: true };
     }
     const workspaceAccess = await canonicalizeFlowboardWorkspaceAccess(
       params.workspaceAccess ?? { unrestricted: true },
     );
-    const card = await params.store.create({ title, workspaceAccess });
+    const card = await params.store.create({ title, boardId, milestoneId, workspaceAccess });
     return { text: `Created ${card.id.slice(0, 8)} ${card.title}` };
+  }
+  if (action === "project") {
+    const accessError = requireWriteAccess(params);
+    if (accessError) {
+      return accessError;
+    }
+    const [projectAction = "list", ...projectArgs] = rest;
+    if (projectAction === "list") {
+      const projects = await params.store.listProjects();
+      return {
+        text: projects.projects.length
+          ? projects.projects
+              .map((project) => `${project.id} ${project.name ?? project.id}`)
+              .join("\n")
+          : "No Flowboard projects.",
+      };
+    }
+    if (projectAction === "create") {
+      const id = projectArgs[0];
+      const milestoneTitle = optionValue(projectArgs, "--milestone");
+      const name = normalizeTitle(withoutOption(projectArgs.slice(1), "--milestone"));
+      if (!id || !name || !milestoneTitle) {
+        return {
+          text: "Usage: /flowboard project create <id> <name> --milestone <title>",
+          isError: true,
+        };
+      }
+      const project = await params.store.createProject({
+        id,
+        name,
+        initialMilestoneTitle: milestoneTitle,
+      });
+      return { text: `Created project ${project.board.id}.` };
+    }
+    if (projectAction === "milestone") {
+      const [milestoneAction, ...milestoneArgs] = projectArgs;
+      if (milestoneAction === "move-card") {
+        const cardId = milestoneArgs[0];
+        const milestoneId = optionValue(milestoneArgs, "--milestone");
+        if (!cardId || !milestoneId) {
+          return {
+            text: "Usage: /flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
+            isError: true,
+          };
+        }
+        const { card, error } = resolveFlowboardCardByIdOrPrefix(
+          await params.store.list(),
+          cardId,
+        );
+        if (!card) {
+          return { text: error, isError: true };
+        }
+        return {
+          text: formatCardLine(
+            await params.store.moveMilestone(card.id, {
+              milestoneId: milestoneId === "unassigned" ? undefined : milestoneId,
+            }),
+          ),
+        };
+      }
+      return {
+        text: "Usage: /flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
+        isError: true,
+      };
+    }
+    return { text: `Unknown Flowboard project action: ${projectAction}`, isError: true };
   }
   if (action === "move") {
     const accessError = requireWriteAccess(params);

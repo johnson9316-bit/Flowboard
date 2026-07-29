@@ -4,15 +4,21 @@ import { describe, expect, it } from "vitest";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-describe("imported Workboard UI host", () => {
-  it("uses the upstream page and live refresh instead of cards.list polling", () => {
+describe("Flowboard M2 project UI host", () => {
+  it("uses the project page and live refresh instead of cards.list polling", () => {
     const main = fs.readFileSync(path.join(root, "ui/src/main.ts"), "utf8");
-    const page = fs.readFileSync(path.join(root, "ui/src/pages/workboard/view.ts"), "utf8");
+    const page = fs.readFileSync(path.join(root, "ui/src/pages/projects/project-view.ts"), "utf8");
 
-    expect(main).toContain('from "./pages/workboard/view.ts"');
+    expect(main).toContain('from "./pages/projects/project-view.ts"');
     expect(main).toContain("flowboard.changes.wait");
+    expect(main).toContain("flowboard.projects.list");
+    expect(main).toContain("flowboard.projects.get");
+    expect(main).toContain("flowboard.cards.moveMilestone");
+    expect(main).toContain("flowboard.cards.moveProject");
     expect(main).not.toMatch(/setInterval\s*\(/);
-    expect(page).toContain('from "../../lib/workboard/index.ts"');
+    expect(page).toContain("flowboardProject.unassigned");
+    expect(page).toContain("draggable=");
+    expect(page).toContain("flowboard-project__kanban");
   });
 
   it("keeps all imported locale bundles and their source metadata", () => {

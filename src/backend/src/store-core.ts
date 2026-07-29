@@ -11,7 +11,9 @@ import type {
   PersistedFlowboardAttachment,
   PersistedFlowboardBoard,
   PersistedFlowboardCard,
+  PersistedFlowboardMilestone,
   PersistedFlowboardNotificationSubscription,
+  PersistedFlowboardProjectDocument,
   FlowboardKeyedStore,
 } from "./persistence-types.js";
 import { normalizeAutomationPatch, normalizeCardAutomation } from "./store-automation.js";
@@ -73,6 +75,8 @@ export class FlowboardCoreStore {
   private readonly changes: FlowboardChangeTracker;
   protected readonly store: FlowboardKeyedStore;
   protected readonly boardStore: FlowboardKeyedStore<PersistedFlowboardBoard>;
+  protected readonly milestoneStore: FlowboardKeyedStore<PersistedFlowboardMilestone>;
+  protected readonly documentStore: FlowboardKeyedStore<PersistedFlowboardProjectDocument>;
   protected readonly subscriptionStore: FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>;
   protected readonly attachmentStore: FlowboardKeyedStore<PersistedFlowboardAttachment>;
 
@@ -80,6 +84,8 @@ export class FlowboardCoreStore {
     store: FlowboardKeyedStore,
     stores: {
       boards?: FlowboardKeyedStore<PersistedFlowboardBoard>;
+      milestones?: FlowboardKeyedStore<PersistedFlowboardMilestone>;
+      documents?: FlowboardKeyedStore<PersistedFlowboardProjectDocument>;
       subscriptions?: FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>;
       attachments?: FlowboardKeyedStore<PersistedFlowboardAttachment>;
       dataVersion?: () => number;
@@ -89,6 +95,13 @@ export class FlowboardCoreStore {
     this.store = this.changes.track(store);
     this.boardStore = this.changes.track(
       stores.boards ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardBoard>),
+    );
+    this.milestoneStore = this.changes.track(
+      stores.milestones ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardMilestone>),
+    );
+    this.documentStore = this.changes.track(
+      stores.documents ??
+        (store as unknown as FlowboardKeyedStore<PersistedFlowboardProjectDocument>),
     );
     this.subscriptionStore =
       stores.subscriptions ??
@@ -208,6 +221,14 @@ export class FlowboardCoreStore {
         ...(board.description ? { description: board.description } : {}),
         ...(board.icon ? { icon: board.icon } : {}),
         ...(board.color ? { color: board.color } : {}),
+        ...(board.position !== undefined ? { position: board.position } : {}),
+        ...(board.version ? { version: board.version } : {}),
+        ...(board.currentObjective ? { currentObjective: board.currentObjective } : {}),
+        ...(board.coreValue ? { coreValue: board.coreValue } : {}),
+        ...(board.sourceOfTruth ? { sourceOfTruth: board.sourceOfTruth } : {}),
+        ...(board.repositoryUrl ? { repositoryUrl: board.repositoryUrl } : {}),
+        ...(board.planningPath ? { planningPath: board.planningPath } : {}),
+        ...(board.homepageUrl ? { homepageUrl: board.homepageUrl } : {}),
         ...(board.defaultWorkspace ? { defaultWorkspace: board.defaultWorkspace } : {}),
         ...(board.orchestration ? { orchestration: board.orchestration } : {}),
         total: 0,
@@ -253,6 +274,11 @@ export class FlowboardCoreStore {
         a.id === "default" ? -1 : b.id === "default" ? 1 : a.id.localeCompare(b.id),
       ),
     };
+  }
+
+  async isProjectArchived(boardId: string): Promise<boolean> {
+    const board = await this.boardStore.lookup(boardId);
+    return Boolean(board?.version === 1 && board.board.archivedAt);
   }
 
   async upsertBoard(input: FlowboardBoardInput): Promise<FlowboardBoardMetadata> {
@@ -426,12 +452,15 @@ export class FlowboardCoreStore {
       syncExecutionAttemptMetadata(metadata, execution, now),
     );
     const boardId = syncedMetadata.automation?.boardId ?? "default";
+    const milestoneId = normalizeOptionalString(input.milestoneId);
     const position = Number.isFinite(normalizedPosition)
       ? normalizedPosition
       : Math.max(
           0,
           ...cards
-            .filter((card) => card.status === status && cardBoardId(card) === boardId)
+            .filter(
+              (card) => cardBoardId(card) === boardId && card.milestoneId === milestoneId,
+            )
             .map((card) => card.position),
         ) + POSITION_STEP;
     let card: FlowboardCard = {
@@ -440,6 +469,7 @@ export class FlowboardCoreStore {
       status,
       priority: normalizePriority(input.priority, "normal"),
       labels: normalizeLabels(input.labels),
+      ...(milestoneId ? { milestoneId } : {}),
       position,
       createdAt: now,
       updatedAt: now,
@@ -562,6 +592,7 @@ export class FlowboardCoreStore {
       // lifecycle source is provenance; copied markers must not survive a manual transition.
       metadata = { ...metadata, lifecycleStatusSourceUpdatedAt: undefined };
     }
+    const effectivePatchRecord = effectivePatch as Record<string, unknown>;
     const automationPatch: Record<string, unknown> = {};
     for (const key of [
       "tenant",
@@ -575,8 +606,8 @@ export class FlowboardCoreStore {
       "maxRetries",
       "scheduledAt",
     ] as const) {
-      if (Object.hasOwn(effectivePatch, key) && effectivePatch[key] !== undefined) {
-        automationPatch[key] = effectivePatch[key];
+      if (Object.hasOwn(effectivePatchRecord, key) && effectivePatchRecord[key] !== undefined) {
+        automationPatch[key] = effectivePatchRecord[key];
       }
     }
     if (Object.keys(automationPatch).length > 0) {
@@ -626,9 +657,9 @@ export class FlowboardCoreStore {
           ? metadata
           : { ...metadata, templateId: normalizeTemplateId(effectivePatch.templateId) },
       position:
-        effectivePatch.position === undefined
+        effectivePatchRecord.position === undefined
           ? existing.position
-          : normalizePosition(effectivePatch.position, existing.position),
+          : normalizePosition(effectivePatchRecord.position, existing.position),
       updatedAt: now,
       ...(startedAt ? { startedAt } : {}),
       ...(completedAt ? { completedAt } : {}),

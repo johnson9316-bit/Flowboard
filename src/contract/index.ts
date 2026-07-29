@@ -26,6 +26,7 @@ export const FLOWBOARD_EVENT_KINDS = [
   "created",
   "edited",
   "moved",
+  "milestone_moved",
   "linked",
   "specified",
   "decomposed",
@@ -74,6 +75,20 @@ export const FLOWBOARD_DIAGNOSTIC_KINDS = [
 ] as const;
 export const FLOWBOARD_DIAGNOSTIC_SEVERITIES = ["warning", "error", "critical"] as const;
 export const FLOWBOARD_NOTIFICATION_KINDS = ["completed", "failed", "stale"] as const;
+export const FLOWBOARD_MILESTONE_STATES = ["active", "completed", "archived"] as const;
+export const FLOWBOARD_PROJECT_DOCUMENT_SECTIONS = [
+  "project",
+  "codebase",
+  "environment",
+  "knowledge",
+] as const;
+export const FLOWBOARD_PROJECT_DOCUMENT_TYPES = [
+  "markdown",
+  "json",
+  "link",
+  "path",
+  "secret_ref",
+] as const;
 export const FLOWBOARD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 
 export function isValidFlowboardBoardId(value: unknown): value is string {
@@ -93,6 +108,10 @@ export type FlowboardTemplateId = (typeof FLOWBOARD_TEMPLATE_IDS)[number];
 export type FlowboardDiagnosticKind = (typeof FLOWBOARD_DIAGNOSTIC_KINDS)[number];
 export type FlowboardDiagnosticSeverity = (typeof FLOWBOARD_DIAGNOSTIC_SEVERITIES)[number];
 export type FlowboardNotificationKind = (typeof FLOWBOARD_NOTIFICATION_KINDS)[number];
+export type FlowboardMilestoneState = (typeof FLOWBOARD_MILESTONE_STATES)[number];
+export type FlowboardProjectDocumentSection =
+  (typeof FLOWBOARD_PROJECT_DOCUMENT_SECTIONS)[number];
+export type FlowboardProjectDocumentType = (typeof FLOWBOARD_PROJECT_DOCUMENT_TYPES)[number];
 
 export type FlowboardExecution = {
   id: string;
@@ -113,6 +132,8 @@ export type FlowboardEvent = {
   at: number;
   fromStatus?: FlowboardStatus;
   toStatus?: FlowboardStatus;
+  fromMilestoneId?: string;
+  toMilestoneId?: string;
   sessionKey?: string;
   runId?: string;
 };
@@ -272,6 +293,14 @@ export type FlowboardBoardMetadata = {
   description?: string;
   icon?: string;
   color?: string;
+  position?: number;
+  version?: string;
+  currentObjective?: string;
+  coreValue?: string;
+  sourceOfTruth?: string;
+  repositoryUrl?: string;
+  planningPath?: string;
+  homepageUrl?: string;
   defaultWorkspace?: FlowboardWorkspace;
   orchestration?: FlowboardOrchestrationSettings;
   createdAt: number;
@@ -285,6 +314,14 @@ export type FlowboardBoardSummary = {
   description?: string;
   icon?: string;
   color?: string;
+  position?: number;
+  version?: string;
+  currentObjective?: string;
+  coreValue?: string;
+  sourceOfTruth?: string;
+  repositoryUrl?: string;
+  planningPath?: string;
+  homepageUrl?: string;
   defaultWorkspace?: FlowboardWorkspace;
   orchestration?: FlowboardOrchestrationSettings;
   total: number;
@@ -300,6 +337,37 @@ export type FlowboardOrchestrationSettings = {
   autoDecomposePerDispatch?: number;
   defaultAssignee?: string;
   orchestratorProfile?: string;
+};
+
+export type FlowboardMilestone = {
+  id: string;
+  boardId: string;
+  title: string;
+  description?: string;
+  color?: string;
+  position: number;
+  state: FlowboardMilestoneState;
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+  archivedAt?: number;
+};
+
+export type FlowboardProjectDocument = {
+  id: string;
+  boardId: string;
+  key: string;
+  section: FlowboardProjectDocumentSection;
+  type: FlowboardProjectDocumentType;
+  title: string;
+  summary?: string;
+  target?: string;
+  content?: string;
+  position: number;
+  hiddenAt?: number;
+  system?: boolean;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type FlowboardNotificationSubscription = {
@@ -351,6 +419,7 @@ export type FlowboardCard = {
   taskId?: string;
   sourceUrl?: string;
   execution?: FlowboardExecution;
+  milestoneId?: string;
   position: number;
   createdAt: number;
   updatedAt: number;
@@ -358,6 +427,12 @@ export type FlowboardCard = {
   completedAt?: number;
   events?: FlowboardEvent[];
   metadata?: FlowboardMetadata;
+};
+
+export type FlowboardProjectView = {
+  board: FlowboardBoardMetadata;
+  milestones: FlowboardMilestone[];
+  cards: FlowboardCard[];
 };
 
 export type FlowboardListResult = {

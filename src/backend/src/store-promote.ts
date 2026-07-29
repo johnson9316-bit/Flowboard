@@ -36,7 +36,7 @@ export class FlowboardPromoteStore extends FlowboardEnrichmentStore {
       assertCanMutateClaimedCard(existing, scope);
       return await this.updateCard(
         id,
-        { status, position },
+        { status },
         {
           allowMetadataDependencyLinks: false,
           enforceStatusHolds: true,
