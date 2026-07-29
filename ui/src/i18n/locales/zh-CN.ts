@@ -4772,6 +4772,8 @@ export const zh_CN: TranslationMap = {
     board: "看板",
     settings: "设置",
     documents: "资料库",
+    language: "语言",
+    languageChangeFailed: "无法切换 Flowboard 语言。",
     newProject: "新建项目",
     newMilestone: "新建里程碑",
     newCard: "新建卡片",

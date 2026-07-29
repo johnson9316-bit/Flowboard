@@ -5031,6 +5031,8 @@ export const en: TranslationMap = {
     board: "Board",
     settings: "Settings",
     documents: "Documents",
+    language: "Language",
+    languageChangeFailed: "Could not change Flowboard language.",
     newProject: "New project",
     newMilestone: "New milestone",
     newCard: "New card",

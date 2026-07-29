@@ -28,6 +28,8 @@ describe("Flowboard M2 project UI state", () => {
       project: null,
       modal: null,
       draggedCardId: null,
+      languageSwitching: false,
+      languageError: null,
       showArchivedProjects: false,
       showHiddenDocuments: false,
       executionPreparation: null,

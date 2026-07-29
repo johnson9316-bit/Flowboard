@@ -146,9 +146,23 @@ function syncTheme(hostDocument: Document): void {
   }
 }
 
-export function startFlowboardHostSync(options: {
-  onLocale: (locale: FlowboardLocale) => void;
-}): () => void {
+export function readInitialFlowboardHostLocale(): FlowboardLocale | null {
+  const hostWindow = parentWindow();
+  if (!hostWindow) {
+    return null;
+  }
+  const hostDocument = parentDocument(hostWindow);
+  if (!hostDocument) {
+    return null;
+  }
+  const storage = parentStorage(hostWindow);
+  return (
+    (storage ? readHostLocale(storage) : null) ??
+    resolveFlowboardLocale(hostDocument.documentElement.lang)
+  );
+}
+
+export function startFlowboardThemeSync(): () => void {
   const hostWindow = parentWindow();
   if (!hostWindow) {
     return () => {};
@@ -160,13 +174,6 @@ export function startFlowboardHostSync(options: {
 
   const sync = () => {
     syncTheme(hostDocument);
-    const storage = parentStorage(hostWindow);
-    const locale =
-      (storage ? readHostLocale(storage) : null) ??
-      resolveFlowboardLocale(hostDocument.documentElement.lang);
-    if (locale) {
-      options.onLocale(locale);
-    }
   };
 
   sync();
@@ -179,18 +186,10 @@ export function startFlowboardHostSync(options: {
         });
   observer?.observe(hostDocument.documentElement, {
     attributes: true,
-    attributeFilter: ["data-theme", "data-theme-mode", "lang", "style"],
+    attributeFilter: ["data-theme", "data-theme-mode", "style"],
   });
-
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === null || isControlUiSettingsKey(event.key)) {
-      sync();
-    }
-  };
-  window.addEventListener("storage", onStorage);
 
   return () => {
     observer?.disconnect();
-    window.removeEventListener("storage", onStorage);
   };
 }

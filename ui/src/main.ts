@@ -7,7 +7,11 @@ import type {
   FlowboardStatus,
 } from "../../src/contract/index.ts";
 import { FlowboardGatewayClient, type FlowboardGatewayState } from "./gateway-client.ts";
-import { startFlowboardHostSync } from "./host-context.ts";
+import {
+  readInitialFlowboardHostLocale,
+  startFlowboardThemeSync,
+  type FlowboardLocale,
+} from "./host-context.ts";
 import { i18n } from "./i18n/index.ts";
 import {
   createFlowboardProjectUiState,
@@ -88,12 +92,9 @@ class FlowboardProjectHost extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.stopped = false;
-    this.unsubscribeI18n = i18n.subscribe(() => this.requestUpdate());
-    this.stopHostSync = startFlowboardHostSync({
-      onLocale: (locale) => {
-        document.documentElement.lang = locale;
-        void i18n.setLocale(locale, { persist: false });
-      },
+    this.unsubscribeI18n = i18n.subscribe((locale) => {
+      document.documentElement.lang = locale;
+      this.requestUpdate();
     });
     document.addEventListener("visibilitychange", this.handleVisibilityChange);
     this.gateway.start();
@@ -115,6 +116,22 @@ class FlowboardProjectHost extends LitElement {
 
   private readonly handleVisibilityChange = () => {
     if (document.visibilityState === "visible" && this.connectedToGateway) {
+    this.stopHostSync = startFlowboardThemeSync();
+    document.documentElement.lang = i18n.getLocale();
+    this.state.languageSwitching = true;
+    void i18n
+      .initialize(readInitialFlowboardHostLocale())
+      .then((applied) => {
+        if (!applied && !this.stopped) {
+          this.state.languageError = i18n.t("flowboardProject.languageChangeFailed");
+        }
+      })
+      .finally(() => {
+        if (!this.stopped) {
+          this.state.languageSwitching = false;
+          this.requestUpdate();
+        }
+      });
       void this.refresh();
     }
   };
@@ -137,6 +154,28 @@ class FlowboardProjectHost extends LitElement {
   private startChangeWait() {
     const generation = ++this.changeLoopGeneration;
     void this.waitForChanges(generation);
+  }
+
+  private setLocale(locale: FlowboardLocale) {
+    if (this.state.languageSwitching) {
+      return;
+    }
+    this.state.languageSwitching = true;
+    this.state.languageError = null;
+    this.requestUpdate();
+    void i18n
+      .setLocale(locale)
+      .then((applied) => {
+        if (!applied && !this.stopped) {
+          this.state.languageError = i18n.t("flowboardProject.languageChangeFailed");
+        }
+      })
+      .finally(() => {
+        if (!this.stopped) {
+          this.state.languageSwitching = false;
+          this.requestUpdate();
+        }
+      });
   }
 
   private async waitForChanges(generation: number) {
@@ -890,3 +929,5 @@ if (!customElements.get("flowboard-workboard")) {
 }
 
 document.body.replaceChildren(document.createElement("flowboard-workboard"));
+      locale: i18n.getLocale(),
+      setLocale: (locale) => this.setLocale(locale),

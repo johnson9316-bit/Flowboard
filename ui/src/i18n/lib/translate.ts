@@ -22,29 +22,46 @@ type SetLocaleOptions = {
 
 const FLOWBOARD_LOCALE_STORAGE_KEY = "flowboard.i18n.locale";
 
-function resolveFlowboardLocale(value: string | null | undefined): Locale {
-  return value?.trim().toLowerCase().startsWith("zh") ? "zh-CN" : DEFAULT_LOCALE;
+export type FlowboardLocale = Extract<Locale, "en" | "zh-CN">;
+
+export function resolveFlowboardLocale(value: unknown): FlowboardLocale {
+  if (typeof value !== "string") {
+    return "en";
+  }
+  return value.trim().toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+}
+
+export function resolveInitialFlowboardLocale(input: {
+  storedLocale?: unknown;
+  hostLocale?: unknown;
+  browserLocale?: unknown;
+}): FlowboardLocale {
+  if (typeof input.storedLocale === "string" && input.storedLocale.trim()) {
+    return resolveFlowboardLocale(input.storedLocale);
+  }
+  if (typeof input.hostLocale === "string" && input.hostLocale.trim()) {
+    return resolveFlowboardLocale(input.hostLocale);
+  }
+  const browserLocale = typeof input.browserLocale === "string" ? input.browserLocale : "";
+  return resolveFlowboardLocale(resolveNavigatorLocale(browserLocale));
 }
 
 export { SUPPORTED_LOCALES, isSupportedLocale };
 
 class I18nManager {
-  private locale: Locale = DEFAULT_LOCALE;
+  private locale: FlowboardLocale = "en";
   private translations: Partial<Record<Locale, TranslationMap>> = { [DEFAULT_LOCALE]: en };
   private subscribers: Set<Subscriber> = new Set();
   // Locale chunks are served by the gateway, so a selection made while disconnected can fail.
   // Preserve the target for the next connected transition; otherwise the chrome silently stays
   // in the old language forever.
-  private pendingLocale: Locale | null = null;
+  private pendingLocale: FlowboardLocale | null = null;
   // Only the latest selection may update retry state or become active after an async chunk load.
   private localeRequestGeneration = 0;
   private localeLoadRecovery: LocaleLoadRecovery | undefined;
+  private initialization: Promise<boolean> | null = null;
 
-  constructor(
-    private readonly loadLocaleTranslation: LocaleTranslationLoader = loadLazyLocaleTranslation,
-  ) {
-    this.loadLocale();
-  }
+  constructor(private readonly loadLocaleTranslation: LocaleTranslationLoader = loadLazyLocaleTranslation) {}
 
   private readStoredLocale(): string | null {
     const storage = getSafeLocalStorage();
@@ -70,41 +87,45 @@ class I18nManager {
     }
   }
 
-  private resolveInitialLocale(): Locale {
-    const saved = this.readStoredLocale();
-    if (saved) {
-      return resolveFlowboardLocale(saved);
-    }
+  private resolveInitialLocale(hostLocale: unknown): FlowboardLocale {
     const language =
       typeof globalThis.navigator?.language === "string" ? globalThis.navigator.language : null;
-    return resolveFlowboardLocale(resolveNavigatorLocale(language ?? ""));
+    return resolveInitialFlowboardLocale({
+      storedLocale: this.readStoredLocale(),
+      hostLocale,
+      browserLocale: language,
+    });
   }
 
-  private loadLocale() {
-    const initialLocale = this.resolveInitialLocale();
-    if (initialLocale === DEFAULT_LOCALE) {
-      this.locale = DEFAULT_LOCALE;
-      return;
+  public initialize(hostLocale?: unknown): Promise<boolean> {
+    if (this.initialization) {
+      return this.initialization;
     }
-    // Use the normal locale setter so startup locale loading follows the same
-    // translation-loading + notify path as manual locale changes.
-    void this.setLocale(initialLocale);
+    this.initialization = this.applyLocale(this.resolveInitialLocale(hostLocale), false, true);
+    return this.initialization;
   }
 
-  public getLocale(): Locale {
+  public getLocale(): FlowboardLocale {
     return this.locale;
   }
 
-  public async setLocale(locale: Locale, options: SetLocaleOptions = {}) {
+  public async setLocale(locale: FlowboardLocale, options: SetLocaleOptions = {}): Promise<boolean> {
     return this.applyLocale(resolveFlowboardLocale(locale), false, options.persist !== false);
   }
 
-  private async applyLocale(locale: Locale, retrying: boolean, persist: boolean) {
+  private async applyLocale(
+    locale: FlowboardLocale,
+    retrying: boolean,
+    persist: boolean,
+  ): Promise<boolean> {
     const requestGeneration = ++this.localeRequestGeneration;
     const needsTranslationLoad = locale !== DEFAULT_LOCALE && !this.translations[locale];
     if (this.locale === locale && !needsTranslationLoad) {
       this.pendingLocale = null;
-      return;
+      if (persist) {
+        this.persistLocale(locale);
+      }
+      return true;
     }
 
     if (needsTranslationLoad) {
@@ -115,7 +136,7 @@ class I18nManager {
           if (this.localeRequestGeneration === requestGeneration) {
             this.pendingLocale = locale;
           }
-          return;
+          return false;
         }
         this.translations[locale] = translation;
       } catch (e) {
@@ -133,12 +154,12 @@ class I18nManager {
           this.localeLoadRecovery.onUnrecoverableLocaleLoad?.(locale);
         }
         console.error(`Failed to load locale: ${locale}`, e);
-        return;
+        return false;
       }
     }
 
     if (this.localeRequestGeneration !== requestGeneration) {
-      return;
+      return false;
     }
     this.pendingLocale = null;
     this.locale = locale;
@@ -146,6 +167,7 @@ class I18nManager {
       this.persistLocale(locale);
     }
     this.notify();
+    return true;
   }
 
   public retryPendingLocale(): void {

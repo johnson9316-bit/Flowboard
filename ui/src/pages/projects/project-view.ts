@@ -17,7 +17,7 @@ import type {
   FlowboardStatus,
 } from "../../../../src/contract/index.ts";
 import "../../components/modal-dialog.ts";
-import { t } from "../../i18n/index.ts";
+import { t, type FlowboardLocale } from "../../i18n/index.ts";
 import { renderFlowboardMarkdown } from "../../lib/markdown.ts";
 import "../../styles/flowboard-project.css";
 
@@ -118,6 +118,8 @@ export type FlowboardProjectUiState = {
   error: string | null;
   projects: FlowboardBoardSummary[];
   project: FlowboardProjectView | null;
+  languageSwitching: boolean;
+  languageError: string | null;
   documents: FlowboardProjectDocument[];
   selectedDocumentId: string | null;
   documentPreview: FlowboardProjectDocumentRead | null;
@@ -149,8 +151,10 @@ export type FlowboardProjectViewController = {
   setScreen: (screen: FlowboardProjectUiState["screen"]) => void;
   openModal: (modal: FlowboardProjectModal) => void;
   closeModal: () => void;
+  locale: FlowboardLocale;
   createProject: (data: Record<string, string>) => void;
   updateProject: (data: Record<string, string>) => void;
+  setLocale: (locale: FlowboardLocale) => void;
   archiveProject: (archived: boolean) => void;
   createCard: (data: Record<string, string>) => void;
   updateCardStatus: (id: string, status: FlowboardStatus) => void;
@@ -202,6 +206,8 @@ export function createFlowboardProjectUiState(): FlowboardProjectUiState {
     executionPreparation: null,
     executionPreparationLoading: false,
     executionPreparationError: null,
+    languageSwitching: false,
+    languageError: null,
     executionInspectionCardId: null,
     executionInspection: null,
     executionInspectionLoading: false,
@@ -1926,3 +1932,22 @@ export function renderFlowboardProjects(controller: FlowboardProjectViewControll
     </section>
   `;
 }
+          <label class="flowboard-project__language">
+            <span class="flowboard-project__sr-only">${t("flowboardProject.language")}</span>
+            <select
+              class="flowboard-project__language-select"
+              aria-label=${t("flowboardProject.language")}
+              .value=${controller.locale}
+              ?disabled=${state.languageSwitching}
+              @change=${(event: Event) =>
+                controller.setLocale(
+                  (event.currentTarget as HTMLSelectElement).value as FlowboardLocale,
+                )}
+            >
+              <option value="zh-CN">${t("languages.zhCN")}</option>
+              <option value="en">${t("languages.en")}</option>
+            </select>
+          </label>
+          ${state.languageError
+            ? html`<span class="flowboard-project__language-error" role="status">${state.languageError}</span>`
+            : nothing}
