@@ -12,6 +12,7 @@ import type {
   FlowboardProjectDocument,
   FlowboardProjectDocumentRead,
   FlowboardProjectDocumentSection,
+  FlowboardProjectDocumentSource,
   FlowboardProjectDocumentType,
   FlowboardProjectView,
   FlowboardStatus,
@@ -46,6 +47,7 @@ const DOCUMENT_TYPES: readonly FlowboardProjectDocumentType[] = [
   "path",
   "secret_ref",
 ];
+const DOCUMENT_SOURCES: readonly FlowboardProjectDocumentSource[] = ["project", "ai_system"];
 const IMPLEMENTATION_STATES: readonly FlowboardDeliveryImplementationState[] = [
   "not_started",
   "in_progress",
@@ -116,15 +118,19 @@ export type FlowboardProjectUiState = {
   loaded: boolean;
   busy: boolean;
   error: string | null;
-  projects: FlowboardBoardSummary[];
-  project: FlowboardProjectView | null;
   languageSwitching: boolean;
   languageError: string | null;
+  projects: FlowboardBoardSummary[];
+  project: FlowboardProjectView | null;
   documents: FlowboardProjectDocument[];
   selectedDocumentId: string | null;
   documentPreview: FlowboardProjectDocumentRead | null;
   documentPreviewLoading: boolean;
   documentPreviewError: string | null;
+  documentEditing: boolean;
+  documentDraft: string | null;
+  documentQuery: string;
+  documentSourceFilter: "all" | FlowboardProjectDocumentSource;
   executionPreparationCardId: string | null;
   executionPreparation: FlowboardCardExecutionPreparation | null;
   executionPreparationLoading: boolean;
@@ -145,16 +151,16 @@ export type FlowboardProjectUiState = {
 export type FlowboardProjectViewController = {
   state: FlowboardProjectUiState;
   connected: boolean;
+  locale: FlowboardLocale;
   requestUpdate: () => void;
   refresh: () => void;
+  setLocale: (locale: FlowboardLocale) => void;
   selectProject: (id: string) => void;
   setScreen: (screen: FlowboardProjectUiState["screen"]) => void;
   openModal: (modal: FlowboardProjectModal) => void;
   closeModal: () => void;
-  locale: FlowboardLocale;
   createProject: (data: Record<string, string>) => void;
   updateProject: (data: Record<string, string>) => void;
-  setLocale: (locale: FlowboardLocale) => void;
   archiveProject: (archived: boolean) => void;
   createCard: (data: Record<string, string>) => void;
   updateCardStatus: (id: string, status: FlowboardStatus) => void;
@@ -167,6 +173,11 @@ export type FlowboardProjectViewController = {
   reorderDocuments: (ids: string[]) => void;
   openDocument: (id: string) => void;
   refreshDocument: () => void;
+  startDocumentEdit: () => void;
+  previewDocumentDraft: () => void;
+  cancelDocumentEdit: () => void;
+  saveDocumentContent: () => void;
+  syncAiInstructions: () => void;
   saveMilestone: (data: Record<string, string>) => void;
   completeMilestone: (id: string) => void;
   archiveMilestone: (id: string, archived: boolean) => void;
@@ -195,6 +206,8 @@ export function createFlowboardProjectUiState(): FlowboardProjectUiState {
     loaded: false,
     busy: false,
     error: null,
+    languageSwitching: false,
+    languageError: null,
     projects: [],
     project: null,
     documents: [],
@@ -202,12 +215,14 @@ export function createFlowboardProjectUiState(): FlowboardProjectUiState {
     documentPreview: null,
     documentPreviewLoading: false,
     documentPreviewError: null,
+    documentEditing: false,
+    documentDraft: null,
+    documentQuery: "",
+    documentSourceFilter: "all",
     executionPreparationCardId: null,
     executionPreparation: null,
     executionPreparationLoading: false,
     executionPreparationError: null,
-    languageSwitching: false,
-    languageError: null,
     executionInspectionCardId: null,
     executionInspection: null,
     executionInspectionLoading: false,
@@ -302,6 +317,29 @@ function documentTypeLabel(type: FlowboardProjectDocumentType): string {
       ? "SecretRef"
       : `${type[0]?.toUpperCase() ?? ""}${type.slice(1)}`;
   return t(`flowboardProject.type${key}`);
+}
+
+function documentSourceLabel(source: FlowboardProjectDocumentSource): string {
+  return t(`flowboardProject.source${source === "ai_system" ? "AiSystem" : "Project"}`);
+}
+
+function documentPathLabel(
+  target: string | undefined,
+  workspacePath: string | undefined,
+): string | undefined {
+  if (!target || !workspacePath) {
+    return target;
+  }
+  const normalizedWorkspace = workspacePath.replace(/[\\/]+$/, "");
+  const normalizedTarget = target.replace(/\\/g, "/");
+  const normalizedRoot = normalizedWorkspace.replace(/\\/g, "/");
+  if (normalizedTarget === normalizedRoot) {
+    return ".";
+  }
+  if (normalizedTarget.startsWith(`${normalizedRoot}/`)) {
+    return normalizedTarget.slice(normalizedRoot.length + 1);
+  }
+  return normalizedTarget.split("/").at(-1) || target;
 }
 
 function projectCardCount(project: FlowboardBoardSummary): number {
@@ -922,73 +960,94 @@ function renderSettings(controller: FlowboardProjectViewController) {
   `;
 }
 
-function renderDocumentSection(
+type DocumentIndexGroup = {
+  id: string;
+  label: string;
+  documents: FlowboardProjectDocument[];
+};
+
+function documentIndexGroups(
+  documents: FlowboardProjectDocument[],
+): DocumentIndexGroup[] {
+  return [
+    {
+      id: "project",
+      label: t("flowboardProject.groupProject"),
+      documents: documents.filter(
+        (document) => document.source === "project" && document.section === "project",
+      ),
+    },
+    {
+      id: "ai-system",
+      label: t("flowboardProject.groupAiSystem"),
+      documents: documents.filter((document) => document.source === "ai_system"),
+    },
+    {
+      id: "codebase",
+      label: sectionLabel("codebase"),
+      documents: documents.filter(
+        (document) => document.source === "project" && document.section === "codebase",
+      ),
+    },
+    {
+      id: "environment",
+      label: sectionLabel("environment"),
+      documents: documents.filter(
+        (document) => document.source === "project" && document.section === "environment",
+      ),
+    },
+    {
+      id: "knowledge",
+      label: sectionLabel("knowledge"),
+      documents: documents.filter(
+        (document) => document.source === "project" && document.section === "knowledge",
+      ),
+    },
+  ];
+}
+
+function renderDocumentIndex(
   controller: FlowboardProjectViewController,
-  section: FlowboardProjectDocumentSection,
+  documents: FlowboardProjectDocument[],
 ) {
-  const sectionDocuments = controller.state.documents.filter(
-    (document) => document.section === section,
-  );
-  const documents = sectionDocuments.filter(
-    (document) => controller.state.showHiddenDocuments || !document.hiddenAt,
-  );
+  const { state } = controller;
+  const workspacePath = state.project?.board.defaultWorkspace?.path;
   return html`
-    <section class="flowboard-project__document-section">
-      <h2>${sectionLabel(section)}</h2>
-      ${documents.length
-        ? html`
-            <div class="flowboard-project__document-list">
-              ${documents.map((document) => {
-                const moveUp = reorderVisibleItemIds(sectionDocuments, documents, document.id, -1);
-                const moveDown = reorderVisibleItemIds(sectionDocuments, documents, document.id, 1);
-                return html`
-                  <article class="flowboard-project__document ${document.hiddenAt ? "is-hidden" : ""}">
-                    <button
-                      class="flowboard-project__document-main"
-                      type="button"
-                      @click=${() => controller.openDocument(document.id)}
-                    >
-                      <span>${document.title}</span>
-                      <small>${document.key} · ${documentTypeLabel(document.type)}</small>
-                      ${document.summary ? html`<p>${document.summary}</p>` : nothing}
-                    </button>
-                    <div class="flowboard-project__document-actions">
-                      <button
-                        class="flowboard-project__icon-button"
-                        type="button"
-                        title=${t("flowboardProject.editDocument")}
-                        @click=${() => controller.openModal({ kind: "document", document })}
-                      >...</button>
-                      ${renderOrderControls({
-                        canMoveUp: Boolean(moveUp),
-                        canMoveDown: Boolean(moveDown),
-                        onMoveUp: () => moveUp && controller.reorderDocuments(moveUp),
-                        onMoveDown: () => moveDown && controller.reorderDocuments(moveDown),
-                      })}
-                      <button
-                        class="flowboard-project__icon-button"
-                        type="button"
-                        title=${document.hiddenAt ? t("flowboardProject.restoreDocument") : t("flowboardProject.hideDocument")}
-                        @click=${() => controller.hideDocument(document.id, !document.hiddenAt)}
-                      >${document.hiddenAt ? "&#8635;" : "&#8211;"}</button>
-                      ${!document.system
-                        ? html`
-                            <button
-                              class="flowboard-project__icon-button"
-                              type="button"
-                              title=${t("flowboardProject.deleteDocument")}
-                              @click=${() => controller.deleteDocument(document.id)}
-                            >&times;</button>
-                          `
-                        : nothing}
-                    </div>
-                  </article>
-                `;
-              })}
-            </div>
-          `
-        : html`<p class="flowboard-project__empty-column">${t("flowboardProject.noDocuments")}</p>`}
-    </section>
+    <div class="flowboard-project__document-index" role="list">
+      ${documentIndexGroups(documents).map(
+        (group) => html`
+          <section class="flowboard-project__document-group">
+            <h2>${group.label}</h2>
+            ${group.documents.length
+              ? html`
+                  <div class="flowboard-project__document-list">
+                    ${group.documents.map(
+                      (document) => html`
+                        <button
+                          class="flowboard-project__document-index-item ${document.hiddenAt
+                            ? "is-hidden"
+                            : ""} ${document.id === state.selectedDocumentId ? "is-selected" : ""}"
+                          type="button"
+                          @click=${() => controller.openDocument(document.id)}
+                        >
+                          <span>${document.title}</span>
+                          <small>
+                            ${documentPathLabel(document.target, workspacePath) ??
+                            documentTypeLabel(document.type)}
+                          </small>
+                          <em>${documentSourceLabel(document.source)}</em>
+                        </button>
+                      `,
+                    )}
+                  </div>
+                `
+              : html`<p class="flowboard-project__empty-column">${t(
+                  "flowboardProject.noDocuments",
+                )}</p>`}
+          </section>
+        `,
+      )}
+    </div>
   `;
 }
 
@@ -998,6 +1057,21 @@ function renderDocuments(controller: FlowboardProjectViewController) {
   if (!project) {
     return nothing;
   }
+  const query = state.documentQuery.trim().toLocaleLowerCase();
+  const visibleDocuments = state.documents.filter((document) => {
+    if (!state.showHiddenDocuments && document.hiddenAt) {
+      return false;
+    }
+    if (state.documentSourceFilter !== "all" && document.source !== state.documentSourceFilter) {
+      return false;
+    }
+    return (
+      !query ||
+      `${document.title} ${document.key} ${document.summary ?? ""} ${document.target ?? ""}`
+        .toLocaleLowerCase()
+        .includes(query)
+    );
+  });
   return html`
     <section class="flowboard-project__documents">
       <div class="flowboard-project__section-heading">
@@ -1006,28 +1080,64 @@ function renderDocuments(controller: FlowboardProjectViewController) {
           <p>${boardName(project.board)}</p>
         </div>
         <div class="flowboard-project__heading-actions">
+          <label class="flowboard-project__document-search">
+            <span class="flowboard-project__sr-only">${t("flowboardProject.searchDocuments")}</span>
+            <input
+              type="search"
+              placeholder=${t("flowboardProject.searchDocuments")}
+              .value=${state.documentQuery}
+              @input=${(event: InputEvent) => {
+                state.documentQuery = (event.currentTarget as HTMLInputElement).value;
+                controller.requestUpdate();
+              }}
+            />
+          </label>
+          <select
+            class="flowboard-project__document-source-filter"
+            aria-label=${t("flowboardProject.documentSource")}
+            .value=${state.documentSourceFilter}
+            @change=${(event: Event) => {
+              state.documentSourceFilter = (event.currentTarget as HTMLSelectElement)
+                .value as FlowboardProjectUiState["documentSourceFilter"];
+              controller.requestUpdate();
+            }}
+          >
+            <option value="all">${t("flowboardProject.allDocumentSources")}</option>
+            ${DOCUMENT_SOURCES.map(
+              (source) =>
+                html`<option value=${source}>${documentSourceLabel(source)}</option>`,
+            )}
+          </select>
           <label class="flowboard-project__checkbox">
             <input
               type="checkbox"
               .checked=${state.showHiddenDocuments}
               @change=${(event: Event) => {
                 state.showHiddenDocuments = (event.currentTarget as HTMLInputElement).checked;
-                controller.refresh();
+                controller.requestUpdate();
               }}
             />
             ${t("flowboardProject.showHidden")}
           </label>
-          <button class="btn btn--primary" type="button" @click=${() => controller.openModal({ kind: "document" })}>
+          <button
+            class="btn"
+            type="button"
+            ?disabled=${state.busy || !project.board.defaultWorkspace?.path}
+            @click=${controller.syncAiInstructions}
+          >
+            ${t("flowboardProject.syncAiInstructions")}
+          </button>
+          <button
+            class="btn btn--primary"
+            type="button"
+            @click=${() => controller.openModal({ kind: "document" })}
+          >
             ${t("flowboardProject.addDocument")}
           </button>
         </div>
       </div>
-      <div class="flowboard-project__documents-layout">
-        <aside class="flowboard-project__document-navigation">
-          ${DOCUMENT_SECTIONS.map((section) => renderDocumentSection(controller, section))}
-        </aside>
-        ${renderDocumentPreview(controller)}
-      </div>
+      ${renderDocumentIndex(controller, visibleDocuments)}
+      ${renderDocumentPreview(controller)}
     </section>
   `;
 }
@@ -1043,35 +1153,162 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
       </section>
     `;
   }
+  const preview = state.documentPreview;
+  const editable =
+    document.type === "markdown" || (document.type === "path" && preview?.source === "path");
+  const draftContent = state.documentDraft;
+  const dirty = draftContent !== null && draftContent !== preview?.content;
+  const content = draftContent ?? preview?.content ?? "";
+  const sectionDocuments = state.documents.filter(
+    (candidate) => candidate.section === document.section,
+  );
+  const sameSourceDocuments = sectionDocuments.filter(
+    (candidate) => candidate.source === document.source,
+  );
+  const moveUp = reorderVisibleItemIds(sectionDocuments, sameSourceDocuments, document.id, -1);
+  const moveDown = reorderVisibleItemIds(sectionDocuments, sameSourceDocuments, document.id, 1);
+  const displayPath = documentPathLabel(
+    preview?.path ?? document.target,
+    state.project?.board.defaultWorkspace?.path,
+  );
   return html`
     <section class="flowboard-project__document-reader">
       <header>
-        <div>
-          <h2>${document.title}</h2>
-          <small>${state.documentPreview?.path ?? document.target ?? documentTypeLabel(document.type)}</small>
+        <div class="flowboard-project__document-reader-title">
+          <div class="flowboard-project__document-reader-heading">
+            <h2>${document.title}</h2>
+            <span class="flowboard-project__document-source-tag">${documentSourceLabel(
+              document.source,
+            )}</span>
+            ${dirty
+              ? html`<span class="flowboard-project__document-unsaved">${t(
+                  "flowboardProject.unsavedDocument",
+                )}</span>`
+              : nothing}
+          </div>
+          <small>${displayPath ?? documentTypeLabel(document.type)}</small>
+          ${displayPath && preview?.path && displayPath !== preview.path
+            ? html`<small class="flowboard-project__document-full-path">${preview.path}</small>`
+            : nothing}
         </div>
-        <button
-          class="flowboard-project__icon-button"
-          type="button"
-          title=${t("flowboardProject.refreshDocument")}
-          aria-label=${t("flowboardProject.refreshDocument")}
-          ?disabled=${state.documentPreviewLoading}
-          @click=${controller.refreshDocument}
-        >&#8635;</button>
+        <div class="flowboard-project__document-reader-actions">
+          ${editable
+            ? html`
+                <button
+                  class="btn"
+                  type="button"
+                  ?disabled=${state.documentPreviewLoading || state.busy}
+                  @click=${controller.startDocumentEdit}
+                >${t("flowboardProject.editDocumentContent")}</button>
+              `
+            : nothing}
+          ${dirty
+            ? html`
+                <button
+                  class="btn"
+                  type="button"
+                  ?disabled=${state.busy}
+                  @click=${controller.cancelDocumentEdit}
+                >${t("common.cancel")}</button>
+                <button
+                  class="btn btn--primary"
+                  type="button"
+                  ?disabled=${state.busy || !preview}
+                  @click=${controller.saveDocumentContent}
+                >${t("flowboardProject.saveDocument")}</button>
+              `
+            : nothing}
+          <button
+            class="flowboard-project__icon-button"
+            type="button"
+            title=${t("flowboardProject.editDocument")}
+            aria-label=${t("flowboardProject.editDocument")}
+            ?disabled=${state.busy}
+            @click=${() => controller.openModal({ kind: "document", document })}
+          >...</button>
+          ${renderOrderControls({
+            canMoveUp: Boolean(moveUp),
+            canMoveDown: Boolean(moveDown),
+            onMoveUp: () => moveUp && controller.reorderDocuments(moveUp),
+            onMoveDown: () => moveDown && controller.reorderDocuments(moveDown),
+          })}
+          <button
+            class="flowboard-project__icon-button"
+            type="button"
+            title=${document.hiddenAt ? t("flowboardProject.restoreDocument") : t("flowboardProject.hideDocument")}
+            aria-label=${document.hiddenAt ? t("flowboardProject.restoreDocument") : t("flowboardProject.hideDocument")}
+            ?disabled=${state.busy}
+            @click=${() => controller.hideDocument(document.id, !document.hiddenAt)}
+          >${document.hiddenAt ? "Restore" : "-"}</button>
+          ${!document.system
+            ? html`
+                <button
+                  class="flowboard-project__icon-button"
+                  type="button"
+                  title=${t("flowboardProject.deleteDocument")}
+                  aria-label=${t("flowboardProject.deleteDocument")}
+                  ?disabled=${state.busy}
+                  @click=${() => controller.deleteDocument(document.id)}
+                >x</button>
+              `
+            : nothing}
+          <button
+            class="flowboard-project__icon-button"
+            type="button"
+            title=${t("flowboardProject.refreshDocument")}
+            aria-label=${t("flowboardProject.refreshDocument")}
+            ?disabled=${state.documentPreviewLoading || state.documentDraft !== null}
+            @click=${controller.refreshDocument}
+          >&#8635;</button>
+        </div>
       </header>
       ${state.documentPreviewLoading
         ? html`<p class="flowboard-project__document-reader-message">${t(
             "flowboardProject.readingDocument",
           )}</p>`
-        : state.documentPreviewError
-          ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
-          : state.documentPreview
-            ? html`<article class="flowboard-markdown">${renderFlowboardMarkdown(
-                state.documentPreview.content,
-              )}</article>`
-            : html`<p class="flowboard-project__document-reader-message">${t(
-                "flowboardProject.noDocumentContent",
-              )}</p>`}
+        : state.documentEditing
+            ? html`
+                <div class="flowboard-project__document-editor">
+                  ${state.documentPreviewError
+                    ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
+                    : nothing}
+                  <textarea
+                    aria-label=${t("flowboardProject.documentContent")}
+                    .value=${content}
+                    @input=${(event: InputEvent) => {
+                      state.documentDraft = (event.currentTarget as HTMLTextAreaElement).value;
+                      controller.requestUpdate();
+                    }}
+                    @keydown=${(event: KeyboardEvent) => {
+                      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "s") {
+                        event.preventDefault();
+                        controller.saveDocumentContent();
+                      }
+                    }}
+                  ></textarea>
+                  <div class="flowboard-project__document-editor-actions">
+                    <button class="btn" type="button" @click=${controller.cancelDocumentEdit}>
+                      ${t("common.cancel")}
+                    </button>
+                    <button class="btn" type="button" @click=${controller.previewDocumentDraft}>
+                      ${t("flowboardProject.previewDocument")}
+                    </button>
+                    <button
+                      class="btn btn--primary"
+                      type="button"
+                      ?disabled=${state.busy || !dirty}
+                      @click=${controller.saveDocumentContent}
+                    >${t("flowboardProject.saveDocument")}</button>
+                  </div>
+                </div>
+              `
+            : state.documentPreviewError
+              ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
+            : preview
+              ? html`<article class="flowboard-markdown">${renderFlowboardMarkdown(content)}</article>`
+              : html`<p class="flowboard-project__document-reader-message">${t(
+                  "flowboardProject.noDocumentContent",
+                )}</p>`}
     </section>
   `;
 }
@@ -1909,29 +2146,6 @@ export function renderFlowboardProjects(controller: FlowboardProjectViewControll
             <span>${t("flowboardProject.allProjects")}</span>
             <strong>${state.projects.length}</strong>
           </button>
-          <button
-            class="btn btn--primary"
-            type="button"
-            ?disabled=${!controller.connected}
-            @click=${() => controller.openModal({ kind: "project" })}
-          >
-            ${t("flowboardProject.newProject")}
-          </button>
-        </div>
-      </div>
-      ${!controller.connected
-        ? html`<div class="callout">${t("flowboardProject.connectionRequired")}</div>`
-        : nothing}
-      ${state.error ? html`<div class="callout danger" role="alert">${state.error}</div>` : nothing}
-      ${renderProjectToolbar(controller)}
-      <main class="flowboard-project__main">
-        ${state.project && state.screen !== "overview" ? renderProjectTabs(controller) : nothing}
-        ${projectView}
-      </main>
-      ${renderModal(controller)}
-    </section>
-  `;
-}
           <label class="flowboard-project__language">
             <span class="flowboard-project__sr-only">${t("flowboardProject.language")}</span>
             <select
@@ -1948,6 +2162,29 @@ export function renderFlowboardProjects(controller: FlowboardProjectViewControll
               <option value="en">${t("languages.en")}</option>
             </select>
           </label>
+          <button
+            class="btn btn--primary"
+            type="button"
+            ?disabled=${!controller.connected}
+            @click=${() => controller.openModal({ kind: "project" })}
+          >
+            ${t("flowboardProject.newProject")}
+          </button>
           ${state.languageError
             ? html`<span class="flowboard-project__language-error" role="status">${state.languageError}</span>`
             : nothing}
+        </div>
+      </div>
+      ${!controller.connected
+        ? html`<div class="callout">${t("flowboardProject.connectionRequired")}</div>`
+        : nothing}
+      ${state.error ? html`<div class="callout danger" role="alert">${state.error}</div>` : nothing}
+      ${renderProjectToolbar(controller)}
+      <main class="flowboard-project__main">
+        ${state.project && state.screen !== "overview" ? renderProjectTabs(controller) : nothing}
+        ${projectView}
+      </main>
+      ${renderModal(controller)}
+    </section>
+  `;
+}

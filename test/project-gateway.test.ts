@@ -64,6 +64,8 @@ describe("Flowboard M2 Gateway methods", () => {
       "flowboard.projects.milestones.reorder",
       "flowboard.projects.milestones.complete",
       "flowboard.projects.documents.create",
+      "flowboard.projects.documents.write",
+      "flowboard.projects.documents.syncAiInstructions",
       "flowboard.projects.documents.reorder",
       "flowboard.projects.documents.delete",
       "flowboard.cards.sources.create",

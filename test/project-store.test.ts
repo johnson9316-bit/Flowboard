@@ -246,6 +246,7 @@ describe("Flowboard M2 project store", () => {
         boardId: "alpha",
         key: "stack",
         section: "codebase",
+        source: "project",
         type: "path",
         title: "Technology Stack",
         target: "/workspace/STACK.md",
@@ -259,7 +260,7 @@ describe("Flowboard M2 project store", () => {
     const listed = await store.listProjectDocuments("alpha", { includeHidden: true });
 
     const legacy = listed.documents.find((document) => document.id === "legacy-stack");
-    expect(legacy).toMatchObject({ id: "legacy-stack", key: "stack" });
+    expect(legacy).toMatchObject({ id: "legacy-stack", key: "stack", source: "project" });
     expect(legacy?.system).toBeUndefined();
     await expect(store.deleteProjectDocument("legacy-stack")).resolves.toEqual({ deleted: true });
   });

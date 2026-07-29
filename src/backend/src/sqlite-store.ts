@@ -32,7 +32,7 @@ import type {
   FlowboardKeyedStore,
 } from "./persistence-types.js";
 const FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"] as const;
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const FLOWBOARD_SQLITE_DIR_MODE = 0o700;
 const FLOWBOARD_SQLITE_FILE_MODE = 0o600;
@@ -411,6 +411,7 @@ const FLOWBOARD_SCHEMA_SQL = `
       board_id TEXT NOT NULL,
       document_key TEXT NOT NULL,
       section TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'project',
       type TEXT NOT NULL,
       title TEXT NOT NULL,
       summary TEXT,
@@ -446,6 +447,12 @@ function ensureFlowboardSchema(db: DatabaseSync): void {
   ensureColumn(db, "flowboard_boards", "repository_url", "repository_url TEXT");
   ensureColumn(db, "flowboard_boards", "planning_path", "planning_path TEXT");
   ensureColumn(db, "flowboard_boards", "homepage_url", "homepage_url TEXT");
+  ensureColumn(
+    db,
+    "flowboard_project_documents",
+    "source",
+    "source TEXT NOT NULL DEFAULT 'project'",
+  );
   db.exec(`
     CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
       ON flowboard_cards(board_id, milestone_id, position);
@@ -1565,6 +1572,7 @@ function readProjectDocument(row: Row): FlowboardProjectDocument {
     boardId: requiredString(row, "board_id"),
     key: requiredString(row, "document_key"),
     section: requiredString(row, "section") as FlowboardProjectDocument["section"],
+    source: (stringValue(row, "source") ?? "project") as FlowboardProjectDocument["source"],
     type: requiredString(row, "type") as FlowboardProjectDocument["type"],
     title: requiredString(row, "title"),
     position: requiredNumber(row, "position"),
@@ -1594,13 +1602,14 @@ class FlowboardSqliteProjectDocumentStore
       .prepare(
         `
           INSERT INTO flowboard_project_documents (
-            id, board_id, document_key, section, type, title, summary, target, content, position,
-            hidden_at, system, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, board_id, document_key, section, source, type, title, summary, target, content,
+            position, hidden_at, system, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             board_id = excluded.board_id,
             document_key = excluded.document_key,
             section = excluded.section,
+            source = excluded.source,
             type = excluded.type,
             title = excluded.title,
             summary = excluded.summary,
@@ -1618,6 +1627,7 @@ class FlowboardSqliteProjectDocumentStore
         document.boardId,
         document.key,
         document.section,
+        document.source,
         document.type,
         document.title,
         bindNull(document.summary),

@@ -116,7 +116,42 @@ function createSchema4Database(): string {
       session_key TEXT,
       run_id TEXT
     ) STRICT;
+    CREATE TABLE flowboard_project_documents (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL,
+      document_key TEXT NOT NULL,
+      section TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      target TEXT,
+      content TEXT,
+      position REAL NOT NULL,
+      hidden_at INTEGER,
+      system INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(board_id, document_key)
+    ) STRICT;
   `);
+  db.prepare(
+    `
+      INSERT INTO flowboard_project_documents (
+        id, board_id, document_key, section, type, title, position, system, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+  ).run(
+    "legacy-document",
+    "default",
+    "legacy",
+    "project",
+    "markdown",
+    "Legacy document",
+    1024,
+    0,
+    10,
+    20,
+  );
   db.close();
   return dbPath;
 }
@@ -159,12 +194,12 @@ describe("Flowboard SQLite schema migrations", () => {
         expect.arrayContaining(["board_id", "position", "state"]),
       );
       expect(columns("flowboard_project_documents")).toEqual(
-        expect.arrayContaining(["document_key", "section", "type", "system"]),
+        expect.arrayContaining(["document_key", "section", "source", "type", "system"]),
       );
       expect(indexes("flowboard_cards")).toContain("flowboard_cards_board_milestone_position_idx");
       expect(
         db
-          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-5'")
+          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-6'")
           .get(),
       ).toBeTruthy();
       expect(legacy).toMatchObject({
@@ -176,9 +211,10 @@ describe("Flowboard SQLite schema migrations", () => {
     }
   });
 
-  it("upgrades schema-4 databases with delivery and source-reference tables", () => {
+  it("upgrades schema-4 databases with delivery and source-reference tables", async () => {
     const dbPath = createSchema4Database();
     const stores = createFlowboardSqliteStores({ dbPath });
+    const legacyDocument = await stores.documents.lookup("legacy-document");
     stores.close();
 
     const db = new DatabaseSync(dbPath);
@@ -195,9 +231,12 @@ describe("Flowboard SQLite schema migrations", () => {
       );
       expect(
         db
-          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-5'")
+          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-6'")
           .get(),
       ).toBeTruthy();
+      expect(legacyDocument).toMatchObject({
+        document: { id: "legacy-document", source: "project" },
+      });
     } finally {
       db.close();
     }

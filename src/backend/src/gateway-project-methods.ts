@@ -9,9 +9,13 @@ import {
 import type { FlowboardStore } from "./store.js";
 import {
   assertFlowboardWorkspaceMutationAccess,
+  assertFlowboardWorkspaceSourceAccess,
   canonicalizeFlowboardWorkspaceAccess,
 } from "./workspace-access.js";
-import { readFlowboardProjectDocument } from "./project-document-reader.js";
+import {
+  readFlowboardProjectDocument,
+  writeFlowboardProjectDocumentPath,
+} from "./project-document-reader.js";
 
 const READ_SCOPE = "operator.read" as const;
 const WRITE_SCOPE = "operator.write" as const;
@@ -38,6 +42,14 @@ async function resolveProjectWorkspaceReadAccess(
       client: request.client,
     }),
   );
+}
+
+async function resolveProjectWorkspaceWriteAccess(request: GatewayMethodContext) {
+  const access = await resolveProjectWorkspaceReadAccess(request);
+  if (!access.unrestricted && !access.writable) {
+    throw new Error("project document workspace access is read-only.");
+  }
+  return access;
 }
 
 export function registerFlowboardProjectGatewayMethods(params: {
@@ -211,8 +223,14 @@ export function registerFlowboardProjectGatewayMethods(params: {
 
   api.registerGatewayMethod(
     "flowboard.projects.documents.list",
-    async ({ params: requestParams, respond }) => {
+    async (request) => {
+      const { params: requestParams, respond } = request;
       try {
+        const access = await resolveProjectWorkspaceReadAccess(request);
+        const project = await store.getProject(requestParams.boardId);
+        if (project.board.defaultWorkspace?.path) {
+          await assertFlowboardWorkspaceSourceAccess(project.board.defaultWorkspace, access);
+        }
         respond(
           true,
           await store.listProjectDocuments(requestParams.boardId, {
@@ -240,6 +258,43 @@ export function registerFlowboardProjectGatewayMethods(params: {
       }
     },
     { scope: READ_SCOPE },
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.write",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        const access = await resolveProjectWorkspaceWriteAccess(request);
+        const document = await store.getProjectDocument(readId(requestParams));
+        if (document.type === "markdown") {
+          const preview = await readFlowboardProjectDocument({ document, access });
+          if (
+            typeof requestParams.expectedRevision !== "string" ||
+            requestParams.expectedRevision !== preview.revision
+          ) {
+            throw new Error("project document changed; reload it before saving.");
+          }
+          const updated = await store.updateProjectDocument(document.id, {
+            content: requestParams.content,
+          });
+          respond(true, {
+            preview: await readFlowboardProjectDocument({ document: updated, access }),
+          });
+          return;
+        }
+        respond(true, {
+          preview: await writeFlowboardProjectDocumentPath({
+            document,
+            content: requestParams.content,
+            expectedRevision: requestParams.expectedRevision,
+            access,
+          }),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
     "flowboard.projects.documents.create",

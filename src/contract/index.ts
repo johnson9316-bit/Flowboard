@@ -89,6 +89,7 @@ export const FLOWBOARD_PROJECT_DOCUMENT_TYPES = [
   "path",
   "secret_ref",
 ] as const;
+export const FLOWBOARD_PROJECT_DOCUMENT_SOURCES = ["project", "ai_system"] as const;
 export const FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES = [
   "not_started",
   "in_progress",
@@ -135,6 +136,8 @@ export type FlowboardMilestoneState = (typeof FLOWBOARD_MILESTONE_STATES)[number
 export type FlowboardProjectDocumentSection =
   (typeof FLOWBOARD_PROJECT_DOCUMENT_SECTIONS)[number];
 export type FlowboardProjectDocumentType = (typeof FLOWBOARD_PROJECT_DOCUMENT_TYPES)[number];
+export type FlowboardProjectDocumentSource =
+  (typeof FLOWBOARD_PROJECT_DOCUMENT_SOURCES)[number];
 export type FlowboardDeliveryImplementationState =
   (typeof FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES)[number];
 export type FlowboardDeliveryVerificationState =
@@ -406,6 +409,7 @@ export type FlowboardProjectDocument = {
   boardId: string;
   key: string;
   section: FlowboardProjectDocumentSection;
+  source: FlowboardProjectDocumentSource;
   type: FlowboardProjectDocumentType;
   title: string;
   summary?: string;
@@ -422,6 +426,7 @@ export type FlowboardProjectDocumentRead = {
   document: FlowboardProjectDocument;
   content: string;
   source: "stored" | "path";
+  revision: string;
   path?: string;
   modifiedAt?: number;
 };

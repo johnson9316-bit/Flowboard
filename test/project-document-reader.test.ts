@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FlowboardProjectDocument } from "../src/contract/index.js";
-import { readFlowboardProjectDocument } from "../src/backend/src/project-document-reader.js";
+import {
+  readFlowboardProjectDocument,
+  writeFlowboardProjectDocumentPath,
+} from "../src/backend/src/project-document-reader.js";
 
 const roots: string[] = [];
 
@@ -25,6 +28,7 @@ function pathDocument(target: string): FlowboardProjectDocument {
     boardId: "project-1",
     key: "project",
     section: "project",
+    source: "project",
     type: "path",
     title: "Project",
     target,
@@ -68,6 +72,84 @@ describe("Flowboard project document reader", () => {
         access: { unrestricted: false, roots: [allowed], writable: false },
       }),
     ).rejects.toThrow("outside the caller's allowed workspaces");
+  });
+
+  it("writes a Markdown file atomically with revision protection and preserved permissions", async () => {
+    const root = createRoot();
+    const target = path.join(root, "PROJECT.md");
+    fs.writeFileSync(target, "# Original\n");
+    fs.chmodSync(target, 0o640);
+    const document = pathDocument(target);
+    const preview = await readFlowboardProjectDocument({ document, access: unrestricted });
+
+    const saved = await writeFlowboardProjectDocumentPath({
+      document,
+      content: "# Updated\n",
+      expectedRevision: preview.revision,
+      access: unrestricted,
+    });
+
+    expect(fs.readFileSync(target, "utf8")).toBe("# Updated\n");
+    expect(fs.statSync(target).mode & 0o777).toBe(0o640);
+    expect(saved).toMatchObject({ content: "# Updated\n", source: "path" });
+    await expect(
+      writeFlowboardProjectDocumentPath({
+        document,
+        content: "# Overwrite\n",
+        expectedRevision: preview.revision,
+        access: unrestricted,
+      }),
+    ).rejects.toThrow("changed on disk");
+  });
+
+  it("refuses path writes outside writable Markdown workspaces and invalid content", async () => {
+    const root = createRoot();
+    const allowed = path.join(root, "allowed");
+    const outside = path.join(root, "outside");
+    fs.mkdirSync(allowed);
+    fs.mkdirSync(outside);
+    const target = path.join(allowed, "PROJECT.md");
+    const outsideFile = path.join(outside, "OUTSIDE.md");
+    fs.writeFileSync(target, "# Project\n");
+    fs.writeFileSync(outsideFile, "# Outside\n");
+    fs.symlinkSync(outsideFile, path.join(allowed, "linked.md"));
+    const preview = await readFlowboardProjectDocument({
+      document: pathDocument(target),
+      access: unrestricted,
+    });
+
+    await expect(
+      writeFlowboardProjectDocumentPath({
+        document: pathDocument(target),
+        content: "# Read only\n",
+        expectedRevision: preview.revision,
+        access: { unrestricted: false, roots: [allowed], writable: false },
+      }),
+    ).rejects.toThrow("read-only");
+    await expect(
+      writeFlowboardProjectDocumentPath({
+        document: pathDocument(path.join(allowed, "linked.md")),
+        content: "# Escaped\n",
+        expectedRevision: "stale",
+        access: { unrestricted: false, roots: [allowed], writable: true },
+      }),
+    ).rejects.toThrow("outside the caller's allowed workspaces");
+    await expect(
+      writeFlowboardProjectDocumentPath({
+        document: pathDocument(target),
+        content: "\ud800",
+        expectedRevision: preview.revision,
+        access: unrestricted,
+      }),
+    ).rejects.toThrow("valid UTF-8");
+    await expect(
+      writeFlowboardProjectDocumentPath({
+        document: { ...pathDocument(target), target: path.join(root, "NOTES.txt") },
+        content: "# Not Markdown\n",
+        expectedRevision: preview.revision,
+        access: unrestricted,
+      }),
+    ).rejects.toThrow("Markdown file");
   });
 
   it("rejects directories, environment files, non-Markdown, missing, oversized, and invalid UTF-8 paths", async () => {

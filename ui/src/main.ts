@@ -49,6 +49,10 @@ type ProjectDocumentReadResponse = {
   preview: FlowboardProjectDocumentRead;
 };
 
+type ProjectDocumentWriteResponse = {
+  preview: FlowboardProjectDocumentRead;
+};
+
 type CardExecutionPreparationResponse = FlowboardCardExecutionPreparation;
 
 type CardExecutionInspectionResponse = FlowboardCardExecutionInspection;
@@ -64,6 +68,22 @@ function validChange(value: unknown): value is ChangeCursor {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function normalizeProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
+  return {
+    ...document,
+    source: document.source ?? "project",
+  };
+}
+
+function normalizeProjectDocumentRead(
+  preview: FlowboardProjectDocumentRead,
+): FlowboardProjectDocumentRead {
+  return {
+    ...preview,
+    document: normalizeProjectDocument(preview.document),
+  };
 }
 
 class FlowboardProjectHost extends LitElement {
@@ -96,6 +116,22 @@ class FlowboardProjectHost extends LitElement {
       document.documentElement.lang = locale;
       this.requestUpdate();
     });
+    this.stopHostSync = startFlowboardThemeSync();
+    document.documentElement.lang = i18n.getLocale();
+    this.state.languageSwitching = true;
+    void i18n
+      .initialize(readInitialFlowboardHostLocale())
+      .then((applied) => {
+        if (!applied && !this.stopped) {
+          this.state.languageError = i18n.t("flowboardProject.languageChangeFailed");
+        }
+      })
+      .finally(() => {
+        if (!this.stopped) {
+          this.state.languageSwitching = false;
+          this.requestUpdate();
+        }
+      });
     document.addEventListener("visibilitychange", this.handleVisibilityChange);
     this.gateway.start();
   }
@@ -116,45 +152,9 @@ class FlowboardProjectHost extends LitElement {
 
   private readonly handleVisibilityChange = () => {
     if (document.visibilityState === "visible" && this.connectedToGateway) {
-    this.stopHostSync = startFlowboardThemeSync();
-    document.documentElement.lang = i18n.getLocale();
-    this.state.languageSwitching = true;
-    void i18n
-      .initialize(readInitialFlowboardHostLocale())
-      .then((applied) => {
-        if (!applied && !this.stopped) {
-          this.state.languageError = i18n.t("flowboardProject.languageChangeFailed");
-        }
-      })
-      .finally(() => {
-        if (!this.stopped) {
-          this.state.languageSwitching = false;
-          this.requestUpdate();
-        }
-      });
       void this.refresh();
     }
   };
-
-  private handleGatewayState(state: FlowboardGatewayState) {
-    const wasConnected = this.connectedToGateway;
-    this.connectedToGateway = state.connected;
-    if (state.connected && !wasConnected) {
-      void this.refresh();
-      this.startChangeWait();
-    } else if (!state.connected && wasConnected) {
-      this.changeLoopGeneration += 1;
-    }
-    if (!state.connected && state.error) {
-      this.state.error = state.error;
-    }
-    this.requestUpdate();
-  }
-
-  private startChangeWait() {
-    const generation = ++this.changeLoopGeneration;
-    void this.waitForChanges(generation);
-  }
 
   private setLocale(locale: FlowboardLocale) {
     if (this.state.languageSwitching) {
@@ -176,6 +176,26 @@ class FlowboardProjectHost extends LitElement {
           this.requestUpdate();
         }
       });
+  }
+
+  private handleGatewayState(state: FlowboardGatewayState) {
+    const wasConnected = this.connectedToGateway;
+    this.connectedToGateway = state.connected;
+    if (state.connected && !wasConnected) {
+      void this.refresh();
+      this.startChangeWait();
+    } else if (!state.connected && wasConnected) {
+      this.changeLoopGeneration += 1;
+    }
+    if (!state.connected && state.error) {
+      this.state.error = state.error;
+    }
+    this.requestUpdate();
+  }
+
+  private startChangeWait() {
+    const generation = ++this.changeLoopGeneration;
+    void this.waitForChanges(generation);
   }
 
   private async waitForChanges(generation: number) {
@@ -232,6 +252,8 @@ class FlowboardProjectHost extends LitElement {
         this.state.selectedDocumentId = null;
         this.state.documentPreview = null;
         this.state.documentPreviewError = null;
+        this.state.documentEditing = false;
+        this.state.documentDraft = null;
         this.clearExecutionState();
         this.state.screen = "overview";
       } else if (selectedId) {
@@ -253,7 +275,7 @@ class FlowboardProjectHost extends LitElement {
           if (generation !== this.refreshGeneration) {
             return;
           }
-          this.state.documents = documents.documents;
+          this.state.documents = documents.documents.map(normalizeProjectDocument);
           if (
             this.state.selectedDocumentId &&
             !documents.documents.some((document) => document.id === this.state.selectedDocumentId)
@@ -261,6 +283,8 @@ class FlowboardProjectHost extends LitElement {
             this.state.selectedDocumentId = null;
             this.state.documentPreview = null;
             this.state.documentPreviewError = null;
+            this.state.documentEditing = false;
+            this.state.documentDraft = null;
           }
         }
       }
@@ -284,6 +308,8 @@ class FlowboardProjectHost extends LitElement {
     this.state.selectedDocumentId = null;
     this.state.documentPreview = null;
     this.state.documentPreviewError = null;
+    this.state.documentEditing = false;
+    this.state.documentDraft = null;
     void this.refresh();
   }
 
@@ -562,13 +588,105 @@ class FlowboardProjectHost extends LitElement {
     }
   }
 
+  private startDocumentEdit() {
+    const document = this.state.documents.find(
+      (candidate) => candidate.id === this.state.selectedDocumentId,
+    );
+    const preview = this.state.documentPreview;
+    if (
+      !document ||
+      !preview ||
+      preview.document.id !== document.id ||
+      (document.type !== "markdown" && !(document.type === "path" && preview.source === "path"))
+    ) {
+      return;
+    }
+    this.state.documentDraft ??= preview.content;
+    this.state.documentEditing = true;
+    this.state.documentPreviewError = null;
+    this.requestUpdate();
+  }
+
+  private previewDocumentDraft() {
+    if (this.state.documentDraft === null) {
+      return;
+    }
+    this.state.documentEditing = false;
+    this.requestUpdate();
+  }
+
+  private cancelDocumentEdit() {
+    this.state.documentEditing = false;
+    this.state.documentDraft = null;
+    this.state.documentPreviewError = null;
+    this.requestUpdate();
+  }
+
+  private saveDocumentContent() {
+    const document = this.state.documents.find(
+      (candidate) => candidate.id === this.state.selectedDocumentId,
+    );
+    const preview = this.state.documentPreview;
+    const content = this.state.documentDraft;
+    if (
+      this.state.busy ||
+      !document ||
+      !preview ||
+      preview.document.id !== document.id ||
+      content === null
+    ) {
+      return;
+    }
+    if (!this.connectedToGateway) {
+      this.state.documentPreviewError = i18n.t("flowboardProject.connectionRequired");
+      this.requestUpdate();
+      return;
+    }
+    this.state.busy = true;
+    this.state.documentPreviewError = null;
+    this.requestUpdate();
+    void this.gateway
+      .request<ProjectDocumentWriteResponse>("flowboard.projects.documents.write", {
+        id: document.id,
+        content,
+        expectedRevision: preview.revision,
+      })
+      .then((response) => {
+        if (this.state.selectedDocumentId !== document.id) {
+          return;
+        }
+        this.state.documents = this.state.documents.map((candidate) =>
+          candidate.id === document.id
+            ? normalizeProjectDocument(response.preview.document)
+            : candidate,
+        );
+        this.state.documentPreview = normalizeProjectDocumentRead(response.preview);
+        this.state.documentEditing = false;
+        this.state.documentDraft = null;
+      })
+      .catch((error) => {
+        if (this.state.selectedDocumentId === document.id) {
+          this.state.documentPreviewError = errorMessage(error);
+        }
+      })
+      .finally(() => {
+        this.state.busy = false;
+        this.requestUpdate();
+      });
+  }
+
   private async readDocument(id: string) {
     if (this.state.documentPreviewLoading) {
       return;
     }
+    const selectionChanged = this.state.selectedDocumentId !== id;
     this.state.selectedDocumentId = id;
     this.state.documentPreview = null;
     this.state.documentPreviewError = null;
+    if (selectionChanged) {
+      this.state.documentEditing = false;
+      this.state.documentDraft = null;
+    }
     this.state.documentPreviewLoading = true;
     this.requestUpdate();
     try {
@@ -577,7 +695,7 @@ class FlowboardProjectHost extends LitElement {
         { id },
       );
       if (this.state.selectedDocumentId === id) {
-        this.state.documentPreview = response.preview;
+        this.state.documentPreview = normalizeProjectDocumentRead(response.preview);
       }
     } catch (error) {
       if (this.state.selectedDocumentId === id) {
@@ -654,6 +772,18 @@ class FlowboardProjectHost extends LitElement {
         ...common,
       });
     });
+  }
+
+  private syncAiInstructions() {
+    const project = this.state.project;
+    if (!project?.board.defaultWorkspace?.path) {
+      return;
+    }
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.projects.documents.syncAiInstructions", {
+        boardId: project.board.id,
+      });
+    }, { closeModal: false });
   }
 
   private hideDocument(id: string, hidden: boolean) {
@@ -877,6 +1007,8 @@ class FlowboardProjectHost extends LitElement {
       connected: this.connectedToGateway,
       requestUpdate: () => this.requestUpdate(),
       refresh: () => void this.refresh(),
+      locale: i18n.getLocale(),
+      setLocale: (locale) => this.setLocale(locale),
       selectProject: (id) => this.selectProject(id),
       setScreen: (screen) => this.setScreen(screen),
       openModal: (modal) => this.openModal(modal),
@@ -898,6 +1030,11 @@ class FlowboardProjectHost extends LitElement {
       reorderDocuments: (ids) => this.reorderDocuments(ids),
       openDocument: (id) => this.openDocument(id),
       refreshDocument: () => this.refreshDocument(),
+      startDocumentEdit: () => this.startDocumentEdit(),
+      previewDocumentDraft: () => this.previewDocumentDraft(),
+      cancelDocumentEdit: () => this.cancelDocumentEdit(),
+      saveDocumentContent: () => this.saveDocumentContent(),
+      syncAiInstructions: () => this.syncAiInstructions(),
       saveMilestone: (data) => this.saveMilestone(data),
       completeMilestone: (id) => this.completeMilestone(id),
       archiveMilestone: (id, archived) => this.archiveMilestone(id, archived),
@@ -929,5 +1066,3 @@ if (!customElements.get("flowboard-workboard")) {
 }
 
 document.body.replaceChildren(document.createElement("flowboard-workboard"));
-      locale: i18n.getLocale(),
-      setLocale: (locale) => this.setLocale(locale),

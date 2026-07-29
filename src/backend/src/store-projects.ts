@@ -45,6 +45,7 @@ import {
   normalizeTitle,
 } from "./store-normalizers.js";
 import { FlowboardNotificationStore } from "./store-notifications.js";
+import { discoverFlowboardAiInstructions } from "./project-ai-instructions.js";
 
 type StandardDocument = {
   key: string;
@@ -74,10 +75,13 @@ const STANDARD_PROJECT_DOCUMENTS: readonly StandardDocument[] = [
 const STANDARD_PROJECT_DOCUMENT_KEYS = new Set(STANDARD_PROJECT_DOCUMENTS.map((item) => item.key));
 
 function presentProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
-  if (!document.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(document.key)) {
-    return document;
+  const next: FlowboardProjectDocument = {
+    ...document,
+    source: document.source ?? "project",
+  };
+  if (!next.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(next.key)) {
+    return next;
   }
-  const next = { ...document };
   delete next.system;
   return next;
 }
@@ -215,6 +219,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         boardId,
         key: item.key,
         section: item.section,
+        source: "project",
         type: "path",
         title: item.title,
         position: (position + 1) * POSITION_STEP,
@@ -223,6 +228,64 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         updatedAt: now,
       };
       await this.documentStore.register(document.id, { version: 1, document });
+    }
+  }
+
+  private async ensureProjectAiInstructionsDirect(
+    board: FlowboardBoardMetadata,
+    now = Date.now(),
+  ): Promise<void> {
+    const workspacePath = board.defaultWorkspace?.path;
+    if (
+      !workspacePath ||
+      (board.defaultWorkspace?.kind !== "dir" && board.defaultWorkspace?.kind !== "worktree")
+    ) {
+      return;
+    }
+    let candidates: Awaited<ReturnType<typeof discoverFlowboardAiInstructions>>;
+    try {
+      candidates = await discoverFlowboardAiInstructions(workspacePath);
+    } catch {
+      // A stale optional workspace must not make the document library unavailable.
+      return;
+    }
+    const existing = (await this.documentStore.entries())
+      .map((entry) => entry.value)
+      .filter(
+        (entry): entry is { version: 1; document: FlowboardProjectDocument } =>
+          entry?.version === 1 && entry.document?.boardId === board.id,
+      )
+      .map((entry) => presentProjectDocument(entry.document));
+    const existingKeys = new Set(existing.map((document) => document.key));
+    const existingTargets = new Set(
+      existing
+        .map((document) => document.target)
+        .filter((target): target is string => Boolean(target)),
+    );
+    const sameSection = existing.filter((document) => document.section === "project");
+    let position = Math.max(0, ...sameSection.map((document) => document.position));
+    for (const candidate of candidates) {
+      if (existingKeys.has(candidate.key) || existingTargets.has(candidate.target)) {
+        continue;
+      }
+      position += POSITION_STEP;
+      const document: FlowboardProjectDocument = {
+        id: randomUUID(),
+        boardId: board.id,
+        key: candidate.key,
+        section: "project",
+        source: "ai_system",
+        type: "path",
+        title: candidate.title,
+        summary: candidate.summary,
+        target: candidate.target,
+        position,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await this.documentStore.register(document.id, { version: 1, document });
+      existingKeys.add(candidate.key);
+      existingTargets.add(candidate.target);
     }
   }
 
@@ -699,7 +762,8 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   ): Promise<{ documents: FlowboardProjectDocument[] }> {
     const normalizedBoardId = normalizeBoardIdRequired(boardId);
     return await this.enqueueMutation(async () => {
-      await this.ensureProjectDirect(normalizedBoardId);
+      const board = await this.ensureProjectDirect(normalizedBoardId);
+      await this.ensureProjectAiInstructionsDirect(board);
       const documents = (await this.documentStore.entries())
         .map((entry) => entry.value)
         .filter(
@@ -764,6 +828,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         boardId,
         key,
         section,
+        source: "project",
         type,
         title,
         position:

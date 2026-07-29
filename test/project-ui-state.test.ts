@@ -32,6 +32,9 @@ describe("Flowboard M2 project UI state", () => {
       languageError: null,
       showArchivedProjects: false,
       showHiddenDocuments: false,
+      documentEditing: false,
+      documentDraft: null,
+      documentSourceFilter: "all",
       executionPreparation: null,
       executionInspection: null,
     });

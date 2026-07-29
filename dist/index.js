@@ -3027,9 +3027,9 @@ async function withCardExecutionLock(store, cardId, action) {
     }
   }
 }
-async function gitCheckout(path5) {
+async function gitCheckout(path6) {
   try {
-    const { stdout } = await execFileAsync("git", ["-C", path5, "rev-parse", "--show-toplevel"], {
+    const { stdout } = await execFileAsync("git", ["-C", path6, "rev-parse", "--show-toplevel"], {
       encoding: "utf8",
       maxBuffer: 16 * 1024
     });
@@ -3647,19 +3647,40 @@ function registerFlowboardWorkspaceWorkflowMethods(params) {
 }
 
 // src/backend/src/project-document-reader.ts
+import { createHash, randomUUID as randomUUID3 } from "node:crypto";
 import fs from "node:fs/promises";
 import path2 from "node:path";
 var MAX_PROJECT_DOCUMENT_BYTES = 1024 * 1024;
 var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set([".md", ".markdown"]);
-async function readFlowboardProjectDocument(params) {
-  const { document } = params;
-  if (document.type === "markdown") {
-    return {
-      document,
-      content: document.content ?? "",
-      source: "stored"
-    };
+function documentRevision(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+function decodeUtf8(bytes) {
+  let content;
+  try {
+    content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("project document file is not valid UTF-8 text.");
   }
+  if (content.includes("\0")) {
+    throw new Error("project document file is not valid UTF-8 text.");
+  }
+  return content;
+}
+function encodeDocumentContent(content) {
+  if (typeof content !== "string") {
+    throw new Error("document content must be a string.");
+  }
+  const bytes = Buffer.from(content, "utf8");
+  if (bytes.byteLength > MAX_PROJECT_DOCUMENT_BYTES) {
+    throw new Error("project document content exceeds the 1 MiB limit.");
+  }
+  if (decodeUtf8(bytes) !== content) {
+    throw new Error("document content is not valid UTF-8 text.");
+  }
+  return bytes;
+}
+function assertMarkdownPath(document) {
   if (document.type !== "path" || !document.target) {
     throw new Error("only Markdown documents and Markdown file paths can be previewed.");
   }
@@ -3670,9 +3691,13 @@ async function readFlowboardProjectDocument(params) {
   if (!MARKDOWN_EXTENSIONS.has(path2.extname(document.target).toLowerCase())) {
     throw new Error("project document paths must reference a Markdown file.");
   }
+  return document.target;
+}
+async function resolveProjectDocumentFile(params) {
+  const target = assertMarkdownPath(params.document);
   let resolvedPath;
   try {
-    resolvedPath = await fs.realpath(document.target);
+    resolvedPath = await fs.realpath(target);
   } catch {
     throw new Error("project document file does not exist.");
   }
@@ -3695,22 +3720,65 @@ async function readFlowboardProjectDocument(params) {
   } catch {
     throw new Error("project document file cannot be read.");
   }
-  let content;
-  try {
-    content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw new Error("project document file is not valid UTF-8 text.");
+  return { content: decodeUtf8(bytes), bytes, path: resolvedPath, stat };
+}
+async function readFlowboardProjectDocument(params) {
+  const { document } = params;
+  if (document.type === "markdown") {
+    const content = document.content ?? "";
+    return {
+      document,
+      content,
+      source: "stored",
+      revision: `stored:${document.updatedAt}:${documentRevision(Buffer.from(content, "utf8"))}`
+    };
   }
-  if (content.includes("\0")) {
-    throw new Error("project document file is not valid UTF-8 text.");
-  }
+  const file = await resolveProjectDocumentFile(params);
   return {
     document,
-    content,
+    content: file.content,
     source: "path",
-    path: resolvedPath,
-    modifiedAt: Math.trunc(stat.mtimeMs)
+    revision: documentRevision(file.bytes),
+    path: file.path,
+    modifiedAt: Math.trunc(Number(file.stat.mtimeMs))
   };
+}
+async function writeFlowboardProjectDocumentPath(params) {
+  if (!params.access.unrestricted && !params.access.writable) {
+    throw new Error("project document workspace access is read-only.");
+  }
+  if (typeof params.expectedRevision !== "string" || !params.expectedRevision) {
+    throw new Error("expected document revision is required.");
+  }
+  const content = encodeDocumentContent(params.content);
+  const current = await resolveProjectDocumentFile(params);
+  if (documentRevision(current.bytes) !== params.expectedRevision) {
+    throw new Error("project document changed on disk; reload it before saving.");
+  }
+  const directory = path2.dirname(current.path);
+  const temporaryPath = path2.join(
+    directory,
+    `.${path2.basename(current.path)}.flowboard-${randomUUID3()}.tmp`
+  );
+  const originalMode = Number(current.stat.mode) & 4095;
+  try {
+    const handle = await fs.open(temporaryPath, "wx", originalMode);
+    try {
+      await handle.writeFile(content);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await fs.chmod(temporaryPath, originalMode);
+    await fs.rename(temporaryPath, current.path);
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => void 0);
+    throw error;
+  }
+  return await readFlowboardProjectDocument({
+    document: params.document,
+    access: params.access
+  });
 }
 
 // src/backend/src/gateway-project-methods.ts
@@ -3732,6 +3800,13 @@ async function resolveProjectWorkspaceReadAccess(request) {
       client: request.client
     })
   );
+}
+async function resolveProjectWorkspaceWriteAccess(request) {
+  const access = await resolveProjectWorkspaceReadAccess(request);
+  if (!access.unrestricted && !access.writable) {
+    throw new Error("project document workspace access is read-only.");
+  }
+  return access;
 }
 function registerFlowboardProjectGatewayMethods(params) {
   const { api, store, redactCard } = params;
@@ -3929,6 +4004,58 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
+    "flowboard.projects.documents.write",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        const access = await resolveProjectWorkspaceWriteAccess(request);
+        const document = await store.getProjectDocument(readId(requestParams));
+        if (document.type === "markdown") {
+          const preview = await readFlowboardProjectDocument({ document, access });
+          if (typeof requestParams.expectedRevision !== "string" || requestParams.expectedRevision !== preview.revision) {
+            throw new Error("project document changed; reload it before saving.");
+          }
+          const updated = await store.updateProjectDocument(document.id, {
+            content: requestParams.content
+          });
+          respond(true, {
+            preview: await readFlowboardProjectDocument({ document: updated, access })
+          });
+          return;
+        }
+        respond(true, {
+          preview: await writeFlowboardProjectDocumentPath({
+            document,
+            content: requestParams.content,
+            expectedRevision: requestParams.expectedRevision,
+            access
+          })
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.projects.documents.syncAiInstructions",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        const access = await resolveProjectWorkspaceWriteAccess(request);
+        const project = await store.getProject(requestParams.boardId);
+        await assertFlowboardWorkspaceMutationAccess(
+          { defaultWorkspace: project.board.defaultWorkspace },
+          access
+        );
+        respond(true, await store.syncProjectAiInstructions(requestParams.boardId));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
     "flowboard.projects.documents.create",
     async ({ params: requestParams, respond }) => {
       try {
@@ -4084,7 +4211,7 @@ function registerFlowboardProjectGatewayMethods(params) {
 }
 
 // src/backend/src/store.ts
-import { randomUUID as randomUUID9 } from "node:crypto";
+import { randomUUID as randomUUID10 } from "node:crypto";
 
 // src/backend/src/sqlite-store.ts
 import fs2 from "node:fs";
@@ -4093,7 +4220,7 @@ import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 5;
+var SCHEMA_VERSION = 6;
 var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var FLOWBOARD_SQLITE_DIR_MODE = 448;
 var FLOWBOARD_SQLITE_FILE_MODE = 384;
@@ -4447,6 +4574,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       board_id TEXT NOT NULL,
       document_key TEXT NOT NULL,
       section TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'project',
       type TEXT NOT NULL,
       title TEXT NOT NULL,
       summary TEXT,
@@ -4481,6 +4609,12 @@ function ensureFlowboardSchema(db) {
   ensureColumn(db, "flowboard_boards", "repository_url", "repository_url TEXT");
   ensureColumn(db, "flowboard_boards", "planning_path", "planning_path TEXT");
   ensureColumn(db, "flowboard_boards", "homepage_url", "homepage_url TEXT");
+  ensureColumn(
+    db,
+    "flowboard_project_documents",
+    "source",
+    "source TEXT NOT NULL DEFAULT 'project'"
+  );
   db.exec(`
     CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
       ON flowboard_cards(board_id, milestone_id, position);
@@ -5484,6 +5618,7 @@ function readProjectDocument(row) {
     boardId: requiredString(row, "board_id"),
     key: requiredString(row, "document_key"),
     section: requiredString(row, "section"),
+    source: stringValue(row, "source") ?? "project",
     type: requiredString(row, "type"),
     title: requiredString(row, "title"),
     position: requiredNumber(row, "position"),
@@ -5508,13 +5643,14 @@ var FlowboardSqliteProjectDocumentStore = class {
     this.db.prepare(
       `
           INSERT INTO flowboard_project_documents (
-            id, board_id, document_key, section, type, title, summary, target, content, position,
-            hidden_at, system, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, board_id, document_key, section, source, type, title, summary, target, content,
+            position, hidden_at, system, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             board_id = excluded.board_id,
             document_key = excluded.document_key,
             section = excluded.section,
+            source = excluded.source,
             type = excluded.type,
             title = excluded.title,
             summary = excluded.summary,
@@ -5531,6 +5667,7 @@ var FlowboardSqliteProjectDocumentStore = class {
       document.boardId,
       document.key,
       document.section,
+      document.source,
       document.type,
       document.title,
       bindNull(document.summary),
@@ -5743,22 +5880,22 @@ function createFlowboardSqliteStores(options = {}) {
 
 // src/backend/src/store-projects.ts
 init_contract();
-import { randomUUID as randomUUID8 } from "node:crypto";
+import { randomUUID as randomUUID9 } from "node:crypto";
 
 // src/backend/src/store-workflow.ts
-import { randomUUID as randomUUID7 } from "node:crypto";
+import { randomUUID as randomUUID8 } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { isFutureDateTimestampMs as isFutureDateTimestampMs2 } from "openclaw/plugin-sdk/number-runtime";
 import { safeEqualSecret as safeEqualSecret2 } from "openclaw/plugin-sdk/security-runtime";
 
 // src/backend/src/store-promote.ts
-import { randomUUID as randomUUID6 } from "node:crypto";
+import { randomUUID as randomUUID7 } from "node:crypto";
 
 // src/backend/src/store-enrichment.ts
-import { randomUUID as randomUUID5 } from "node:crypto";
+import { randomUUID as randomUUID6 } from "node:crypto";
 
 // src/backend/src/store-core.ts
-import { randomUUID as randomUUID4 } from "node:crypto";
+import { randomUUID as randomUUID5 } from "node:crypto";
 
 // src/backend/src/store-automation.ts
 function normalizeTrustedWorkspaceAccess(value, fallback) {
@@ -5820,13 +5957,13 @@ function normalizeAutomationPatch(patch, current) {
 }
 
 // src/backend/src/store-change-tracker.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID4 } from "node:crypto";
 var FlowboardChangeTracker = class {
   constructor(readDataVersion) {
     this.readDataVersion = readDataVersion;
     this.externalDataVersion = readDataVersion?.();
   }
-  epoch = randomUUID3();
+  epoch = randomUUID4();
   revision = 0;
   latestChange;
   mutationRevision = 0;
@@ -6207,7 +6344,7 @@ var FlowboardCoreStore = class {
       ).map((card2) => card2.position)
     ) + POSITION_STEP;
     let card = {
-      id: randomUUID4(),
+      id: randomUUID5(),
       title: normalizeTitle(input.title),
       status,
       priority: normalizePriority(input.priority, "normal"),
@@ -6218,7 +6355,7 @@ var FlowboardCoreStore = class {
       updatedAt: now,
       events: [
         {
-          id: randomUUID4(),
+          id: randomUUID5(),
           kind: "created",
           at: now,
           toStatus: status,
@@ -6413,7 +6550,7 @@ var FlowboardCoreStore = class {
     if (!body) {
       throw new Error("comment body is required.");
     }
-    const comment = { id: randomUUID4(), body, createdAt: now };
+    const comment = { id: randomUUID5(), body, createdAt: now };
     return await this.updateMetadata(id, (existing) => {
       assertCanMutateClaimedCard(existing, scope);
       return {
@@ -6433,7 +6570,7 @@ var FlowboardCoreStore = class {
     return await this.mutateSourceReferences(id, (references) => [
       ...references,
       {
-        id: randomUUID4(),
+        id: randomUUID5(),
         label,
         target,
         position: Math.max(0, ...references.map((reference) => reference.position)) + POSITION_STEP,
@@ -6561,7 +6698,7 @@ var FlowboardCoreStore = class {
       throw new Error("parent and child dependency links must use linkDependency.");
     }
     const link = {
-      id: randomUUID4(),
+      id: randomUUID5(),
       type,
       createdAt: now,
       ...targetCardId ? { targetCardId } : {},
@@ -6612,7 +6749,7 @@ var FlowboardCoreStore = class {
     const nextParentLinks = parentLinks.some(
       (link) => link.type === "child" && link.targetCardId === child.id
     ) ? parentLinks : appendLinkPreservingDependencies(parentLinks, {
-      id: randomUUID4(),
+      id: randomUUID5(),
       type: "child",
       targetCardId: child.id,
       createdAt: now
@@ -6620,7 +6757,7 @@ var FlowboardCoreStore = class {
     const nextChildLinks = childLinks.some(
       (link) => link.type === "parent" && link.targetCardId === parent.id
     ) ? childLinks : appendLinkPreservingDependencies(childLinks, {
-      id: randomUUID4(),
+      id: randomUUID5(),
       type: "parent",
       targetCardId: parent.id,
       createdAt: now
@@ -6705,7 +6842,7 @@ var FlowboardCoreStore = class {
       workerLogs: [
         ...card.metadata?.workerLogs ?? [],
         {
-          id: randomUUID4(),
+          id: randomUUID5(),
           level: "info",
           message: "Auto orchestration marked this triage card for specification or decomposition.",
           createdAt: now
@@ -6896,7 +7033,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
     const sessionKey = normalizeBoundedString(input.sessionKey, void 0, 240, "session key");
     const runId = normalizeBoundedString(input.runId, void 0, 160, "run id");
     const log = {
-      id: randomUUID5(),
+      id: randomUUID6(),
       level,
       message,
       createdAt: now,
@@ -6923,7 +7060,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
       const sessionKey = normalizeBoundedString(input.sessionKey, void 0, 240, "session key");
       const runId = normalizeBoundedString(input.runId, void 0, 160, "run id");
       const log = {
-        id: randomUUID5(),
+        id: randomUUID6(),
         level: "error",
         message: detail,
         createdAt: now,
@@ -6933,7 +7070,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
       const execution = card.execution?.status === "running" ? { ...card.execution, status: "blocked", updatedAt: now } : card.execution;
       const attempts = closeRunningAttempts(card.metadata?.attempts, now, "blocked", detail);
       const notification = {
-        id: randomUUID5(),
+        id: randomUUID6(),
         kind: "failed",
         createdAt: now,
         sequence: this.nextNotificationSequence(now),
@@ -7005,7 +7142,7 @@ var FlowboardPromoteStore = class extends FlowboardEnrichmentStore {
       const reason = normalizeBoundedString(input.reason, void 0, 1e3, "promote reason");
       const comments = reason ? [
         ...existing.metadata?.comments ?? [],
-        { id: randomUUID6(), body: reason, createdAt: Date.now() }
+        { id: randomUUID7(), body: reason, createdAt: Date.now() }
       ].slice(-MAX_CARD_COMMENTS) : existing.metadata?.comments;
       return await this.updateCard(
         id,
@@ -7066,7 +7203,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       if (existingClaim && (isFutureDateTimestampMs2(existingClaim.expiresAt, { nowMs: now }) || !isFlowboardClaimReclaimable(existingClaim, now))) {
         throw new Error(`card already claimed by ${existingClaim.ownerId}.`);
       }
-      const token = randomUUID7();
+      const token = randomUUID8();
       const expiresAt = addFlowboardDurationMs(
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS
@@ -7104,7 +7241,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
           attempts: closeRunningAttempts(existing.metadata?.attempts, now, "stopped", reason),
           comments: [
             ...existing.metadata?.comments ?? [],
-            { id: randomUUID7(), body: reason, createdAt: now }
+            { id: randomUUID8(), body: reason, createdAt: now }
           ].slice(-MAX_CARD_COMMENTS)
         }
       });
@@ -7116,7 +7253,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       throw new Error("claim ownerId is required.");
     }
     const ttlSeconds = typeof input.ttlSeconds === "number" && Number.isFinite(input.ttlSeconds) ? Math.max(1, Math.trunc(input.ttlSeconds)) : void 0;
-    const token = normalizeBoundedString(input.token, void 0, 160, "claim token") ?? randomUUID7();
+    const token = normalizeBoundedString(input.token, void 0, 160, "claim token") ?? randomUUID8();
     return await this.enqueueMutation(async () => {
       const now = Date.now();
       const expiresAt = addFlowboardDurationMs(
@@ -7195,7 +7332,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       return {
         ...metadata,
         claim: removeUndefinedMetadataFields({ claim: nextClaim }).claim,
-        comments: note ? [...metadata.comments ?? [], { id: randomUUID7(), body: note, createdAt: now }].slice(
+        comments: note ? [...metadata.comments ?? [], { id: randomUUID8(), body: note, createdAt: now }].slice(
           -MAX_CARD_COMMENTS
         ) : metadata.comments
       };
@@ -7258,7 +7395,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
     const artifacts = Array.isArray(input.artifacts) ? input.artifacts.map((artifact) => normalizeArtifact({ ...artifact, createdAt: now })).filter((artifact) => artifact !== null).slice(-MAX_CARD_ARTIFACTS) : [];
     const metadata = clearDiagnostics(existing.metadata, ["missing_proof"]);
     const notification = {
-      id: randomUUID7(),
+      id: randomUUID8(),
       kind: "completed",
       createdAt: now,
       sequence: this.nextNotificationSequence(now),
@@ -7287,7 +7424,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
           ),
           comments: summary ? [
             ...metadata.comments ?? [],
-            { id: randomUUID7(), body: summary, createdAt: now }
+            { id: randomUUID8(), body: summary, createdAt: now }
           ].slice(-MAX_CARD_COMMENTS) : metadata.comments,
           proof: proof ? appendCompletionProof(metadata.proof, proof, proofId) : metadata.proof,
           artifacts: artifacts.length ? [...metadata.artifacts ?? [], ...artifacts].slice(-MAX_CARD_ARTIFACTS) : metadata.artifacts,
@@ -7313,7 +7450,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       const reason = normalizeBoundedString(input.reason, void 0, 2e3, "block reason") ?? "Flowboard card blocked.";
       const metadata = existing.metadata ?? {};
       const notification = {
-        id: randomUUID7(),
+        id: randomUUID8(),
         kind: "failed",
         createdAt: now,
         sequence: this.nextNotificationSequence(now),
@@ -7332,7 +7469,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
           failureCount: (metadata.failureCount ?? 0) + 1,
           comments: [
             ...metadata.comments ?? [],
-            { id: randomUUID7(), body: reason, createdAt: now }
+            { id: randomUUID8(), body: reason, createdAt: now }
           ].slice(-MAX_CARD_COMMENTS),
           notifications: [...metadata.notifications ?? [], notification].slice(
             -MAX_CARD_NOTIFICATIONS
@@ -7369,7 +7506,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
         ...shouldResetFailures ? { failureCount: 0 } : {},
         comments: reason ? [
           ...baseMetadata?.comments ?? [],
-          { id: randomUUID7(), body: reason, createdAt: Date.now() }
+          { id: randomUUID8(), body: reason, createdAt: Date.now() }
         ].slice(-MAX_CARD_COMMENTS) : baseMetadata?.comments
       };
       return await this.updateCard(id, { agentId, status, metadata }, { enforceStatusHolds: true });
@@ -7396,7 +7533,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
             attempts: closeRunningAttempts(existing.metadata?.attempts, now, "stopped", reason),
             comments: [
               ...existing.metadata?.comments ?? [],
-              { id: randomUUID7(), body: reason, createdAt: now }
+              { id: randomUUID8(), body: reason, createdAt: now }
             ].slice(-MAX_CARD_COMMENTS),
             stale: null
           }
@@ -7433,7 +7570,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
         ...existing.metadata,
         comments: summary ? [
           ...existing.metadata?.comments ?? [],
-          { id: randomUUID7(), body: summary, createdAt: now }
+          { id: randomUUID8(), body: summary, createdAt: now }
         ].slice(-MAX_CARD_COMMENTS) : existing.metadata?.comments,
         automation: normalizeAutomation(
           {
@@ -7684,6 +7821,108 @@ var FlowboardNotificationStore = class extends FlowboardWorkflowStore {
   }
 };
 
+// src/backend/src/project-ai-instructions.ts
+import fs3 from "node:fs/promises";
+import path4 from "node:path";
+var ROOT_INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"];
+var DEPLOYMENT_SKILL_FILES = [
+  ".claude/skills/deploy-test/SKILL.md",
+  ".claude/skills/deploy-prod/SKILL.md"
+];
+var EXCLUDED_MODULE_DIRECTORIES = /* @__PURE__ */ new Set([
+  ".claude",
+  ".git",
+  ".next",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "out",
+  "vendor"
+]);
+function isPathInside2(root, candidate) {
+  const relative = path4.relative(root, candidate);
+  return relative === "" || !relative.startsWith(`..${path4.sep}`) && relative !== "..";
+}
+function candidateKey(relativePath) {
+  const normalized = relativePath.toLocaleLowerCase().replace(/\.md$/i, "").replace(/[\\/]+/g, ".").replace(/[^a-z0-9._-]/g, "-").replace(/^\.+/, "");
+  return `ai.${normalized}`;
+}
+function candidateTitle(relativePath) {
+  return relativePath.startsWith(".claude/skills/") ? relativePath.replace(".claude/skills/", "").replace("/SKILL.md", " skill") : relativePath;
+}
+async function addCandidate(params) {
+  const candidate = path4.join(params.root, params.relativePath);
+  let target;
+  try {
+    target = await fs3.realpath(candidate);
+  } catch {
+    return;
+  }
+  if (!isPathInside2(params.root, target)) {
+    return;
+  }
+  let stat;
+  try {
+    stat = await fs3.stat(target);
+  } catch {
+    return;
+  }
+  if (!stat.isFile()) {
+    return;
+  }
+  params.result.push({
+    key: candidateKey(params.relativePath),
+    relativePath: params.relativePath,
+    target,
+    title: candidateTitle(params.relativePath),
+    summary: params.relativePath.startsWith(".claude/skills/") ? "Managed deployment skill." : "AI instruction entry point."
+  });
+}
+async function discoverFlowboardAiInstructions(workspacePath) {
+  let root;
+  try {
+    root = await fs3.realpath(workspacePath);
+  } catch {
+    throw new Error("project default workspace does not exist.");
+  }
+  let rootStat;
+  try {
+    rootStat = await fs3.stat(root);
+  } catch {
+    throw new Error("project default workspace cannot be read.");
+  }
+  if (!rootStat.isDirectory()) {
+    throw new Error("project default workspace must be a directory.");
+  }
+  const result = [];
+  for (const fileName of ROOT_INSTRUCTION_FILES) {
+    await addCandidate({ root, relativePath: fileName, result });
+  }
+  let entries;
+  try {
+    entries = await fs3.readdir(root, { encoding: "utf8", withFileTypes: true });
+  } catch {
+    throw new Error("project default workspace cannot be read.");
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || EXCLUDED_MODULE_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+    for (const fileName of ROOT_INSTRUCTION_FILES) {
+      await addCandidate({
+        root,
+        relativePath: path4.join(entry.name, fileName),
+        result
+      });
+    }
+  }
+  for (const relativePath of DEPLOYMENT_SKILL_FILES) {
+    await addCandidate({ root, relativePath, result });
+  }
+  return result;
+}
+
 // src/backend/src/store-projects.ts
 var STANDARD_PROJECT_DOCUMENTS = [
   { key: "project", section: "project", title: "Project Overview" },
@@ -7706,10 +7945,13 @@ var STANDARD_PROJECT_DOCUMENTS = [
 ];
 var STANDARD_PROJECT_DOCUMENT_KEYS = new Set(STANDARD_PROJECT_DOCUMENTS.map((item) => item.key));
 function presentProjectDocument(document) {
-  if (!document.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(document.key)) {
-    return document;
+  const next = {
+    ...document,
+    source: document.source ?? "project"
+  };
+  if (!next.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(next.key)) {
+    return next;
   }
-  const next = { ...document };
   delete next.system;
   return next;
 }
@@ -7799,10 +8041,11 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
         continue;
       }
       const document = {
-        id: randomUUID8(),
+        id: randomUUID9(),
         boardId,
         key: item.key,
         section: item.section,
+        source: "project",
         type: "path",
         title: item.title,
         position: (position + 1) * POSITION_STEP,
@@ -7979,7 +8222,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
     const description = normalizeBoundedString(input.description, void 0, 2e3, "milestone description");
     const color = normalizeBoundedString(input.color, void 0, 40, "milestone color");
     return {
-      id: randomUUID8(),
+      id: randomUUID9(),
       boardId,
       title,
       position: normalizePosition(input.position, POSITION_STEP),
@@ -8247,10 +8490,11 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       );
       const now = Date.now();
       const document = {
-        id: randomUUID8(),
+        id: randomUUID9(),
         boardId,
         key,
         section,
+        source: "project",
         type,
         title,
         position: input.position === void 0 ? Math.max(0, ...sameSection.map((entry) => entry.document.position)) + POSITION_STEP : normalizePosition(input.position, POSITION_STEP),
@@ -8294,6 +8538,51 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       }
       await this.documentStore.register(next.id, { version: 1, document: next });
       return next;
+    });
+  }
+  async syncProjectAiInstructions(boardId) {
+    const normalizedBoardId = normalizeBoardIdRequired(boardId);
+    return await this.enqueueMutation(async () => {
+      const board = await this.ensureProjectDirect(normalizedBoardId);
+      const workspacePath = board.defaultWorkspace?.path;
+      if (!workspacePath || board.defaultWorkspace?.kind !== "dir" && board.defaultWorkspace?.kind !== "worktree") {
+        throw new Error("project default workspace is required to sync AI instructions.");
+      }
+      const candidates = await discoverFlowboardAiInstructions(workspacePath);
+      const existing = (await this.documentStore.entries()).map((entry) => entry.value).filter(
+        (entry) => entry?.version === 1 && entry.document?.boardId === normalizedBoardId
+      ).map((entry) => presentProjectDocument(entry.document));
+      const existingKeys = new Set(existing.map((document) => document.key));
+      const existingTargets = new Set(
+        existing.map((document) => document.target).filter((target) => Boolean(target))
+      );
+      const sameSection = existing.filter((document) => document.section === "project");
+      let position = Math.max(0, ...sameSection.map((document) => document.position));
+      const documents = [];
+      const now = Date.now();
+      for (const candidate of candidates) {
+        if (existingKeys.has(candidate.key) || existingTargets.has(candidate.target)) {
+          continue;
+        }
+        position += POSITION_STEP;
+        const document = {
+          id: randomUUID9(),
+          boardId: normalizedBoardId,
+          key: candidate.key,
+          section: "project",
+          source: "ai_system",
+          type: "path",
+          title: candidate.title,
+          summary: candidate.summary,
+          target: candidate.target,
+          position,
+          createdAt: now,
+          updatedAt: now
+        };
+        await this.documentStore.register(document.id, { version: 1, document });
+        documents.push(document);
+      }
+      return { documents };
     });
   }
   async hideProjectDocument(id, hidden = true) {
@@ -8451,7 +8740,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
               notifications: [
                 ...latest.metadata?.notifications ?? [],
                 {
-                  id: randomUUID9(),
+                  id: randomUUID10(),
                   kind: "failed",
                   createdAt: now,
                   sequence: this.nextNotificationSequence(now),
@@ -8475,7 +8764,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
               notifications: [
                 ...latest.metadata?.notifications ?? [],
                 {
-                  id: randomUUID9(),
+                  id: randomUUID10(),
                   kind: "failed",
                   createdAt: now,
                   sequence: this.nextNotificationSequence(now),
@@ -15109,8 +15398,8 @@ function createFlowboardTools(params) {
 }
 
 // src/ui-static.ts
-import fs3 from "node:fs";
-import path4 from "node:path";
+import fs4 from "node:fs";
+import path5 from "node:path";
 import { fileURLToPath } from "node:url";
 var UI_PREFIX = "/flowboard/";
 var MIME_TYPES = {
@@ -15134,8 +15423,8 @@ function send(req, res, status, headers, body) {
   res.end();
 }
 function isWithinRoot(root, candidate) {
-  const relative = path4.relative(root, candidate);
-  return relative === "" || !relative.startsWith(`..${path4.sep}`) && relative !== "..";
+  const relative = path5.relative(root, candidate);
+  return relative === "" || !relative.startsWith(`..${path5.sep}`) && relative !== "..";
 }
 function resolveUiFile(root, requestPath) {
   let decodedPath;
@@ -15148,20 +15437,20 @@ function resolveUiFile(root, requestPath) {
     return null;
   }
   const relativePath = decodedPath.slice(UI_PREFIX.length).replace(/^\/+/, "");
-  const candidate = path4.resolve(root, relativePath || "index.html");
+  const candidate = path5.resolve(root, relativePath || "index.html");
   if (!isWithinRoot(root, candidate)) {
     return null;
   }
-  if (fs3.existsSync(candidate) && fs3.statSync(candidate).isFile()) {
+  if (fs4.existsSync(candidate) && fs4.statSync(candidate).isFile()) {
     return { filePath: candidate, fallback: false };
   }
-  if (path4.extname(relativePath) === "") {
-    return { filePath: path4.join(root, "index.html"), fallback: true };
+  if (path5.extname(relativePath) === "") {
+    return { filePath: path5.join(root, "index.html"), fallback: true };
   }
   return null;
 }
 function createFlowboardStaticUiHandler(uiRoot) {
-  const root = path4.resolve(
+  const root = path5.resolve(
     uiRoot ?? fileURLToPath(new URL("../ui/dist/", import.meta.url))
   );
   return (req, res) => {
@@ -15180,8 +15469,8 @@ function createFlowboardStaticUiHandler(uiRoot) {
       return true;
     }
     try {
-      const content = fs3.readFileSync(resolved.filePath);
-      const extension = path4.extname(resolved.filePath).toLowerCase();
+      const content = fs4.readFileSync(resolved.filePath);
+      const extension = path5.extname(resolved.filePath).toLowerCase();
       const immutableAsset = pathname.includes("/assets/") && !resolved.fallback;
       send(
         req,
