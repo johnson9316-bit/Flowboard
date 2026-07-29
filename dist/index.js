@@ -2302,13 +2302,16 @@ function mergeDiagnostics(previous, next) {
     } : entry;
   });
 }
+function flowboardLastActivityAt(card) {
+  return card.metadata?.claim?.lastHeartbeatAt ?? card.execution?.updatedAt ?? card.updatedAt;
+}
 function computeCardDiagnostics(card, now) {
   if (card.metadata?.archivedAt) {
     return [];
   }
   const diagnostics = [];
   const claim = card.metadata?.claim;
-  const lastHeartbeatAt = claim?.lastHeartbeatAt ?? card.execution?.updatedAt ?? card.updatedAt;
+  const lastHeartbeatAt = flowboardLastActivityAt(card);
   if ((card.status === "todo" || card.status === "backlog" || card.status === "ready") && card.agentId && now - card.updatedAt > READY_STRANDED_MS) {
     diagnostics.push(
       diagnostic(
@@ -10230,105 +10233,74 @@ function registerFlowboardCommand(params) {
 import { formatErrorMessage as formatErrorMessage4 } from "openclaw/plugin-sdk/error-runtime";
 
 // src/backend/src/lifecycle.ts
-var STALE_SESSION_MS = 30 * 60 * 1e3;
-function isFailedSessionStatus(status) {
-  return status === "failed" || status === "killed" || status === "timeout";
+var ABANDONED_RUN_GRACE_MS = 10 * 60 * 1e3;
+function claimsRunning(card) {
+  return card.status === "running" || card.execution?.status === "running" || Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running")) || Boolean(card.metadata?.claim);
 }
-function findFlowboardSession(card, sessions) {
-  const sessionKey = cardSessionKey(card);
-  if (!sessionKey) {
-    return null;
+var TERMINAL_EXECUTION_STATUSES = /* @__PURE__ */ new Set(["done", "review", "blocked"]);
+function flowboardRunEvidence(params) {
+  const { card, now } = params;
+  if (!claimsRunning(card) || !cardSessionKey(card)) {
+    return "unlinked";
   }
-  return sessions.find((session) => session.key === sessionKey) ?? null;
+  const executionStatus = card.execution?.status;
+  if (executionStatus && TERMINAL_EXECUTION_STATUSES.has(executionStatus)) {
+    return "finished";
+  }
+  const silentFor = now - flowboardLastActivityAt(card);
+  if (silentFor <= RUNNING_HEARTBEAT_STALE_MS) {
+    return "live";
+  }
+  return silentFor <= RUNNING_HEARTBEAT_STALE_MS + ABANDONED_RUN_GRACE_MS ? "stale" : "abandoned";
 }
-function sessionUpdatedAt(session) {
-  return typeof session.updatedAt === "number" && Number.isFinite(session.updatedAt) ? session.updatedAt : void 0;
-}
-function taskUpdatedAt(task) {
-  if (typeof task.updatedAt === "number") {
-    return task.updatedAt > 0 ? task.updatedAt : void 0;
-  }
-  if (typeof task.updatedAt === "string") {
-    const parsed = Date.parse(task.updatedAt);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : void 0;
-  }
-  return void 0;
-}
-function staleSessionState(session, now) {
-  if (session.status !== "running" || session.hasActiveRun !== false) {
-    return void 0;
-  }
-  const updatedAt = sessionUpdatedAt(session);
-  if (updatedAt === void 0 || now - updatedAt < STALE_SESSION_MS) {
+function staleRunState(card, now) {
+  if (flowboardRunEvidence({ card, now }) !== "stale") {
     return void 0;
   }
   return {
     detectedAt: now,
-    lastSessionUpdatedAt: updatedAt,
-    reason: "Linked thread has not reported recent activity."
+    lastSessionUpdatedAt: flowboardLastActivityAt(card),
+    reason: "Linked run has not reported recent activity."
   };
 }
 function getFlowboardLifecycle(params) {
-  const { card, sessions, task, now } = params;
-  const session = findFlowboardSession(card, sessions);
-  if (task) {
-    const sourceUpdatedAt2 = taskUpdatedAt(task);
-    switch (task.status) {
-      case "queued":
-      case "running":
-        if (!session || !(session.abortedLastRun || session.status === "done" || isFailedSessionStatus(session.status))) {
-          return { session, state: "running", targetStatus: "running", ...sourceUpdatedAt2 !== void 0 ? { sourceUpdatedAt: sourceUpdatedAt2 } : {} };
-        }
-        break;
-      case "completed":
-        return { session, state: "succeeded", targetStatus: "review", ...sourceUpdatedAt2 !== void 0 ? { sourceUpdatedAt: sourceUpdatedAt2 } : {} };
-      case "failed":
-      case "cancelled":
-      case "timed_out":
-        return { session, state: "failed", targetStatus: "blocked", ...sourceUpdatedAt2 !== void 0 ? { sourceUpdatedAt: sourceUpdatedAt2 } : {} };
-    }
+  const { card, now } = params;
+  const state = flowboardRunEvidence({ card, now });
+  if (state === "unlinked") {
+    return { state };
   }
-  if (!cardSessionKey(card)) {
-    return { session: null, state: "unlinked" };
+  const sourceUpdatedAt = flowboardLastActivityAt(card);
+  switch (state) {
+    case "finished":
+      return {
+        state,
+        ...card.execution?.status === "done" || card.execution?.status === "review" ? { targetStatus: "review" } : { targetStatus: "blocked" },
+        sourceUpdatedAt
+      };
+    case "live":
+      return { state, targetStatus: "running", sourceUpdatedAt };
+    case "stale":
+      return { state, targetStatus: "running", sourceUpdatedAt };
+    case "abandoned":
+      return { state, targetStatus: "blocked", sourceUpdatedAt };
   }
-  if (!session) {
-    return { session: null, state: "missing" };
-  }
-  const sourceUpdatedAt = sessionUpdatedAt(session);
-  const withSource = (verdict) => ({
-    session,
-    ...verdict,
-    ...sourceUpdatedAt !== void 0 ? { sourceUpdatedAt } : {}
-  });
-  if (staleSessionState(session, now)) {
-    return withSource({ state: "stale", targetStatus: "running" });
-  }
-  if (session.hasActiveRun === true || session.status === "running") {
-    return withSource({ state: "running", targetStatus: "running" });
-  }
-  if (session.abortedLastRun || isFailedSessionStatus(session.status)) {
-    return withSource({ state: "failed", targetStatus: "blocked" });
-  }
-  if (session.status === "done") {
-    return withSource({ state: "succeeded", targetStatus: "review" });
-  }
-  return { session, state: "idle" };
 }
 function executionStatusForLifecycle(lifecycle) {
   switch (lifecycle.state) {
-    case "running":
+    case "live":
     case "stale":
       return "running";
-    case "succeeded":
-      return "review";
-    case "failed":
+    case "abandoned":
       return "blocked";
-    case "idle":
-      return "idle";
-    case "missing":
+    // A finished run's execution status is already the outcome; rewriting it would
+    // overwrite a real result (`done`) with a coarser one.
+    case "finished":
     case "unlinked":
       return void 0;
   }
+}
+function shouldCloseOrphanedRun(params) {
+  return flowboardRunEvidence(params) === "abandoned";
 }
 function shouldSyncCardStatus(card, targetStatus) {
   if (!targetStatus || card.status === targetStatus) {
@@ -10348,74 +10320,6 @@ function shouldSyncExecutionStatus(card, targetStatus) {
 
 // src/backend/src/reconciler.ts
 var RECONCILE_INTERVAL_MS = 15e3;
-var SESSIONS_REQUEST_TIMEOUT_MS = 1e4;
-var HOST_TASK_STATUSES = /* @__PURE__ */ new Set([
-  "queued",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
-  "timed_out"
-]);
-function readHostSession(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return void 0;
-  }
-  const row = value;
-  const key = typeof row.key === "string" ? row.key.trim() : "";
-  if (!key) {
-    return void 0;
-  }
-  return {
-    key,
-    ...typeof row.status === "string" ? { status: row.status } : {},
-    ...typeof row.updatedAt === "number" && Number.isFinite(row.updatedAt) ? { updatedAt: row.updatedAt } : {},
-    ...typeof row.hasActiveRun === "boolean" ? { hasActiveRun: row.hasActiveRun } : {},
-    ...typeof row.abortedLastRun === "boolean" ? { abortedLastRun: row.abortedLastRun } : {}
-  };
-}
-function readHostTask(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return void 0;
-  }
-  const row = value;
-  const status = typeof row.status === "string" ? row.status : "";
-  if (!HOST_TASK_STATUSES.has(status)) {
-    return void 0;
-  }
-  return {
-    status,
-    ...typeof row.updatedAt === "number" || typeof row.updatedAt === "string" ? { updatedAt: row.updatedAt } : {}
-  };
-}
-async function readHostSessions(runtime) {
-  if (!await runtime.gateway.isAvailable()) {
-    return void 0;
-  }
-  const response = await runtime.gateway.request("sessions.list", void 0, {
-    timeoutMs: SESSIONS_REQUEST_TIMEOUT_MS
-  });
-  if (!Array.isArray(response?.sessions)) {
-    return void 0;
-  }
-  return response.sessions.flatMap((row) => {
-    const session = readHostSession(row);
-    return session ? [session] : [];
-  });
-}
-function readCardTask(runtime, card) {
-  const sessionKey = cardSessionKey(card);
-  if (!sessionKey) {
-    return void 0;
-  }
-  try {
-    const runs = runtime.tasks.runs.bindSession({ sessionKey });
-    const record = card.taskId ? runs.get(card.taskId) : runs.findLatest();
-    return readHostTask(record);
-  } catch {
-    return void 0;
-  }
-}
 function hasRunningAttempt(card) {
   return Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"));
 }
@@ -10425,14 +10329,8 @@ function activeCards(cards) {
   );
 }
 async function applyLifecycle(params) {
-  const { store, card, sessions, runtime, now } = params;
-  const task = readCardTask(runtime, card);
-  const lifecycle = getFlowboardLifecycle({
-    card,
-    sessions,
-    ...task ? { task } : {},
-    now
-  });
+  const { store, card, now } = params;
+  const lifecycle = getFlowboardLifecycle({ card, now });
   const executionStatus = executionStatusForLifecycle(lifecycle);
   const patch = {};
   const metadataPatch = {};
@@ -10443,7 +10341,7 @@ async function applyLifecycle(params) {
   if (shouldSyncExecutionStatus(card, executionStatus)) {
     patch.execution = { ...card.execution, status: executionStatus, updatedAt: now };
   }
-  const stale = lifecycle.session ? staleSessionState(lifecycle.session, now) : void 0;
+  const stale = staleRunState(card, now);
   const existingStale = card.metadata?.stale;
   if (stale) {
     const changed = !existingStale || existingStale.lastSessionUpdatedAt !== stale.lastSessionUpdatedAt || existingStale.reason !== stale.reason;
@@ -10463,19 +10361,15 @@ async function applyLifecycle(params) {
   return true;
 }
 async function finishOrphanedRun(params) {
-  const { store, card, sessions, runtime, now } = params;
+  const { store, card, runtime, now } = params;
   const runId = cardRunId(card);
-  const sessionKey = cardSessionKey(card);
-  if (!runId || !sessionKey) {
-    return false;
-  }
-  if (sessions.some((session) => session.key === sessionKey)) {
+  if (!runId || !shouldCloseOrphanedRun({ card, now })) {
     return false;
   }
   await store.finishExecutionForRun(runId, {
     outcome: "failed",
     endedAt: now,
-    reason: "Run did not survive a Gateway restart."
+    reason: "Run stopped reporting and did not survive to report an outcome."
   });
   await cleanupFlowboardRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
     () => void 0
@@ -10491,18 +10385,14 @@ async function reconcileFlowboardCards(params) {
     reclaimed: 0,
     skipped: 0
   };
-  const sessions = await readHostSessions(params.runtime);
-  if (!sessions) {
-    return outcome;
-  }
   for (const card of activeCards(await params.store.list())) {
     outcome.checked += 1;
     try {
-      if (params.finishOrphanedRuns && await finishOrphanedRun({ ...params, card, sessions, now })) {
+      if (await finishOrphanedRun({ ...params, card, now })) {
         outcome.finished += 1;
         continue;
       }
-      if (await applyLifecycle({ ...params, card, sessions, now })) {
+      if (await applyLifecycle({ ...params, card, now })) {
         outcome.updated += 1;
       }
       if (isFlowboardClaimReclaimable(card.metadata?.claim, now)) {
@@ -10526,13 +10416,14 @@ async function reconcileFlowboardCards(params) {
 function createFlowboardReconcilerService(params) {
   let timer;
   let running = false;
+  let lastFailure = "";
   return {
     id: "flowboard-reconciler",
     start(ctx) {
       if (timer) {
         return;
       }
-      const pass = async (finishOrphanedRuns) => {
+      const pass = async () => {
         if (running) {
           return;
         }
@@ -10540,24 +10431,28 @@ function createFlowboardReconcilerService(params) {
         try {
           const outcome = await reconcileFlowboardCards({
             ...params,
-            finishOrphanedRuns,
             onCardError: (cardId, error) => ctx.logger.warn(
               `flowboard could not reconcile card ${cardId}: ${formatErrorMessage4(error)}`
             )
           });
+          lastFailure = "";
           if (outcome.updated || outcome.finished || outcome.reclaimed) {
             ctx.logger.info(
               `flowboard reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`
             );
           }
         } catch (error) {
-          ctx.logger.warn(`flowboard reconcile failed: ${formatErrorMessage4(error)}`);
+          const message = formatErrorMessage4(error);
+          if (message !== lastFailure) {
+            lastFailure = message;
+            ctx.logger.warn(`flowboard reconcile failed: ${message}`);
+          }
         } finally {
           running = false;
         }
       };
-      void pass(true);
-      timer = setInterval(() => void pass(false), RECONCILE_INTERVAL_MS);
+      void pass();
+      timer = setInterval(() => void pass(), RECONCILE_INTERVAL_MS);
       timer.unref?.();
     },
     stop() {

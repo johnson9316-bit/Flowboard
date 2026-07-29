@@ -53,8 +53,10 @@ export default definePluginEntry({
     registerFlowboardGatewayMethods({ api, store });
     registerFlowboardCommand({ api, store });
     api.registerService(createFlowboardChangeEventService(store));
-    // Server-side control loop: converges card state against live host state even
-    // with no browser attached, and recovers runs orphaned by a Gateway restart.
+    // Server-side control loop: converges card state with no browser attached, and
+    // recovers runs orphaned by a Gateway restart. The hook below reports outcomes
+    // for runs that end normally; the loop covers the case where this process did
+    // not live long enough to receive one.
     api.registerService(createFlowboardReconcilerService({ store, runtime: api.runtime }));
     api.on("subagent_ended", async (event) => {
       if (event.runId) {

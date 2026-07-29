@@ -1,10 +1,16 @@
-// Flowboard plugin module reconciles card state against live host state.
+// Flowboard plugin module reconciles card state against the evidence a run leaves
+// behind.
 //
-// This is the control loop. It runs in the Gateway process, on a timer plus once
-// at startup, so a card converges on the truth whether or not anybody has the
-// board open. Previously the equivalent logic lived in the browser, which meant
-// an unattended Gateway left finished runs marked "running" forever, and a Gateway
-// restart orphaned every in-flight run with nothing to clean it up.
+// This is the control loop. It runs in the Gateway process, on a timer plus once at
+// startup, so a card converges whether or not anybody has the board open.
+// Previously the equivalent logic lived in the browser, which meant an unattended
+// Gateway left finished runs marked "running" forever, and a Gateway restart
+// orphaned every in-flight run with nothing to clean it up.
+//
+// Outcomes for runs that finish normally arrive through the `subagent_ended` hook in
+// `index.ts`. This loop exists for the case that hook cannot cover: the process died
+// before the event was delivered. See `lifecycle.ts` for why that judgement is made
+// from local evidence instead of asking the host.
 import type { FlowboardCard } from "../../contract/index.js";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
@@ -13,114 +19,19 @@ import { cleanupFlowboardRunWorktree } from "./dispatcher-workspace.js";
 import {
   executionStatusForLifecycle,
   getFlowboardLifecycle,
+  shouldCloseOrphanedRun,
   shouldSyncCardStatus,
   shouldSyncExecutionStatus,
-  staleSessionState,
-  type FlowboardHostSession,
-  type FlowboardHostTask,
-  type FlowboardHostTaskStatus,
+  staleRunState,
 } from "./lifecycle.js";
-import { cardRunId, cardSessionKey } from "./store-card-helpers.js";
+import { cardRunId } from "./store-card-helpers.js";
 import { isFlowboardClaimReclaimable } from "./store-constants.js";
 import { FlowboardRevisionConflictError } from "./store-core.js";
 import type { FlowboardStore } from "./store.js";
 
 const RECONCILE_INTERVAL_MS = 15_000;
-const SESSIONS_REQUEST_TIMEOUT_MS = 10_000;
 
-const HOST_TASK_STATUSES = new Set<string>([
-  "queued",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
-  "timed_out",
-]);
-
-export type FlowboardReconcilerRuntime = Pick<PluginRuntime, "gateway" | "tasks" | "worktrees">;
-
-type SessionsListResponse = {
-  sessions?: unknown;
-};
-
-function readHostSession(value: unknown): FlowboardHostSession | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  const row = value as Record<string, unknown>;
-  const key = typeof row.key === "string" ? row.key.trim() : "";
-  if (!key) {
-    return undefined;
-  }
-  return {
-    key,
-    ...(typeof row.status === "string" ? { status: row.status } : {}),
-    ...(typeof row.updatedAt === "number" && Number.isFinite(row.updatedAt)
-      ? { updatedAt: row.updatedAt }
-      : {}),
-    ...(typeof row.hasActiveRun === "boolean" ? { hasActiveRun: row.hasActiveRun } : {}),
-    ...(typeof row.abortedLastRun === "boolean" ? { abortedLastRun: row.abortedLastRun } : {}),
-  };
-}
-
-function readHostTask(value: unknown): FlowboardHostTask | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  const row = value as Record<string, unknown>;
-  const status = typeof row.status === "string" ? row.status : "";
-  if (!HOST_TASK_STATUSES.has(status)) {
-    return undefined;
-  }
-  return {
-    status: status as FlowboardHostTaskStatus,
-    ...(typeof row.updatedAt === "number" || typeof row.updatedAt === "string"
-      ? { updatedAt: row.updatedAt }
-      : {}),
-  };
-}
-
-/**
- * Live sessions as the host sees them. Returns undefined — rather than an empty
- * list — when the host cannot be asked, because "no sessions" and "unknown" must
- * lead to different decisions: an empty list would make every linked card look
- * abandoned.
- */
-async function readHostSessions(
-  runtime: FlowboardReconcilerRuntime,
-): Promise<FlowboardHostSession[] | undefined> {
-  if (!(await runtime.gateway.isAvailable())) {
-    return undefined;
-  }
-  const response = await runtime.gateway.request<SessionsListResponse>("sessions.list", undefined, {
-    timeoutMs: SESSIONS_REQUEST_TIMEOUT_MS,
-  });
-  if (!Array.isArray(response?.sessions)) {
-    return undefined;
-  }
-  return response.sessions.flatMap((row) => {
-    const session = readHostSession(row);
-    return session ? [session] : [];
-  });
-}
-
-/** Task record for a card, read from the in-process task runtime. */
-function readCardTask(
-  runtime: FlowboardReconcilerRuntime,
-  card: FlowboardCard,
-): FlowboardHostTask | undefined {
-  const sessionKey = cardSessionKey(card);
-  if (!sessionKey) {
-    return undefined;
-  }
-  try {
-    const runs = runtime.tasks.runs.bindSession({ sessionKey });
-    const record = card.taskId ? runs.get(card.taskId) : runs.findLatest();
-    return readHostTask(record);
-  } catch {
-    return undefined;
-  }
-}
+export type FlowboardReconcilerRuntime = Pick<PluginRuntime, "worktrees">;
 
 function hasRunningAttempt(card: FlowboardCard): boolean {
   return Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"));
@@ -148,25 +59,17 @@ type ReconcileOutcome = {
 };
 
 /**
- * Applies one lifecycle verdict. Status, execution status and staleness are
- * written together so a card cannot be left half-converged, and the write is a
+ * Applies one lifecycle verdict. Status, execution status and staleness are written
+ * together so a card cannot be left half-converged, and the write is a
  * compare-and-swap so a worker reporting in mid-pass wins over this pass.
  */
 async function applyLifecycle(params: {
   store: FlowboardStore;
   card: FlowboardCard;
-  sessions: readonly FlowboardHostSession[];
-  runtime: FlowboardReconcilerRuntime;
   now: number;
 }): Promise<boolean> {
-  const { store, card, sessions, runtime, now } = params;
-  const task = readCardTask(runtime, card);
-  const lifecycle = getFlowboardLifecycle({
-    card,
-    sessions,
-    ...(task ? { task } : {}),
-    now,
-  });
+  const { store, card, now } = params;
+  const lifecycle = getFlowboardLifecycle({ card, now });
   const executionStatus = executionStatusForLifecycle(lifecycle);
   const patch: Record<string, unknown> = {};
   const metadataPatch: Record<string, unknown> = {};
@@ -181,7 +84,7 @@ async function applyLifecycle(params: {
     patch.execution = { ...card.execution, status: executionStatus, updatedAt: now };
   }
 
-  const stale = lifecycle.session ? staleSessionState(lifecycle.session, now) : undefined;
+  const stale = staleRunState(card, now);
   const existingStale = card.metadata?.stale;
   if (stale) {
     const changed =
@@ -208,30 +111,26 @@ async function applyLifecycle(params: {
 }
 
 /**
- * Closes out a card whose run is provably over: the host has no live session for
- * it. Without this, a Gateway restart during a run leaves the card "running" with
- * nothing left alive to report its outcome.
+ * Closes out a card whose run is provably over. Without this, a Gateway restart
+ * during a run leaves the card "running" with nothing left alive to report its
+ * outcome. `finishExecutionForRun` also clears the claim and closes the running
+ * attempt, so this is the whole of the cleanup.
  */
 async function finishOrphanedRun(params: {
   store: FlowboardStore;
   card: FlowboardCard;
-  sessions: readonly FlowboardHostSession[];
   runtime: FlowboardReconcilerRuntime;
   now: number;
 }): Promise<boolean> {
-  const { store, card, sessions, runtime, now } = params;
+  const { store, card, runtime, now } = params;
   const runId = cardRunId(card);
-  const sessionKey = cardSessionKey(card);
-  if (!runId || !sessionKey) {
-    return false;
-  }
-  if (sessions.some((session) => session.key === sessionKey)) {
+  if (!runId || !shouldCloseOrphanedRun({ card, now })) {
     return false;
   }
   await store.finishExecutionForRun(runId, {
     outcome: "failed",
     endedAt: now,
-    reason: "Run did not survive a Gateway restart.",
+    reason: "Run stopped reporting and did not survive to report an outcome.",
   });
   await cleanupFlowboardRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
     () => undefined,
@@ -243,8 +142,6 @@ export async function reconcileFlowboardCards(params: {
   store: FlowboardStore;
   runtime: FlowboardReconcilerRuntime;
   now?: number;
-  /** Startup pass also closes runs orphaned by the previous process. */
-  finishOrphanedRuns?: boolean;
   onCardError?: (cardId: string, error: unknown) => void;
 }): Promise<ReconcileOutcome> {
   const now = params.now ?? Date.now();
@@ -255,23 +152,20 @@ export async function reconcileFlowboardCards(params: {
     reclaimed: 0,
     skipped: 0,
   };
-  const sessions = await readHostSessions(params.runtime);
-  if (!sessions) {
-    // Without host truth every verdict would be a guess. Leave state alone.
-    return outcome;
-  }
   for (const card of activeCards(await params.store.list())) {
     outcome.checked += 1;
     try {
-      if (params.finishOrphanedRuns && (await finishOrphanedRun({ ...params, card, sessions, now }))) {
+      if (await finishOrphanedRun({ ...params, card, now })) {
         outcome.finished += 1;
+        // The card moved; its status catches up on the next pass against fresh state
+        // rather than against the revision this one read.
         continue;
       }
-      if (await applyLifecycle({ ...params, card, sessions, now })) {
+      if (await applyLifecycle({ ...params, card, now })) {
         outcome.updated += 1;
       }
-      // A claim whose lease lapsed past the grace window belongs to a worker that
-      // is not coming back; releasing it frees the card and the owner's slot.
+      // A claim whose lease lapsed past the grace window belongs to a worker that is
+      // not coming back; releasing it frees the card and the owner's slot.
       if (isFlowboardClaimReclaimable(card.metadata?.claim, now)) {
         const latest = await params.store.get(card.id);
         if (latest && isFlowboardClaimReclaimable(latest.metadata?.claim, now)) {
@@ -284,8 +178,8 @@ export async function reconcileFlowboardCards(params: {
     } catch (error) {
       // One card must never abort the sweep: a card the store refuses to move
       // (unfinished dependencies, a status hold) would otherwise leave every card
-      // after it unreconciled. Losing a compare-and-swap is the expected case —
-      // a worker reported in mid-pass and its write is the newer one.
+      // after it unreconciled. Losing a compare-and-swap is the expected case — a
+      // worker reported in mid-pass and its write is the newer one.
       outcome.skipped += 1;
       if (!(error instanceof FlowboardRevisionConflictError)) {
         params.onCardError?.(card.id, error);
@@ -301,6 +195,7 @@ export function createFlowboardReconcilerService(params: {
 }): OpenClawPluginService {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
+  let lastFailure = "";
 
   return {
     id: "flowboard-reconciler",
@@ -308,7 +203,7 @@ export function createFlowboardReconcilerService(params: {
       if (timer) {
         return;
       }
-      const pass = async (finishOrphanedRuns: boolean) => {
+      const pass = async () => {
         if (running) {
           return;
         }
@@ -316,27 +211,33 @@ export function createFlowboardReconcilerService(params: {
         try {
           const outcome = await reconcileFlowboardCards({
             ...params,
-            finishOrphanedRuns,
             onCardError: (cardId, error) =>
               ctx.logger.warn(
                 `flowboard could not reconcile card ${cardId}: ${formatErrorMessage(error)}`,
               ),
           });
+          lastFailure = "";
           if (outcome.updated || outcome.finished || outcome.reclaimed) {
             ctx.logger.info(
               `flowboard reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`,
             );
           }
         } catch (error) {
-          ctx.logger.warn(`flowboard reconcile failed: ${formatErrorMessage(error)}`);
+          // A pass that fails for a whole-sweep reason keeps failing the same way
+          // every interval. Log the change, not the repetition.
+          const message = formatErrorMessage(error);
+          if (message !== lastFailure) {
+            lastFailure = message;
+            ctx.logger.warn(`flowboard reconcile failed: ${message}`);
+          }
         } finally {
           running = false;
         }
       };
-      // Startup pass first: it is the only thing that recovers runs the previous
-      // process left in flight.
-      void pass(true);
-      timer = setInterval(() => void pass(false), RECONCILE_INTERVAL_MS);
+      // Run once at startup: that pass is what recovers runs the previous process
+      // left in flight.
+      void pass();
+      timer = setInterval(() => void pass(), RECONCILE_INTERVAL_MS);
       timer.unref?.();
     },
     stop() {

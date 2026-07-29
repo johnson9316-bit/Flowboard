@@ -9,12 +9,16 @@ import type {
   PersistedFlowboardNotificationSubscription,
   PersistedFlowboardProjectDocument,
 } from "../src/backend/src/persistence-types.js";
-import type { FlowboardHostSession } from "../src/backend/src/lifecycle.js";
 import {
   reconcileFlowboardCards,
   type FlowboardReconcilerRuntime,
 } from "../src/backend/src/reconciler.js";
 import { FlowboardStore } from "../src/backend/src/store.js";
+
+/** Silent long enough to be presumed gone: heartbeat-stale (20m) plus grace (10m). */
+const ABANDONED_MS = 31 * 60 * 1000;
+/** Silent enough to be flagged, not yet long enough to be closed. */
+const STALE_MS = 25 * 60 * 1000;
 
 function keyedStore<T>(): FlowboardKeyedStore<T> {
   const values = new Map<string, T>();
@@ -44,27 +48,8 @@ function createStore(): FlowboardStore {
   });
 }
 
-function createRuntime(options: {
-  sessions?: FlowboardHostSession[] | null;
-  task?: Record<string, unknown>;
-  gatewayAvailable?: boolean;
-}): FlowboardReconcilerRuntime {
-  const request = vi.fn(async () =>
-    options.sessions === null ? {} : { sessions: options.sessions ?? [] },
-  );
+function createRuntime(): FlowboardReconcilerRuntime {
   return {
-    gateway: {
-      isAvailable: async () => options.gatewayAvailable !== false,
-      request: request as never,
-    },
-    tasks: {
-      runs: {
-        bindSession: () => ({
-          get: () => options.task,
-          findLatest: () => options.task,
-        }),
-      },
-    } as never,
     worktrees: {
       create: vi.fn(),
       release: vi.fn(async () => undefined),
@@ -73,10 +58,10 @@ function createRuntime(options: {
   };
 }
 
-/** A card mid-run: claimed, running, with a live execution and session. */
+/** A card mid-run: claimed, running, with a live execution and a heartbeat now. */
 async function createRunningCard(
   store: FlowboardStore,
-  sessionKey = "session-1",
+  sessionKey = "subagent:flowboard-default-card",
 ): Promise<FlowboardCard> {
   const created = await store.create({ title: "Running card", status: "ready" });
   const claimed = await store.claimExecution(created.id, {
@@ -86,14 +71,14 @@ async function createRunningCard(
   return await store.update(claimed.card.id, {
     status: "running",
     sessionKey,
-    runId: "run-1",
+    runId: `run-${created.id}`,
     execution: {
       id: "exec-1",
       kind: "agent-session",
       mode: "autonomous",
       status: "running",
       sessionKey,
-      runId: "run-1",
+      runId: `run-${created.id}`,
       startedAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -101,130 +86,85 @@ async function createRunningCard(
 }
 
 describe("Flowboard reconciler", () => {
-  it("moves a running card to review once its session reports done", async () => {
+  it("leaves a card alone while its worker is still heartbeating", async () => {
     const store = createStore();
     const card = await createRunningCard(store);
-    const runtime = createRuntime({
-      sessions: [{ key: "session-1", status: "done", hasActiveRun: false, updatedAt: Date.now() }],
-    });
 
-    const outcome = await reconcileFlowboardCards({ store, runtime });
+    const outcome = await reconcileFlowboardCards({ store, runtime: createRuntime() });
 
-    expect(outcome).toMatchObject({ checked: 1, updated: 1 });
+    expect(outcome).toMatchObject({ checked: 1, updated: 0, finished: 0 });
     const reconciled = await store.get(card.id);
-    expect(reconciled?.status).toBe("review");
-    expect(reconciled?.execution?.status).toBe("review");
+    expect(reconciled?.status).toBe("running");
+    expect(reconciled?.execution?.status).toBe("running");
+    expect(reconciled?.metadata?.stale).toBeUndefined();
   });
 
-  it("blocks a running card whose session failed", async () => {
+  it("closes a run whose worker went silent past the grace window", async () => {
     const store = createStore();
     const card = await createRunningCard(store);
-    const runtime = createRuntime({
-      sessions: [{ key: "session-1", status: "failed", hasActiveRun: false, updatedAt: Date.now() }],
-    });
-
-    await reconcileFlowboardCards({ store, runtime });
-
-    const reconciled = await store.get(card.id);
-    expect(reconciled?.status).toBe("blocked");
-    expect(reconciled?.execution?.status).toBe("blocked");
-  });
-
-  it("closes a run orphaned by a Gateway restart on the startup pass", async () => {
-    const store = createStore();
-    const card = await createRunningCard(store);
-    // The previous process died; the host has no session for this card any more.
-    const runtime = createRuntime({ sessions: [] });
 
     const outcome = await reconcileFlowboardCards({
       store,
-      runtime,
-      finishOrphanedRuns: true,
+      runtime: createRuntime(),
+      now: Date.now() + ABANDONED_MS,
     });
 
     expect(outcome).toMatchObject({ checked: 1, finished: 1 });
     const reconciled = await store.get(card.id);
-    expect(reconciled?.execution?.status).not.toBe("running");
-    expect(reconciled?.metadata?.attempts?.some((a) => a.status === "running")).toBeFalsy();
+    // The run is closed out, not left claiming to be in flight, and the claim and
+    // running attempt go with it so the card and the owner's slot are both free.
+    expect(reconciled?.execution?.status).toBe("blocked");
+    expect(reconciled?.metadata?.claim).toBeUndefined();
+    expect(reconciled?.metadata?.attempts?.some((a) => a.status === "running")).toBe(false);
   });
 
-  it("leaves an orphaned run untouched on a periodic pass", async () => {
+  it("moves a card off running once its run is closed", async () => {
     const store = createStore();
     const card = await createRunningCard(store);
-    const runtime = createRuntime({ sessions: [] });
+    const now = Date.now() + ABANDONED_MS;
 
-    const outcome = await reconcileFlowboardCards({ store, runtime });
+    // First pass closes the run; the status catches up on the next pass against
+    // fresh state rather than the revision the closing pass had read.
+    await reconcileFlowboardCards({ store, runtime: createRuntime(), now });
+    await reconcileFlowboardCards({ store, runtime: createRuntime(), now });
 
-    expect(outcome.finished).toBe(0);
-    expect((await store.get(card.id))?.execution?.status).toBe("running");
+    expect((await store.get(card.id))?.status).toBe("blocked");
   });
 
-  it("marks a long-idle session stale and clears the marker when it recovers", async () => {
+  it("flags a quiet run stale without closing it, and clears the flag when it reports in", async () => {
     const store = createStore();
     const card = await createRunningCard(store);
-    const idleSince = Date.now() - 31 * 60 * 1000;
+    const quietSince = (await store.get(card.id))!.metadata!.claim!.lastHeartbeatAt;
 
-    await reconcileFlowboardCards({
+    const outcome = await reconcileFlowboardCards({
       store,
-      runtime: createRuntime({
-        sessions: [
-          { key: "session-1", status: "running", hasActiveRun: false, updatedAt: idleSince },
-        ],
-      }),
+      runtime: createRuntime(),
+      now: quietSince + STALE_MS,
     });
+
+    expect(outcome).toMatchObject({ finished: 0, updated: 1 });
     const stale = await store.get(card.id);
-    expect(stale?.metadata?.stale).toMatchObject({ lastSessionUpdatedAt: idleSince });
+    expect(stale?.metadata?.stale).toMatchObject({ lastSessionUpdatedAt: quietSince });
+    // Still running: a stuck run must read as stuck, not as moved on.
+    expect(stale?.status).toBe("running");
+    expect(stale?.execution?.status).toBe("running");
 
-    await reconcileFlowboardCards({
-      store,
-      runtime: createRuntime({
-        sessions: [
-          { key: "session-1", status: "running", hasActiveRun: true, updatedAt: Date.now() },
-        ],
-      }),
-    });
+    const claim = stale!.metadata!.claim!;
+    await store.heartbeat(card.id, { ownerId: claim.ownerId, token: claim.token });
+    await reconcileFlowboardCards({ store, runtime: createRuntime() });
     expect((await store.get(card.id))?.metadata?.stale).toBeUndefined();
-  });
-
-  it("prefers a terminal task record over a still-listed session", async () => {
-    const store = createStore();
-    const card = await createRunningCard(store);
-    const runtime = createRuntime({
-      sessions: [{ key: "session-1", status: "running", hasActiveRun: true, updatedAt: Date.now() }],
-      task: { status: "completed", updatedAt: Date.now() },
-    });
-
-    await reconcileFlowboardCards({ store, runtime });
-
-    expect((await store.get(card.id))?.status).toBe("review");
-  });
-
-  it("changes nothing when the host cannot be asked", async () => {
-    const store = createStore();
-    const card = await createRunningCard(store);
-
-    for (const runtime of [
-      createRuntime({ gatewayAvailable: false }),
-      createRuntime({ sessions: null }),
-    ]) {
-      const outcome = await reconcileFlowboardCards({ store, runtime, finishOrphanedRuns: true });
-      // "Unknown" must never be read as "no sessions exist", which would look
-      // like every linked card had been abandoned.
-      expect(outcome).toMatchObject({ checked: 0, updated: 0, finished: 0 });
-    }
-    expect((await store.get(card.id))?.status).toBe("running");
   });
 
   it("skips cards that are archived or have no work in flight", async () => {
     const store = createStore();
     await store.create({ title: "Idle backlog card", status: "backlog" });
-    const archived = await createRunningCard(store, "session-archived");
+    const archived = await createRunningCard(store, "subagent:flowboard-archived");
     await store.archive(archived.id, true);
 
     const outcome = await reconcileFlowboardCards({
       store,
-      runtime: createRuntime({ sessions: [] }),
-      finishOrphanedRuns: true,
+      runtime: createRuntime(),
+      now: Date.now() + ABANDONED_MS,
     });
 
     expect(outcome.checked).toBe(0);
@@ -232,8 +172,8 @@ describe("Flowboard reconciler", () => {
 
   it("keeps sweeping after one card fails to converge", async () => {
     const store = createStore();
-    const rejected = await createRunningCard(store, "session-rejected");
-    const healthy = await createRunningCard(store, "session-healthy");
+    const rejected = await createRunningCard(store, "subagent:flowboard-rejected");
+    const healthy = await createRunningCard(store, "subagent:flowboard-healthy");
 
     // Stands in for any store rule that refuses this one card — a status hold, an
     // unfinished dependency. The rest of the sweep must still happen.
@@ -248,18 +188,14 @@ describe("Flowboard reconciler", () => {
 
     const outcome = await reconcileFlowboardCards({
       store,
-      runtime: createRuntime({
-        sessions: [
-          { key: "session-rejected", status: "done", hasActiveRun: false, updatedAt: Date.now() },
-          { key: "session-healthy", status: "done", hasActiveRun: false, updatedAt: Date.now() },
-        ],
-      }),
+      runtime: createRuntime(),
+      now: Date.now() + STALE_MS,
       onCardError,
     });
 
     expect(outcome).toMatchObject({ checked: 2, updated: 1, skipped: 1 });
     expect(onCardError).toHaveBeenCalledWith(rejected.id, expect.any(Error));
-    expect((await store.get(healthy.id))?.status).toBe("review");
+    expect((await store.get(healthy.id))?.metadata?.stale).toBeDefined();
   });
 
   it("releases a claim whose lease lapsed past the grace window", async () => {
@@ -274,12 +210,32 @@ describe("Flowboard reconciler", () => {
 
     const outcome = await reconcileFlowboardCards({
       store,
-      runtime: createRuntime({ sessions: [] }),
+      runtime: createRuntime(),
       // Well past the claim TTL plus the reclaim grace period.
       now: Date.now() + 20 * 60 * 1000,
     });
 
     expect(outcome.reclaimed).toBe(1);
     expect((await store.get(created.id))?.metadata?.claim).toBeUndefined();
+  });
+
+  it("does not close a run that never started one", async () => {
+    const store = createStore();
+    const created = await store.create({ title: "Claimed but not started", status: "ready" });
+    const claimed = await store.claimExecution(created.id, {
+      ownerId: "owner-a",
+      expectedRevision: created.revision,
+    });
+
+    const outcome = await reconcileFlowboardCards({
+      store,
+      runtime: createRuntime(),
+      now: Date.now() + ABANDONED_MS,
+    });
+
+    // Nothing was dispatched, so there is no run to close — only the stale claim to
+    // reclaim. Reporting a closed run here would invent a failure that never ran.
+    expect(outcome.finished).toBe(0);
+    expect((await store.get(claimed.card.id))?.status).toBe("ready");
   });
 });

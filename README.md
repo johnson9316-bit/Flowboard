@@ -25,12 +25,21 @@ Simplified Chinese.
 
 ## How State Converges
 
-Card state is reconciled by a **Gateway-side service**, not by the browser. It
-sweeps active cards on a timer and once at startup, comparing each against live
-host session and task state. A card therefore reaches its true status whether or
-not anyone has the board open, and runs left in flight by a Gateway restart get
-closed out instead of sitting at `running` forever. The Control UI is a pure
-observer: it reads state and never writes lifecycle status.
+Runs that end normally report their outcome through the Gateway's
+`subagent_ended` event. Anything that event cannot cover — most importantly a
+Gateway that restarts mid-run — is picked up by a **Gateway-side reconciler**
+service, which sweeps active cards on a timer and once at startup. A run that
+stops heartbeating well past its grace window is presumed gone and closed out
+instead of sitting at `running` forever, and a card whose execution already
+recorded an outcome is moved to match it. Card state therefore converges whether
+or not anyone has the board open, and the Control UI is a pure observer: it reads
+state and never writes lifecycle status.
+
+The reconciler judges liveness from the card's own claim heartbeat rather than by
+asking the host, because a third-party plugin cannot read host run state after the
+fact: `runtime.gateway.request` is restricted to bundled and trusted-official
+plugins, task records are scoped to the requester session rather than the card's,
+and `subagent.waitForRun` cannot distinguish a finished run from a forgotten one.
 
 Admission decisions — claiming a card, starting a run — commit through a database
 compare-and-swap on a monotonic card `revision`, so a card cannot be claimed

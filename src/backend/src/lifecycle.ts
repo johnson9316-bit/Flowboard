@@ -1,196 +1,177 @@
-// Flowboard plugin module derives card lifecycle from host session and task state.
+// Flowboard plugin module decides whether a card's recorded run is still alive.
 //
-// These are pure decisions: given a card plus what the host reports about its
-// session and task, say what the card's status and execution status should be.
-// The browser previously owned this logic, which meant card state only converged
-// while somebody had the board open. Nothing here touches persistence or the
-// Gateway; `reconciler.ts` collects the inputs and applies the results.
+// These are pure decisions: given a card and the current time, say whether the run
+// it claims to be executing is live, stuck, or gone, and what the card's status and
+// execution status should become. The browser previously owned this logic, which
+// meant card state only converged while somebody had the board open.
+// `reconciler.ts` collects the inputs and applies the results.
+//
+// The evidence is local on purpose. A linked plugin cannot read host run state
+// after the fact — every avenue was tried against a live Gateway and none work:
+//   - `runtime.gateway.request("sessions.list")` is refused for any plugin that is
+//     not bundled or trusted-official.
+//   - `runtime.tasks.runs.bindSession({sessionKey})` scopes every lookup to
+//     `task.ownerKey`, which for a Flowboard run is the *requester* session that
+//     spawned the subagent, not the card's own session, and the dispatch path never
+//     learns it.
+//   - `runtime.subagent.waitForRun({runId})` answers "timeout" for any run not live
+//     in the current process, so it cannot distinguish finished from forgotten.
+// What remains is decisive enough: a working worker heartbeats, and a worker that
+// died with the Gateway does not.
+//
+// One trap to leave alone: `sessions.list` reports agent-scoped keys
+// (`agent:main:subagent:…`) while a card without an explicit `agentId` stores the
+// unscoped tail. The host resolves either form, so every host call still works — but
+// a literal comparison between the two never matches, and the previous version of
+// this module made exactly that comparison to decide a run was orphaned.
 import type {
   FlowboardCard,
   FlowboardExecutionStatus,
   FlowboardStaleState,
   FlowboardStatus,
 } from "../../contract/index.js";
-import { cardSessionKey } from "./store-card-helpers.js";
+import { cardSessionKey, flowboardLastActivityAt } from "./store-card-helpers.js";
+import { RUNNING_HEARTBEAT_STALE_MS } from "./store-constants.js";
 
-/** Session fields this module reads, as reported by the host `sessions.list` RPC. */
-export type FlowboardHostSession = {
-  key: string;
-  status?: string;
-  updatedAt?: number;
-  hasActiveRun?: boolean;
-  abortedLastRun?: boolean;
-};
+/**
+ * How long past the heartbeat-stale threshold a run is given before it is treated
+ * as gone. The extra window separates "this worker is slow or wedged" from "this
+ * worker no longer exists", so a live-but-quiet run is flagged rather than killed.
+ */
+const ABANDONED_RUN_GRACE_MS = 10 * 60 * 1000;
 
-export type FlowboardHostTaskStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "timed_out";
-
-/** Task fields this module reads, as reported by the host task runtime. */
-export type FlowboardHostTask = {
-  status: FlowboardHostTaskStatus;
-  updatedAt?: number | string;
-};
-
-export type FlowboardLifecycleState =
+export type FlowboardRunEvidence =
+  /** The card records no run to judge. */
   | "unlinked"
-  | "missing"
-  | "idle"
-  | "running"
+  /** The run already recorded an outcome; only the card status may be lagging. */
+  | "finished"
+  /** Heartbeat or execution activity is recent. */
+  | "live"
+  /** No recent activity, but not yet long enough to call the run gone. */
   | "stale"
-  | "succeeded"
-  | "failed";
+  /** Silent long past the grace window. Nothing is left to report an outcome. */
+  | "abandoned";
+
+export type FlowboardLifecycleState = FlowboardRunEvidence;
 
 export type FlowboardLifecycle = {
-  session: FlowboardHostSession | null;
   state: FlowboardLifecycleState;
   targetStatus?: FlowboardStatus;
   /**
-   * When the host state behind this verdict last changed. Used to reject a
+   * When the evidence behind this verdict was last refreshed. Used to reject a
    * verdict that is older than the card's current status provenance.
    */
   sourceUpdatedAt?: number;
 };
 
-const STALE_SESSION_MS = 30 * 60 * 1000;
-
-export function isFailedSessionStatus(status: string | undefined): boolean {
-  return status === "failed" || status === "killed" || status === "timeout";
+/** Whether the card claims work is in flight at all. */
+function claimsRunning(card: FlowboardCard): boolean {
+  return (
+    card.status === "running" ||
+    card.execution?.status === "running" ||
+    Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running")) ||
+    Boolean(card.metadata?.claim)
+  );
 }
 
-export function findFlowboardSession(
-  card: FlowboardCard,
-  sessions: readonly FlowboardHostSession[],
-): FlowboardHostSession | null {
-  const sessionKey = cardSessionKey(card);
-  if (!sessionKey) {
-    return null;
-  }
-  return sessions.find((session) => session.key === sessionKey) ?? null;
-}
+/** Execution statuses that record an outcome, so no liveness question remains. */
+const TERMINAL_EXECUTION_STATUSES = new Set<FlowboardExecutionStatus>(["done", "review", "blocked"]);
 
-function sessionUpdatedAt(session: FlowboardHostSession): number | undefined {
-  return typeof session.updatedAt === "number" && Number.isFinite(session.updatedAt)
-    ? session.updatedAt
-    : undefined;
-}
-
-function taskUpdatedAt(task: FlowboardHostTask): number | undefined {
-  if (typeof task.updatedAt === "number") {
-    return task.updatedAt > 0 ? task.updatedAt : undefined;
+export function flowboardRunEvidence(params: {
+  card: FlowboardCard;
+  now: number;
+}): FlowboardRunEvidence {
+  const { card, now } = params;
+  if (!claimsRunning(card) || !cardSessionKey(card)) {
+    return "unlinked";
   }
-  if (typeof task.updatedAt === "string") {
-    const parsed = Date.parse(task.updatedAt);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  const executionStatus = card.execution?.status;
+  if (executionStatus && TERMINAL_EXECUTION_STATUSES.has(executionStatus)) {
+    // The run reported an outcome — by `subagent_ended`, by the worker itself, or by
+    // an earlier pass closing it out. Heartbeat age says nothing here: closing a run
+    // touches `updatedAt`, which would otherwise read as a fresh sign of life.
+    return "finished";
   }
-  return undefined;
+  const silentFor = now - flowboardLastActivityAt(card);
+  if (silentFor <= RUNNING_HEARTBEAT_STALE_MS) {
+    return "live";
+  }
+  return silentFor <= RUNNING_HEARTBEAT_STALE_MS + ABANDONED_RUN_GRACE_MS ? "stale" : "abandoned";
 }
 
 /**
- * A session that still claims to be running but has had no active run and no
- * activity for a long while. The worker is presumed gone without having reported
- * an outcome.
+ * A run that has gone quiet but is not yet presumed gone. Flagging it — rather than
+ * closing it — is deliberate: the worker may still report in, and force-failing a
+ * live run destroys real work while leaving a dead one open only delays cleanup.
  */
-export function staleSessionState(
-  session: FlowboardHostSession,
+export function staleRunState(
+  card: FlowboardCard,
   now: number,
 ): FlowboardStaleState | undefined {
-  if (session.status !== "running" || session.hasActiveRun !== false) {
-    return undefined;
-  }
-  const updatedAt = sessionUpdatedAt(session);
-  if (updatedAt === undefined || now - updatedAt < STALE_SESSION_MS) {
+  if (flowboardRunEvidence({ card, now }) !== "stale") {
     return undefined;
   }
   return {
     detectedAt: now,
-    lastSessionUpdatedAt: updatedAt,
-    reason: "Linked thread has not reported recent activity.",
+    lastSessionUpdatedAt: flowboardLastActivityAt(card),
+    reason: "Linked run has not reported recent activity.",
   };
 }
 
-/**
- * Task state wins over session state when both exist, because a task carries an
- * explicit outcome while a session only reports liveness. The exception is a task
- * still claiming queued/running while its session already ended — then the
- * session's terminal state is the newer truth and we fall through to it.
- */
 export function getFlowboardLifecycle(params: {
   card: FlowboardCard;
-  sessions: readonly FlowboardHostSession[];
-  task?: FlowboardHostTask;
   now: number;
 }): FlowboardLifecycle {
-  const { card, sessions, task, now } = params;
-  const session = findFlowboardSession(card, sessions);
-  if (task) {
-    const sourceUpdatedAt = taskUpdatedAt(task);
-    switch (task.status) {
-      case "queued":
-      case "running":
-        if (
-          !session ||
-          !(session.abortedLastRun || session.status === "done" || isFailedSessionStatus(session.status))
-        ) {
-          return { session, state: "running", targetStatus: "running", ...(sourceUpdatedAt !== undefined ? { sourceUpdatedAt } : {}) };
-        }
-        break;
-      case "completed":
-        return { session, state: "succeeded", targetStatus: "review", ...(sourceUpdatedAt !== undefined ? { sourceUpdatedAt } : {}) };
-      case "failed":
-      case "cancelled":
-      case "timed_out":
-        return { session, state: "failed", targetStatus: "blocked", ...(sourceUpdatedAt !== undefined ? { sourceUpdatedAt } : {}) };
-    }
+  const { card, now } = params;
+  const state = flowboardRunEvidence({ card, now });
+  if (state === "unlinked") {
+    return { state };
   }
-  if (!cardSessionKey(card)) {
-    return { session: null, state: "unlinked" };
+  const sourceUpdatedAt = flowboardLastActivityAt(card);
+  switch (state) {
+    case "finished":
+      // Let the card catch up to the outcome its own execution already recorded.
+      return {
+        state,
+        ...(card.execution?.status === "done" || card.execution?.status === "review"
+          ? { targetStatus: "review" as const }
+          : { targetStatus: "blocked" as const }),
+        sourceUpdatedAt,
+      };
+    case "live":
+      return { state, targetStatus: "running", sourceUpdatedAt };
+    case "stale":
+      // Still nominally running: the card should read "running" while it is flagged
+      // stale, so a human sees a stuck run rather than a moved one.
+      return { state, targetStatus: "running", sourceUpdatedAt };
+    case "abandoned":
+      return { state, targetStatus: "blocked", sourceUpdatedAt };
   }
-  if (!session) {
-    return { session: null, state: "missing" };
-  }
-  const sourceUpdatedAt = sessionUpdatedAt(session);
-  const withSource = <T extends Omit<FlowboardLifecycle, "session">>(verdict: T) => ({
-    session,
-    ...verdict,
-    ...(sourceUpdatedAt !== undefined ? { sourceUpdatedAt } : {}),
-  });
-  if (staleSessionState(session, now)) {
-    return withSource({ state: "stale", targetStatus: "running" });
-  }
-  if (session.hasActiveRun === true || session.status === "running") {
-    return withSource({ state: "running", targetStatus: "running" });
-  }
-  if (session.abortedLastRun || isFailedSessionStatus(session.status)) {
-    return withSource({ state: "failed", targetStatus: "blocked" });
-  }
-  if (session.status === "done") {
-    return withSource({ state: "succeeded", targetStatus: "review" });
-  }
-  return { session, state: "idle" };
 }
 
 export function executionStatusForLifecycle(
   lifecycle: FlowboardLifecycle,
 ): FlowboardExecutionStatus | undefined {
   switch (lifecycle.state) {
-    case "running":
+    case "live":
     case "stale":
       return "running";
-    case "succeeded":
-      return "review";
-    case "failed":
+    case "abandoned":
       return "blocked";
-    case "idle":
-      return "idle";
-    case "missing":
+    // A finished run's execution status is already the outcome; rewriting it would
+    // overwrite a real result (`done`) with a coarser one.
+    case "finished":
     case "unlinked":
       return undefined;
   }
+}
+
+/**
+ * Whether a run should be closed out because nothing is left alive to report its
+ * outcome. Only an abandoned run qualifies; everything else is left alone.
+ */
+export function shouldCloseOrphanedRun(params: { card: FlowboardCard; now: number }): boolean {
+  return flowboardRunEvidence(params) === "abandoned";
 }
 
 /**

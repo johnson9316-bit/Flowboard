@@ -404,13 +404,24 @@ export function mergeDiagnostics(
   });
 }
 
+/**
+ * The freshest evidence that whoever owns this card is still working. A claim
+ * heartbeat is the strongest signal; an execution timestamp and then the card's own
+ * `updatedAt` stand in when there is no claim. Exported so the reconciler judges
+ * liveness by exactly the rule the `running_without_heartbeat` diagnostic uses,
+ * rather than a second definition that could drift from it.
+ */
+export function flowboardLastActivityAt(card: FlowboardCard): number {
+  return card.metadata?.claim?.lastHeartbeatAt ?? card.execution?.updatedAt ?? card.updatedAt;
+}
+
 export function computeCardDiagnostics(card: FlowboardCard, now: number): FlowboardDiagnostic[] {
   if (card.metadata?.archivedAt) {
     return [];
   }
   const diagnostics: FlowboardDiagnostic[] = [];
   const claim = card.metadata?.claim;
-  const lastHeartbeatAt = claim?.lastHeartbeatAt ?? card.execution?.updatedAt ?? card.updatedAt;
+  const lastHeartbeatAt = flowboardLastActivityAt(card);
   if (
     (card.status === "todo" || card.status === "backlog" || card.status === "ready") &&
     card.agentId &&
