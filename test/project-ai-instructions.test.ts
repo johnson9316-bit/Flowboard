@@ -39,37 +39,52 @@ function keyedStore<T>(): FlowboardKeyedStore<T> {
   };
 }
 
-function createStore(): FlowboardStore {
-  return new FlowboardStore(keyedStore<PersistedFlowboardCard>(), {
-    boards: keyedStore<PersistedFlowboardBoard>(),
-    milestones: keyedStore<PersistedFlowboardMilestone>(),
-    documents: keyedStore<PersistedFlowboardProjectDocument>(),
-    subscriptions: keyedStore<PersistedFlowboardNotificationSubscription>(),
-    attachments: keyedStore<PersistedFlowboardAttachment>(),
-  });
+function createStore() {
+  const documents = keyedStore<PersistedFlowboardProjectDocument>();
+  return {
+    documents,
+    store: new FlowboardStore(keyedStore<PersistedFlowboardCard>(), {
+      boards: keyedStore<PersistedFlowboardBoard>(),
+      milestones: keyedStore<PersistedFlowboardMilestone>(),
+      documents,
+      subscriptions: keyedStore<PersistedFlowboardNotificationSubscription>(),
+      attachments: keyedStore<PersistedFlowboardAttachment>(),
+    }),
+  };
 }
 
 function createWorkspace(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-ai-instructions-"));
   roots.push(root);
   fs.mkdirSync(path.join(root, "web"));
+  fs.mkdirSync(path.join(root, "docs"));
+  fs.mkdirSync(path.join(root, ".planning", "codebase"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".planning", "notes"), { recursive: true });
   fs.mkdirSync(path.join(root, "node_modules", "ignored"), { recursive: true });
+  fs.mkdirSync(path.join(root, "tpm", "ignored"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".claude", "agents"), { recursive: true });
   fs.mkdirSync(path.join(root, ".claude", "skills", "deploy-test"), { recursive: true });
   fs.mkdirSync(path.join(root, ".claude", "skills", "deploy-prod"), { recursive: true });
   fs.writeFileSync(path.join(root, "AGENTS.md"), "# Root agents\n");
   fs.writeFileSync(path.join(root, "CLAUDE.md"), "# Root Claude\n");
+  fs.writeFileSync(path.join(root, "README.md"), "# Project readme\n");
   fs.writeFileSync(path.join(root, "web", "AGENTS.md"), "# Web agents\n");
+  fs.writeFileSync(path.join(root, "docs", "overview.md"), "# Overview\n");
+  fs.writeFileSync(path.join(root, ".planning", "codebase", "ARCHITECTURE.md"), "# Architecture\n");
+  fs.writeFileSync(path.join(root, ".planning", "notes", "decision.md"), "# Decision\n");
   fs.writeFileSync(path.join(root, "node_modules", "ignored", "AGENTS.md"), "# Ignore\n");
+  fs.writeFileSync(path.join(root, "tpm", "ignored", "README.md"), "# Ignore\n");
+  fs.writeFileSync(path.join(root, ".claude", "agents", "ignored.md"), "# Ignore\n");
   fs.writeFileSync(path.join(root, ".claude", "skills", "deploy-test", "SKILL.md"), "# Test\n");
   fs.writeFileSync(path.join(root, ".claude", "skills", "deploy-prod", "SKILL.md"), "# Prod\n");
   fs.writeFileSync(path.join(root, ".claude", "settings.local.json"), "{\"ignored\":true}\n");
   return root;
 }
 
-describe("Flowboard AI instruction synchronization", () => {
-  it("discovers only approved instruction files and preserves existing user changes", async () => {
+describe("Flowboard project document discovery", () => {
+  it("discovers project and AI Markdown files while listing documents and preserves user changes", async () => {
     const workspace = createWorkspace();
-    const store = createStore();
+    const { store } = createStore();
     await store.createProject({
       id: "alpha",
       name: "Alpha",
@@ -77,9 +92,25 @@ describe("Flowboard AI instruction synchronization", () => {
       defaultWorkspace: { kind: "dir", path: workspace },
     });
 
-    const first = await store.syncProjectAiInstructions("alpha");
-    expect(first.documents).toHaveLength(5);
-    expect(first.documents).toEqual(
+    const first = await store.listProjectDocuments("alpha", { includeHidden: true });
+    const aiDocuments = first.documents.filter((document) => document.source === "ai_system");
+    expect(aiDocuments).toHaveLength(5);
+    const projectDocuments = first.documents.filter((document) => document.source === "project");
+    expect(projectDocuments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ target: path.join(workspace, "README.md") }),
+        expect.objectContaining({ target: path.join(workspace, "docs", "overview.md") }),
+        expect.objectContaining({
+          target: path.join(workspace, ".planning", "codebase", "ARCHITECTURE.md"),
+          section: "codebase",
+        }),
+        expect.objectContaining({
+          target: path.join(workspace, ".planning", "notes", "decision.md"),
+          section: "knowledge",
+        }),
+      ]),
+    );
+    expect(aiDocuments).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "ai.agents", source: "ai_system" }),
         expect.objectContaining({ key: "ai.claude", source: "ai_system" }),
@@ -88,11 +119,15 @@ describe("Flowboard AI instruction synchronization", () => {
         expect.objectContaining({ key: "ai.claude.skills.deploy-prod.skill", source: "ai_system" }),
       ]),
     );
-    expect(
-      first.documents.some((document) => document.target?.includes("node_modules") === true),
-    ).toBe(false);
+    expect(first.documents.some((document) => document.target?.includes("node_modules") === true)).toBe(
+      false,
+    );
+    expect(first.documents.some((document) => document.target?.includes("tpm") === true)).toBe(false);
+    expect(first.documents.some((document) => document.target?.includes(".claude/agents") === true)).toBe(
+      false,
+    );
 
-    const agents = first.documents.find((document) => document.key === "ai.agents");
+    const agents = aiDocuments.find((document) => document.key === "ai.agents");
     if (!agents) {
       throw new Error("missing synced AGENTS.md");
     }
@@ -103,7 +138,6 @@ describe("Flowboard AI instruction synchronization", () => {
     await store.hideProjectDocument(agents.id);
     fs.rmSync(path.join(workspace, "AGENTS.md"));
 
-    await expect(store.syncProjectAiInstructions("alpha")).resolves.toEqual({ documents: [] });
     const listed = await store.listProjectDocuments("alpha", { includeHidden: true });
     expect(listed.documents.find((document) => document.id === agents.id)).toMatchObject({
       title: "Team agent rules",
@@ -113,14 +147,53 @@ describe("Flowboard AI instruction synchronization", () => {
     });
   });
 
-  it("requires a directory-like default workspace before synchronizing", async () => {
-    const store = createStore();
+  it("keeps the project document library empty without a default workspace", async () => {
+    const { store } = createStore();
     await store.createProject({
       id: "alpha",
       name: "Alpha",
       initialMilestoneTitle: "Build",
     });
 
-    await expect(store.syncProjectAiInstructions("alpha")).rejects.toThrow("default workspace");
+    await expect(store.listProjectDocuments("alpha")).resolves.toEqual({ documents: [] });
+  });
+
+  it("replaces generated path records with workspace-scanned documents", async () => {
+    const workspace = createWorkspace();
+    const { store, documents } = createStore();
+    await store.createProject({
+      id: "alpha",
+      name: "Alpha",
+      initialMilestoneTitle: "Build",
+      defaultWorkspace: { kind: "dir", path: workspace },
+    });
+    await documents.register("legacy-readme", {
+      version: 1,
+      document: {
+        id: "legacy-readme",
+        boardId: "alpha",
+        key: "dev_environment",
+        section: "environment",
+        source: "project",
+        type: "path",
+        title: "Development Environment",
+        target: "README.md",
+        position: 1024,
+        system: true,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+
+    const listed = await store.listProjectDocuments("alpha", { includeHidden: true });
+    expect(listed.documents.find((document) => document.id === "legacy-readme")).toBeUndefined();
+    expect(listed.documents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target: path.join(workspace, "README.md"),
+          title: "README",
+        }),
+      ]),
+    );
   });
 });

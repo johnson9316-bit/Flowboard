@@ -13,6 +13,7 @@ import {
   type FlowboardLocale,
 } from "./host-context.ts";
 import { i18n } from "./i18n/index.ts";
+import { flowboardEditorHtmlToMarkdown } from "./lib/markdown.ts";
 import {
   createFlowboardProjectUiState,
   renderFlowboardProjects,
@@ -615,6 +616,18 @@ class FlowboardProjectHost extends LitElement {
     this.requestUpdate();
   }
 
+  private formatDocument(
+    command: "bold" | "italic" | "formatBlock" | "insertUnorderedList",
+  ) {
+    const editor = this.querySelector<HTMLElement>(".flowboard-project__rich-editor");
+    if (!editor) {
+      return;
+    }
+    editor.focus();
+    document.execCommand(command, false, command === "formatBlock" ? "h2" : undefined);
+    this.state.documentDraft = flowboardEditorHtmlToMarkdown(editor.innerHTML);
+  }
+
   private cancelDocumentEdit() {
     this.state.documentEditing = false;
     this.state.documentDraft = null;
@@ -772,18 +785,6 @@ class FlowboardProjectHost extends LitElement {
         ...common,
       });
     });
-  }
-
-  private syncAiInstructions() {
-    const project = this.state.project;
-    if (!project?.board.defaultWorkspace?.path) {
-      return;
-    }
-    void this.mutate(async () => {
-      await this.gateway.request("flowboard.projects.documents.syncAiInstructions", {
-        boardId: project.board.id,
-      });
-    }, { closeModal: false });
   }
 
   private hideDocument(id: string, hidden: boolean) {
@@ -1034,7 +1035,7 @@ class FlowboardProjectHost extends LitElement {
       previewDocumentDraft: () => this.previewDocumentDraft(),
       cancelDocumentEdit: () => this.cancelDocumentEdit(),
       saveDocumentContent: () => this.saveDocumentContent(),
-      syncAiInstructions: () => this.syncAiInstructions(),
+      formatDocument: (command) => this.formatDocument(command),
       saveMilestone: (data) => this.saveMilestone(data),
       completeMilestone: (id) => this.completeMilestone(id),
       archiveMilestone: (id, archived) => this.archiveMilestone(id, archived),

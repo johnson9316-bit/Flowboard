@@ -45,43 +45,13 @@ import {
   normalizeTitle,
 } from "./store-normalizers.js";
 import { FlowboardNotificationStore } from "./store-notifications.js";
-import { discoverFlowboardAiInstructions } from "./project-ai-instructions.js";
-
-type StandardDocument = {
-  key: string;
-  section: FlowboardProjectDocumentSection;
-  title: string;
-};
-
-const STANDARD_PROJECT_DOCUMENTS: readonly StandardDocument[] = [
-  { key: "project", section: "project", title: "Project Overview" },
-  { key: "requirements", section: "project", title: "Requirements" },
-  { key: "roadmap", section: "project", title: "Roadmap" },
-  { key: "state", section: "project", title: "Current State" },
-  { key: "retrospective", section: "project", title: "Retrospective" },
-  { key: "architecture", section: "codebase", title: "Architecture" },
-  { key: "structure", section: "codebase", title: "Directory Structure" },
-  { key: "conventions", section: "codebase", title: "Coding Conventions" },
-  { key: "testing", section: "codebase", title: "Testing" },
-  { key: "integrations", section: "codebase", title: "Integrations" },
-  { key: "concerns", section: "codebase", title: "Risks and Technical Debt" },
-  { key: "dev_environment", section: "environment", title: "Development Environment" },
-  { key: "test_deploy", section: "environment", title: "Test and Deployment Environment" },
-  { key: "notes", section: "knowledge", title: "Notes" },
-  { key: "research", section: "knowledge", title: "Research" },
-  { key: "todos", section: "knowledge", title: "Todos" },
-  { key: "seeds", section: "knowledge", title: "Seeds" },
-];
-const STANDARD_PROJECT_DOCUMENT_KEYS = new Set(STANDARD_PROJECT_DOCUMENTS.map((item) => item.key));
+import { discoverFlowboardProjectDocuments } from "./project-document-discovery.js";
 
 function presentProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
   const next: FlowboardProjectDocument = {
     ...document,
     source: document.source ?? "project",
   };
-  if (!next.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(next.key)) {
-    return next;
-  }
   delete next.system;
   return next;
 }
@@ -145,7 +115,6 @@ function normalizeDocumentBody(
   type: FlowboardProjectDocumentType,
   fallback?: FlowboardProjectDocument,
 ): Pick<FlowboardProjectDocument, "target" | "content"> {
-  const hasTargetInput = Object.hasOwn(input, "target");
   const target =
     type === "link"
       ? normalizeExternalUrl(input.target, fallback?.target, "document URL")
@@ -156,12 +125,9 @@ function normalizeDocumentBody(
     type === "markdown" || type === "json"
       ? normalizeBoundedString(input.content, fallback?.content, 20_000, "document content")
       : undefined;
-  const allowsUnboundSystemPath =
-    type === "path" && fallback?.system === true && !hasTargetInput && !fallback.target;
   if (
     (type === "link" || type === "path" || type === "secret_ref") &&
-    !target &&
-    !allowsUnboundSystemPath
+    !target
   ) {
     throw new Error(`${type} documents require a target.`);
   }
@@ -201,37 +167,28 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     return board;
   }
 
-  private async ensureProjectDocumentsDirect(boardId: string, now = Date.now()): Promise<void> {
-    const existingKeys = new Set(
-      (await this.documentStore.entries())
-        .map((entry) => entry.value)
-        .filter(
-          (entry) => entry?.version === 1 && entry.document?.boardId === boardId,
-        )
-        .map((entry) => entry.document.key),
-    );
-    for (const [position, item] of STANDARD_PROJECT_DOCUMENTS.entries()) {
-      if (existingKeys.has(item.key)) {
-        continue;
+  private async removeLegacyGeneratedProjectDocumentsDirect(
+    board: FlowboardBoardMetadata,
+  ): Promise<void> {
+    if (
+      !board.defaultWorkspace?.path ||
+      (board.defaultWorkspace.kind !== "dir" && board.defaultWorkspace.kind !== "worktree")
+    ) {
+      return;
+    }
+    for (const entry of await this.documentStore.entries()) {
+      const document = entry.value?.version === 1 ? entry.value.document : undefined;
+      if (
+        document?.boardId === board.id &&
+        document.system === true &&
+        document.type === "path"
+      ) {
+        await this.documentStore.delete(entry.key);
       }
-      const document: FlowboardProjectDocument = {
-        id: randomUUID(),
-        boardId,
-        key: item.key,
-        section: item.section,
-        source: "project",
-        type: "path",
-        title: item.title,
-        position: (position + 1) * POSITION_STEP,
-        system: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await this.documentStore.register(document.id, { version: 1, document });
     }
   }
 
-  private async ensureProjectAiInstructionsDirect(
+  private async discoverProjectDocumentsDirect(
     board: FlowboardBoardMetadata,
     now = Date.now(),
   ): Promise<void> {
@@ -242,9 +199,9 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     ) {
       return;
     }
-    let candidates: Awaited<ReturnType<typeof discoverFlowboardAiInstructions>>;
+    let candidates: Awaited<ReturnType<typeof discoverFlowboardProjectDocuments>>;
     try {
-      candidates = await discoverFlowboardAiInstructions(workspacePath);
+      candidates = await discoverFlowboardProjectDocuments(workspacePath);
     } catch {
       // A stale optional workspace must not make the document library unavailable.
       return;
@@ -262,19 +219,26 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         .map((document) => document.target)
         .filter((target): target is string => Boolean(target)),
     );
-    const sameSection = existing.filter((document) => document.section === "project");
-    let position = Math.max(0, ...sameSection.map((document) => document.position));
+    const nextPositionBySection = new Map<FlowboardProjectDocumentSection, number>();
     for (const candidate of candidates) {
       if (existingKeys.has(candidate.key) || existingTargets.has(candidate.target)) {
         continue;
       }
-      position += POSITION_STEP;
+      const position =
+        (nextPositionBySection.get(candidate.section) ??
+          Math.max(
+            0,
+            ...existing
+              .filter((document) => document.section === candidate.section)
+              .map((document) => document.position),
+          )) + POSITION_STEP;
+      nextPositionBySection.set(candidate.section, position);
       const document: FlowboardProjectDocument = {
         id: randomUUID(),
         boardId: board.id,
         key: candidate.key,
-        section: "project",
-        source: "ai_system",
+        section: candidate.section,
+        source: candidate.source,
         type: "path",
         title: candidate.title,
         summary: candidate.summary,
@@ -290,9 +254,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   }
 
   private async ensureProjectDirect(boardId: string, now = Date.now()): Promise<FlowboardBoardMetadata> {
-    const board = await this.ensureBoardDirect(boardId, now);
-    await this.ensureProjectDocumentsDirect(boardId, now);
-    return board;
+    return await this.ensureBoardDirect(boardId, now);
   }
 
   async assertProjectCanReceiveCards(boardId: string): Promise<void> {
@@ -369,7 +331,6 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       await this.boardStore.register(board.id, { version: 1, board });
       try {
         await this.milestoneStore.register(milestone.id, { version: 1, milestone });
-        await this.ensureProjectDocumentsDirect(boardId, milestone.createdAt);
       } catch (error) {
         for (const entry of await this.documentStore.entries()) {
           if (entry.value?.version === 1 && entry.value.document.boardId === boardId) {
@@ -400,7 +361,6 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       }
       const board = normalizeBoardMetadata({ ...input, id: boardId }, existing?.board);
       await this.boardStore.register(boardId, { version: 1, board });
-      await this.ensureProjectDocumentsDirect(boardId, board.updatedAt);
       return board;
     });
   }
@@ -763,7 +723,8 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     const normalizedBoardId = normalizeBoardIdRequired(boardId);
     return await this.enqueueMutation(async () => {
       const board = await this.ensureProjectDirect(normalizedBoardId);
-      await this.ensureProjectAiInstructionsDirect(board);
+      await this.removeLegacyGeneratedProjectDocumentsDirect(board);
+      await this.discoverProjectDocumentsDirect(board);
       const documents = (await this.documentStore.entries())
         .map((entry) => entry.value)
         .filter(
@@ -909,9 +870,6 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       const entry = await this.documentStore.lookup(id.trim());
       if (!entry?.document) {
         return { deleted: false };
-      }
-      if (entry.document.system && STANDARD_PROJECT_DOCUMENT_KEYS.has(entry.document.key)) {
-        throw new Error("standard project documents can be hidden but not deleted.");
       }
       return { deleted: await this.documentStore.delete(entry.document.id) };
     });

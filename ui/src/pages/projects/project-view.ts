@@ -19,7 +19,11 @@ import type {
 } from "../../../../src/contract/index.ts";
 import "../../components/modal-dialog.ts";
 import { t, type FlowboardLocale } from "../../i18n/index.ts";
-import { renderFlowboardMarkdown } from "../../lib/markdown.ts";
+import {
+  flowboardEditorHtmlToMarkdown,
+  flowboardMarkdownToEditorHtml,
+  renderFlowboardMarkdown,
+} from "../../lib/markdown.ts";
 import "../../styles/flowboard-project.css";
 
 const STATUSES: readonly FlowboardStatus[] = [
@@ -177,7 +181,7 @@ export type FlowboardProjectViewController = {
   previewDocumentDraft: () => void;
   cancelDocumentEdit: () => void;
   saveDocumentContent: () => void;
-  syncAiInstructions: () => void;
+  formatDocument: (command: "bold" | "italic" | "formatBlock" | "insertUnorderedList") => void;
   saveMilestone: (data: Record<string, string>) => void;
   completeMilestone: (id: string) => void;
   archiveMilestone: (id: string, archived: boolean) => void;
@@ -1120,14 +1124,6 @@ function renderDocuments(controller: FlowboardProjectViewController) {
             ${t("flowboardProject.showHidden")}
           </label>
           <button
-            class="btn"
-            type="button"
-            ?disabled=${state.busy || !project.board.defaultWorkspace?.path}
-            @click=${controller.syncAiInstructions}
-          >
-            ${t("flowboardProject.syncAiInstructions")}
-          </button>
-          <button
             class="btn btn--primary"
             type="button"
             @click=${() => controller.openModal({ kind: "document" })}
@@ -1272,12 +1268,55 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
                   ${state.documentPreviewError
                     ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
                     : nothing}
-                  <textarea
+                  <div
+                    class="flowboard-project__document-editor-toolbar"
+                    role="toolbar"
+                    aria-label=${t("flowboardProject.richTextToolbar")}
+                  >
+                    <button
+                      class="flowboard-project__editor-button"
+                      type="button"
+                      title=${t("flowboardProject.formatBold")}
+                      aria-label=${t("flowboardProject.formatBold")}
+                      @mousedown=${(event: MouseEvent) => event.preventDefault()}
+                      @click=${() => controller.formatDocument("bold")}
+                    ><strong>B</strong></button>
+                    <button
+                      class="flowboard-project__editor-button"
+                      type="button"
+                      title=${t("flowboardProject.formatItalic")}
+                      aria-label=${t("flowboardProject.formatItalic")}
+                      @mousedown=${(event: MouseEvent) => event.preventDefault()}
+                      @click=${() => controller.formatDocument("italic")}
+                    ><em>I</em></button>
+                    <button
+                      class="flowboard-project__editor-button"
+                      type="button"
+                      title=${t("flowboardProject.formatHeading")}
+                      aria-label=${t("flowboardProject.formatHeading")}
+                      @mousedown=${(event: MouseEvent) => event.preventDefault()}
+                      @click=${() => controller.formatDocument("formatBlock")}
+                    >H</button>
+                    <button
+                      class="flowboard-project__editor-button"
+                      type="button"
+                      title=${t("flowboardProject.formatList")}
+                      aria-label=${t("flowboardProject.formatList")}
+                      @mousedown=${(event: MouseEvent) => event.preventDefault()}
+                      @click=${() => controller.formatDocument("insertUnorderedList")}
+                    >${t("flowboardProject.formatList")}</button>
+                  </div>
+                  <div
+                    class="flowboard-project__rich-editor"
+                    contenteditable="true"
+                    role="textbox"
+                    aria-multiline="true"
                     aria-label=${t("flowboardProject.documentContent")}
-                    .value=${content}
+                    .innerHTML=${flowboardMarkdownToEditorHtml(content)}
                     @input=${(event: InputEvent) => {
-                      state.documentDraft = (event.currentTarget as HTMLTextAreaElement).value;
-                      controller.requestUpdate();
+                      state.documentDraft = flowboardEditorHtmlToMarkdown(
+                        (event.currentTarget as HTMLElement).innerHTML,
+                      );
                     }}
                     @keydown=${(event: KeyboardEvent) => {
                       if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "s") {
@@ -1285,7 +1324,7 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
                         controller.saveDocumentContent();
                       }
                     }}
-                  ></textarea>
+                  ></div>
                   <div class="flowboard-project__document-editor-actions">
                     <button class="btn" type="button" @click=${controller.cancelDocumentEdit}>
                       ${t("common.cancel")}
@@ -1296,7 +1335,7 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
                     <button
                       class="btn btn--primary"
                       type="button"
-                      ?disabled=${state.busy || !dirty}
+                      ?disabled=${state.busy}
                       @click=${controller.saveDocumentContent}
                     >${t("flowboardProject.saveDocument")}</button>
                   </div>

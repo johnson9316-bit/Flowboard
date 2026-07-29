@@ -65,7 +65,6 @@ describe("Flowboard M2 Gateway methods", () => {
       "flowboard.projects.milestones.complete",
       "flowboard.projects.documents.create",
       "flowboard.projects.documents.write",
-      "flowboard.projects.documents.syncAiInstructions",
       "flowboard.projects.documents.reorder",
       "flowboard.projects.documents.delete",
       "flowboard.cards.sources.create",
@@ -86,6 +85,7 @@ describe("Flowboard M2 Gateway methods", () => {
     expect(registrations.get("flowboard.projects.documents.read")?.options.scope).toBe(
       "operator.read",
     );
+    expect(registrations.get("flowboard.projects.documents.syncAiInstructions")).toBeUndefined();
     expect(registrations.get("flowboard.cards.execution.prepare")?.options.scope).toBe(
       "operator.read",
     );

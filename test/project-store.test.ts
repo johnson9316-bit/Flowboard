@@ -45,7 +45,7 @@ function createStore() {
 }
 
 describe("Flowboard M2 project store", () => {
-  it("creates a project atomically with its first milestone and standard documents", async () => {
+  it("creates a project atomically with its first milestone", async () => {
     const { store } = createStore();
 
     const project = await store.createProject({
@@ -58,19 +58,7 @@ describe("Flowboard M2 project store", () => {
     expect(project.board).toMatchObject({ id: "alpha", name: "Alpha" });
     expect(project.milestones).toHaveLength(1);
     expect(project.milestones[0]).toMatchObject({ boardId: "alpha", state: "active" });
-    expect(documents.documents).toHaveLength(17);
-    expect(documents.documents).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: "project", type: "path", system: true }),
-        expect.objectContaining({ key: "requirements", type: "path", system: true }),
-        expect.objectContaining({ key: "architecture", type: "path", system: true }),
-        expect.objectContaining({ key: "dev_environment", type: "path", system: true }),
-        expect.objectContaining({ key: "notes", type: "path", system: true }),
-      ]),
-    );
-    expect(documents.documents.map((document) => document.key)).not.toEqual(
-      expect.arrayContaining(["config", "stack", "onboarding"]),
-    );
+    expect(documents.documents).toEqual([]);
 
     await expect(
       store.createProject({
@@ -205,7 +193,7 @@ describe("Flowboard M2 project store", () => {
     ).rejects.toThrow("active milestone");
   });
 
-  it("protects placement fields, standard documents, and archived project entry points", async () => {
+  it("protects placement fields and archived project entry points", async () => {
     const { store } = createStore();
     const project = await store.createProject({
       id: "alpha",
@@ -213,17 +201,9 @@ describe("Flowboard M2 project store", () => {
       initialMilestoneTitle: "Build",
     });
     const card = await store.create({ title: "Card", boardId: "alpha" });
-    const documents = await store.listProjectDocuments("alpha");
-    const standard = documents.documents.find((document) => document.key === "project");
-    if (!standard) {
-      throw new Error("missing standard document");
-    }
-
     await expect(
       store.update(card.id, { milestoneId: project.milestones[0]?.id } as never),
     ).rejects.toThrow("dedicated project or milestone move");
-    await expect(store.deleteProjectDocument(standard.id)).rejects.toThrow("standard project documents");
-    await store.hideProjectDocument(standard.id);
 
     await store.archiveProject("alpha");
     await expect(store.create({ title: "Blocked", boardId: "alpha" })).rejects.toThrow("project is archived");
@@ -232,7 +212,7 @@ describe("Flowboard M2 project store", () => {
     ).rejects.toThrow("project is archived");
   });
 
-  it("keeps removed fixed-directory records as deletable historical documents", async () => {
+  it("keeps legacy generated records as deletable historical documents", async () => {
     const { documents, store } = createStore();
     await store.createProject({
       id: "alpha",

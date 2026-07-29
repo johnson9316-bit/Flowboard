@@ -3973,8 +3973,14 @@ function registerFlowboardProjectGatewayMethods(params) {
   );
   api.registerGatewayMethod(
     "flowboard.projects.documents.list",
-    async ({ params: requestParams, respond }) => {
+    async (request) => {
+      const { params: requestParams, respond } = request;
       try {
+        const access = await resolveProjectWorkspaceReadAccess(request);
+        const project = await store.getProject(requestParams.boardId);
+        if (project.board.defaultWorkspace?.path) {
+          await assertFlowboardWorkspaceSourceAccess(project.board.defaultWorkspace, access);
+        }
         respond(
           true,
           await store.listProjectDocuments(requestParams.boardId, {
@@ -4031,24 +4037,6 @@ function registerFlowboardProjectGatewayMethods(params) {
             access
           })
         });
-      } catch (error) {
-        respondError(respond, error);
-      }
-    },
-    { scope: WRITE_SCOPE2 }
-  );
-  api.registerGatewayMethod(
-    "flowboard.projects.documents.syncAiInstructions",
-    async (request) => {
-      const { params: requestParams, respond } = request;
-      try {
-        const access = await resolveProjectWorkspaceWriteAccess(request);
-        const project = await store.getProject(requestParams.boardId);
-        await assertFlowboardWorkspaceMutationAccess(
-          { defaultWorkspace: project.board.defaultWorkspace },
-          access
-        );
-        respond(true, await store.syncProjectAiInstructions(requestParams.boardId));
       } catch (error) {
         respondError(respond, error);
       }
@@ -7821,45 +7809,83 @@ var FlowboardNotificationStore = class extends FlowboardWorkflowStore {
   }
 };
 
-// src/backend/src/project-ai-instructions.ts
+// src/backend/src/project-document-discovery.ts
+import { createHash as createHash2 } from "node:crypto";
 import fs3 from "node:fs/promises";
 import path4 from "node:path";
-var ROOT_INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"];
-var DEPLOYMENT_SKILL_FILES = [
-  ".claude/skills/deploy-test/SKILL.md",
-  ".claude/skills/deploy-prod/SKILL.md"
-];
-var EXCLUDED_MODULE_DIRECTORIES = /* @__PURE__ */ new Set([
+var MAX_DISCOVERED_DOCUMENTS = 500;
+var MARKDOWN_EXTENSIONS2 = /* @__PURE__ */ new Set([".md", ".markdown"]);
+var EXCLUDED_DIRECTORIES = /* @__PURE__ */ new Set([
   ".claude",
   ".git",
+  ".github",
   ".next",
   "build",
   "coverage",
   "dist",
   "node_modules",
   "out",
+  "tpm",
   "vendor"
 ]);
+var INCLUDED_HIDDEN_DIRECTORIES = /* @__PURE__ */ new Set([".planning", ".trae"]);
+var EXTRA_DOCUMENT_PATHS = [
+  ".github/copilot-instructions.md",
+  ".claude/skills/deploy-test/SKILL.md",
+  ".claude/skills/deploy-prod/SKILL.md"
+];
 function isPathInside2(root, candidate) {
   const relative = path4.relative(root, candidate);
   return relative === "" || !relative.startsWith(`..${path4.sep}`) && relative !== "..";
 }
-function candidateKey(relativePath) {
-  const normalized = relativePath.toLocaleLowerCase().replace(/\.md$/i, "").replace(/[\\/]+/g, ".").replace(/[^a-z0-9._-]/g, "-").replace(/^\.+/, "");
-  return `ai.${normalized}`;
+function normalizedRelativePath(root, target) {
+  return path4.relative(root, target).split(path4.sep).join("/");
+}
+function isMarkdownPath(relativePath) {
+  return MARKDOWN_EXTENSIONS2.has(path4.extname(relativePath).toLocaleLowerCase());
+}
+function sourceForDocument(relativePath) {
+  const normalized = relativePath.toLocaleLowerCase();
+  if (normalized === ".github/copilot-instructions.md" || normalized === ".claude/skills/deploy-test/skill.md" || normalized === ".claude/skills/deploy-prod/skill.md" || /^(?:[^/]+\/)?(?:agents|claude)\.md$/.test(normalized)) {
+    return "ai_system";
+  }
+  return "project";
+}
+function sectionForDocument(relativePath) {
+  const normalized = relativePath.toLocaleLowerCase();
+  if (normalized.startsWith(".planning/codebase/")) {
+    return "codebase";
+  }
+  if (normalized.startsWith(".planning/intel/") || /(?:^|\/)(?:deploy|deployment|environment|operations|ops|runbook)(?:\/|$)/.test(normalized)) {
+    return "environment";
+  }
+  if (normalized.startsWith(".planning/notes/") || normalized.startsWith(".planning/research/")) {
+    return "knowledge";
+  }
+  return "project";
+}
+function candidateKey(relativePath, source) {
+  if (source === "ai_system") {
+    const normalized = relativePath.toLocaleLowerCase().replace(/\.(?:md|markdown)$/i, "").replace(/[\\/]+/g, ".").replace(/[^a-z0-9._-]/g, "-").replace(/^\.+/, "");
+    return `ai.${normalized}`;
+  }
+  return `file.${createHash2("sha256").update(relativePath).digest("hex").slice(0, 24)}`;
 }
 function candidateTitle(relativePath) {
-  return relativePath.startsWith(".claude/skills/") ? relativePath.replace(".claude/skills/", "").replace("/SKILL.md", " skill") : relativePath;
+  return path4.basename(relativePath).replace(/\.(?:md|markdown)$/i, "");
 }
 async function addCandidate(params) {
-  const candidate = path4.join(params.root, params.relativePath);
+  if (params.results.length >= MAX_DISCOVERED_DOCUMENTS || !isMarkdownPath(params.relativePath)) {
+    return;
+  }
+  const candidatePath = path4.join(params.root, params.relativePath);
   let target;
   try {
-    target = await fs3.realpath(candidate);
+    target = await fs3.realpath(candidatePath);
   } catch {
     return;
   }
-  if (!isPathInside2(params.root, target)) {
+  if (!isPathInside2(params.root, target) || params.targets.has(target)) {
     return;
   }
   let stat;
@@ -7871,15 +7897,59 @@ async function addCandidate(params) {
   if (!stat.isFile()) {
     return;
   }
-  params.result.push({
-    key: candidateKey(params.relativePath),
-    relativePath: params.relativePath,
+  const relativePath = normalizedRelativePath(params.root, target);
+  const source = sourceForDocument(relativePath);
+  params.results.push({
+    key: candidateKey(relativePath, source),
+    relativePath,
     target,
-    title: candidateTitle(params.relativePath),
-    summary: params.relativePath.startsWith(".claude/skills/") ? "Managed deployment skill." : "AI instruction entry point."
+    title: candidateTitle(relativePath),
+    summary: source === "ai_system" ? "AI instruction file." : relativePath,
+    section: sectionForDocument(relativePath),
+    source
   });
+  params.targets.add(target);
 }
-async function discoverFlowboardAiInstructions(workspacePath) {
+async function walkDirectory(params) {
+  if (params.results.length >= MAX_DISCOVERED_DOCUMENTS) {
+    return;
+  }
+  let entries;
+  try {
+    entries = await fs3.readdir(params.directory, { encoding: "utf8", withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries.toSorted(
+    (left, right) => Number(right.isFile()) - Number(left.isFile()) || left.name.localeCompare(right.name)
+  )) {
+    if (params.results.length >= MAX_DISCOVERED_DOCUMENTS || entry.isSymbolicLink()) {
+      continue;
+    }
+    const relativePath = params.relativeDirectory ? path4.join(params.relativeDirectory, entry.name) : entry.name;
+    if (entry.isFile()) {
+      await addCandidate({
+        root: params.root,
+        relativePath,
+        results: params.results,
+        targets: params.targets
+      });
+      continue;
+    }
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    if (EXCLUDED_DIRECTORIES.has(entry.name) || entry.name.startsWith(".") && !INCLUDED_HIDDEN_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+    await walkDirectory({
+      ...params,
+      directory: path4.join(params.directory, entry.name),
+      relativeDirectory: relativePath
+    });
+  }
+}
+async function discoverFlowboardProjectDocuments(workspacePath) {
   let root;
   try {
     root = await fs3.realpath(workspacePath);
@@ -7895,63 +7965,27 @@ async function discoverFlowboardAiInstructions(workspacePath) {
   if (!rootStat.isDirectory()) {
     throw new Error("project default workspace must be a directory.");
   }
-  const result = [];
-  for (const fileName of ROOT_INSTRUCTION_FILES) {
-    await addCandidate({ root, relativePath: fileName, result });
+  const results = [];
+  const targets = /* @__PURE__ */ new Set();
+  for (const relativePath of EXTRA_DOCUMENT_PATHS) {
+    await addCandidate({ root, relativePath, results, targets });
   }
-  let entries;
-  try {
-    entries = await fs3.readdir(root, { encoding: "utf8", withFileTypes: true });
-  } catch {
-    throw new Error("project default workspace cannot be read.");
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory() || EXCLUDED_MODULE_DIRECTORIES.has(entry.name)) {
-      continue;
-    }
-    for (const fileName of ROOT_INSTRUCTION_FILES) {
-      await addCandidate({
-        root,
-        relativePath: path4.join(entry.name, fileName),
-        result
-      });
-    }
-  }
-  for (const relativePath of DEPLOYMENT_SKILL_FILES) {
-    await addCandidate({ root, relativePath, result });
-  }
-  return result;
+  await walkDirectory({
+    root,
+    directory: root,
+    relativeDirectory: "",
+    results,
+    targets
+  });
+  return results;
 }
 
 // src/backend/src/store-projects.ts
-var STANDARD_PROJECT_DOCUMENTS = [
-  { key: "project", section: "project", title: "Project Overview" },
-  { key: "requirements", section: "project", title: "Requirements" },
-  { key: "roadmap", section: "project", title: "Roadmap" },
-  { key: "state", section: "project", title: "Current State" },
-  { key: "retrospective", section: "project", title: "Retrospective" },
-  { key: "architecture", section: "codebase", title: "Architecture" },
-  { key: "structure", section: "codebase", title: "Directory Structure" },
-  { key: "conventions", section: "codebase", title: "Coding Conventions" },
-  { key: "testing", section: "codebase", title: "Testing" },
-  { key: "integrations", section: "codebase", title: "Integrations" },
-  { key: "concerns", section: "codebase", title: "Risks and Technical Debt" },
-  { key: "dev_environment", section: "environment", title: "Development Environment" },
-  { key: "test_deploy", section: "environment", title: "Test and Deployment Environment" },
-  { key: "notes", section: "knowledge", title: "Notes" },
-  { key: "research", section: "knowledge", title: "Research" },
-  { key: "todos", section: "knowledge", title: "Todos" },
-  { key: "seeds", section: "knowledge", title: "Seeds" }
-];
-var STANDARD_PROJECT_DOCUMENT_KEYS = new Set(STANDARD_PROJECT_DOCUMENTS.map((item) => item.key));
 function presentProjectDocument(document) {
   const next = {
     ...document,
     source: document.source ?? "project"
   };
-  if (!next.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(next.key)) {
-    return next;
-  }
   delete next.system;
   return next;
 }
@@ -7993,11 +8027,9 @@ function normalizeDocumentType(value, fallback) {
   return value;
 }
 function normalizeDocumentBody(input, type, fallback) {
-  const hasTargetInput = Object.hasOwn(input, "target");
   const target = type === "link" ? normalizeExternalUrl(input.target, fallback?.target, "document URL") : type === "path" || type === "secret_ref" ? normalizeBoundedString(input.target, fallback?.target, 2e3, "document target") : void 0;
   const content = type === "markdown" || type === "json" ? normalizeBoundedString(input.content, fallback?.content, 2e4, "document content") : void 0;
-  const allowsUnboundSystemPath = type === "path" && fallback?.system === true && !hasTargetInput && !fallback.target;
-  if ((type === "link" || type === "path" || type === "secret_ref") && !target && !allowsUnboundSystemPath) {
+  if ((type === "link" || type === "path" || type === "secret_ref") && !target) {
     throw new Error(`${type} documents require a target.`);
   }
   if (type === "path" && (target?.includes("\0") || target?.includes("\n"))) {
@@ -8030,36 +8062,66 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
     await this.boardStore.register(board.id, { version: 1, board });
     return board;
   }
-  async ensureProjectDocumentsDirect(boardId, now = Date.now()) {
-    const existingKeys = new Set(
-      (await this.documentStore.entries()).map((entry) => entry.value).filter(
-        (entry) => entry?.version === 1 && entry.document?.boardId === boardId
-      ).map((entry) => entry.document.key)
+  async removeLegacyGeneratedProjectDocumentsDirect(board) {
+    if (!board.defaultWorkspace?.path || board.defaultWorkspace.kind !== "dir" && board.defaultWorkspace.kind !== "worktree") {
+      return;
+    }
+    for (const entry of await this.documentStore.entries()) {
+      const document = entry.value?.version === 1 ? entry.value.document : void 0;
+      if (document?.boardId === board.id && document.system === true && document.type === "path") {
+        await this.documentStore.delete(entry.key);
+      }
+    }
+  }
+  async discoverProjectDocumentsDirect(board, now = Date.now()) {
+    const workspacePath = board.defaultWorkspace?.path;
+    if (!workspacePath || board.defaultWorkspace?.kind !== "dir" && board.defaultWorkspace?.kind !== "worktree") {
+      return;
+    }
+    let candidates;
+    try {
+      candidates = await discoverFlowboardProjectDocuments(workspacePath);
+    } catch {
+      return;
+    }
+    const existing = (await this.documentStore.entries()).map((entry) => entry.value).filter(
+      (entry) => entry?.version === 1 && entry.document?.boardId === board.id
+    ).map((entry) => presentProjectDocument(entry.document));
+    const existingKeys = new Set(existing.map((document) => document.key));
+    const existingTargets = new Set(
+      existing.map((document) => document.target).filter((target) => Boolean(target))
     );
-    for (const [position, item] of STANDARD_PROJECT_DOCUMENTS.entries()) {
-      if (existingKeys.has(item.key)) {
+    const nextPositionBySection = /* @__PURE__ */ new Map();
+    for (const candidate of candidates) {
+      if (existingKeys.has(candidate.key) || existingTargets.has(candidate.target)) {
         continue;
       }
+      const position = (nextPositionBySection.get(candidate.section) ?? Math.max(
+        0,
+        ...existing.filter((document2) => document2.section === candidate.section).map((document2) => document2.position)
+      )) + POSITION_STEP;
+      nextPositionBySection.set(candidate.section, position);
       const document = {
         id: randomUUID9(),
-        boardId,
-        key: item.key,
-        section: item.section,
-        source: "project",
+        boardId: board.id,
+        key: candidate.key,
+        section: candidate.section,
+        source: candidate.source,
         type: "path",
-        title: item.title,
-        position: (position + 1) * POSITION_STEP,
-        system: true,
+        title: candidate.title,
+        summary: candidate.summary,
+        target: candidate.target,
+        position,
         createdAt: now,
         updatedAt: now
       };
       await this.documentStore.register(document.id, { version: 1, document });
+      existingKeys.add(candidate.key);
+      existingTargets.add(candidate.target);
     }
   }
   async ensureProjectDirect(boardId, now = Date.now()) {
-    const board = await this.ensureBoardDirect(boardId, now);
-    await this.ensureProjectDocumentsDirect(boardId, now);
-    return board;
+    return await this.ensureBoardDirect(boardId, now);
   }
   async assertProjectCanReceiveCards(boardId) {
     const board = await this.boardStore.lookup(boardId);
@@ -8127,7 +8189,6 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       await this.boardStore.register(board.id, { version: 1, board });
       try {
         await this.milestoneStore.register(milestone.id, { version: 1, milestone });
-        await this.ensureProjectDocumentsDirect(boardId, milestone.createdAt);
       } catch (error) {
         for (const entry of await this.documentStore.entries()) {
           if (entry.value?.version === 1 && entry.value.document.boardId === boardId) {
@@ -8157,7 +8218,6 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       }
       const board = normalizeBoardMetadata({ ...input, id: boardId }, existing?.board);
       await this.boardStore.register(boardId, { version: 1, board });
-      await this.ensureProjectDocumentsDirect(boardId, board.updatedAt);
       return board;
     });
   }
@@ -8452,7 +8512,9 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
   async listProjectDocuments(boardId, options = {}) {
     const normalizedBoardId = normalizeBoardIdRequired(boardId);
     return await this.enqueueMutation(async () => {
-      await this.ensureProjectDirect(normalizedBoardId);
+      const board = await this.ensureProjectDirect(normalizedBoardId);
+      await this.removeLegacyGeneratedProjectDocumentsDirect(board);
+      await this.discoverProjectDocumentsDirect(board);
       const documents = (await this.documentStore.entries()).map((entry) => entry.value).filter(
         (entry) => entry?.version === 1 && entry.document?.boardId === normalizedBoardId
       ).map((entry) => presentProjectDocument(entry.document)).filter((document) => options.includeHidden === true || !document.hiddenAt).toSorted(
@@ -8540,51 +8602,6 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       return next;
     });
   }
-  async syncProjectAiInstructions(boardId) {
-    const normalizedBoardId = normalizeBoardIdRequired(boardId);
-    return await this.enqueueMutation(async () => {
-      const board = await this.ensureProjectDirect(normalizedBoardId);
-      const workspacePath = board.defaultWorkspace?.path;
-      if (!workspacePath || board.defaultWorkspace?.kind !== "dir" && board.defaultWorkspace?.kind !== "worktree") {
-        throw new Error("project default workspace is required to sync AI instructions.");
-      }
-      const candidates = await discoverFlowboardAiInstructions(workspacePath);
-      const existing = (await this.documentStore.entries()).map((entry) => entry.value).filter(
-        (entry) => entry?.version === 1 && entry.document?.boardId === normalizedBoardId
-      ).map((entry) => presentProjectDocument(entry.document));
-      const existingKeys = new Set(existing.map((document) => document.key));
-      const existingTargets = new Set(
-        existing.map((document) => document.target).filter((target) => Boolean(target))
-      );
-      const sameSection = existing.filter((document) => document.section === "project");
-      let position = Math.max(0, ...sameSection.map((document) => document.position));
-      const documents = [];
-      const now = Date.now();
-      for (const candidate of candidates) {
-        if (existingKeys.has(candidate.key) || existingTargets.has(candidate.target)) {
-          continue;
-        }
-        position += POSITION_STEP;
-        const document = {
-          id: randomUUID9(),
-          boardId: normalizedBoardId,
-          key: candidate.key,
-          section: "project",
-          source: "ai_system",
-          type: "path",
-          title: candidate.title,
-          summary: candidate.summary,
-          target: candidate.target,
-          position,
-          createdAt: now,
-          updatedAt: now
-        };
-        await this.documentStore.register(document.id, { version: 1, document });
-        documents.push(document);
-      }
-      return { documents };
-    });
-  }
   async hideProjectDocument(id, hidden = true) {
     return await this.enqueueMutation(async () => {
       const entry = await this.documentStore.lookup(id.trim());
@@ -8608,9 +8625,6 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       const entry = await this.documentStore.lookup(id.trim());
       if (!entry?.document) {
         return { deleted: false };
-      }
-      if (entry.document.system && STANDARD_PROJECT_DOCUMENT_KEYS.has(entry.document.key)) {
-        throw new Error("standard project documents can be hidden but not deleted.");
       }
       return { deleted: await this.documentStore.delete(entry.document.id) };
     });
