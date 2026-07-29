@@ -93,7 +93,7 @@ export type FlowboardProjectModal =
 
 export type FlowboardCardExecutionPreparation = {
   cardId: string;
-  expectedUpdatedAt: number;
+  expectedRevision: number;
   active: boolean;
   agentId: string;
   defaultProvider?: string;

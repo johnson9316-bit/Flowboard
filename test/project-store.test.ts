@@ -81,6 +81,7 @@ describe("Flowboard M2 project store", () => {
         position: 1024,
         createdAt: 1,
         updatedAt: 1,
+        revision: 1,
         metadata: { automation: { boardId: "legacy" } },
       },
     });

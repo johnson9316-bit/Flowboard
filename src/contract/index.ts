@@ -486,6 +486,13 @@ export type FlowboardCard = {
   position: number;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Monotonic write counter. Bumped on every persisted card write and used as
+   * the optimistic-concurrency token for cross-process compare-and-swap. Unlike
+   * `updatedAt` it never collides within a millisecond and never changes without
+   * an actual write.
+   */
+  revision: number;
   startedAt?: number;
   completedAt?: number;
   events?: FlowboardEvent[];

@@ -53,8 +53,6 @@ type GitCheckout = {
   branch?: string;
 };
 
-const executionLocks = new WeakMap<FlowboardStore, Map<string, Promise<void>>>();
-
 function readOptionalString(value: unknown, maxLength = 4_000): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -68,33 +66,6 @@ function activeExecution(card: FlowboardCard): boolean {
     card.execution?.status === "running" ||
     Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"))
   );
-}
-
-async function withCardExecutionLock<T>(
-  store: FlowboardStore,
-  cardId: string,
-  action: () => Promise<T>,
-): Promise<T> {
-  const locks = executionLocks.get(store) ?? new Map<string, Promise<void>>();
-  executionLocks.set(store, locks);
-  const previous = locks.get(cardId) ?? Promise.resolve();
-  let release: (() => void) | undefined;
-  const current = previous.then(
-    async () =>
-      await new Promise<void>((resolve) => {
-        release = resolve;
-      }),
-  );
-  locks.set(cardId, current);
-  await previous;
-  try {
-    return await action();
-  } finally {
-    release?.();
-    if (locks.get(cardId) === current) {
-      locks.delete(cardId);
-    }
-  }
 }
 
 async function gitCheckout(path: string): Promise<GitCheckout> {
@@ -306,7 +277,7 @@ export async function prepareFlowboardCardExecution(params: {
   const context = await params.store.buildWorkerContext(card.id);
   return {
     cardId: card.id,
-    expectedUpdatedAt: card.updatedAt,
+    expectedRevision: card.revision,
     active: activeExecution(card),
     agentId: ownerId,
     defaultProvider: params.options.runtime.agent.defaults.provider,
@@ -322,11 +293,11 @@ export async function prepareFlowboardCardExecution(params: {
 export async function startFlowboardCardExecution(params: {
   store: FlowboardStore;
   id: unknown;
-  expectedUpdatedAt: unknown;
+  expectedRevision: unknown;
   options: FlowboardCardExecutionOptions;
 }) {
   const card = await resolveCard(params.store, params.id);
-  return await withCardExecutionLock(params.store, card.id, async () => {
+  {
     const latest = await resolveCard(params.store, card.id);
     const sessionKey = buildSessionKey(latest);
     const source = await resolveExecutionSource(
@@ -336,8 +307,11 @@ export async function startFlowboardCardExecution(params: {
     );
     await ensureTargetCanRun({ card: latest, source, options: params.options, sessionKey });
     const ownerId = latest.agentId ?? params.options.defaultAgentId;
-    const expectedUpdatedAt =
-      typeof params.expectedUpdatedAt === "number" ? params.expectedUpdatedAt : undefined;
+    // The claim below is a database-level compare-and-swap, so it is itself the
+    // mutual exclusion for concurrent starts — including starts issued by another
+    // Gateway process, which an in-process lock could never have covered.
+    const expectedRevision =
+      typeof params.expectedRevision === "number" ? params.expectedRevision : latest.revision;
     let claimToken: string | undefined;
     let materializedWorkspace: FlowboardWorkspace | undefined;
     let runStarted = false;
@@ -345,7 +319,7 @@ export async function startFlowboardCardExecution(params: {
     try {
       const claimed = await params.store.claimExecution(latest.id, {
         ownerId,
-        expectedUpdatedAt,
+        expectedRevision,
         ttlSeconds: latest.metadata?.automation?.maxRuntimeSeconds,
       });
       claimToken = claimed.token;
@@ -398,7 +372,10 @@ export async function startFlowboardCardExecution(params: {
           token: claimToken,
         }),
         lane: `flowboard:${cardBoardId(current)}:${current.id}`,
-        idempotencyKey: `flowboard:execution:${current.id}:${claimed.card.updatedAt}`,
+        // The claim token is minted fresh per winning claim, so it identifies
+        // exactly this start attempt. A timestamp could collide inside one
+        // millisecond and changed on writes unrelated to starting a run.
+        idempotencyKey: `flowboard:execution:${current.id}:${claimed.token}`,
         lightContext: true,
         deliver: false,
         cwd: worktreePath,
@@ -455,7 +432,7 @@ export async function startFlowboardCardExecution(params: {
       }
       throw error;
     }
-  });
+  }
 }
 
 export async function inspectFlowboardCardExecution(params: {

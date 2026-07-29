@@ -2,16 +2,44 @@ import { randomUUID } from "node:crypto";
 import type { FlowboardChange } from "../../contract/index.js";
 import type { FlowboardKeyedStore } from "./persistence-types.js";
 
+/**
+ * Revisions reserved per round trip to the backing store. Large enough that a
+ * busy Gateway rarely re-reserves, small enough that restarts do not skip far.
+ */
+const CHANGE_REVISION_BLOCK = 10_000;
+
 export class FlowboardChangeTracker {
-  private readonly epoch = randomUUID();
-  private revision = 0;
+  private readonly epoch: string;
+  private revision: number;
+  private revisionCeiling: number;
   private latestChange: FlowboardChange | undefined;
   private mutationRevision = 0;
   private externalDataVersion: number | undefined;
   private readonly listeners = new Set<(change: FlowboardChange) => void>();
+  private readonly reserveRevisions: (count: number) => number;
 
-  constructor(private readonly readDataVersion?: () => number) {
+  constructor(
+    private readonly readDataVersion?: () => number,
+    epoch?: string,
+    reserveRevisions?: (count: number) => number,
+  ) {
+    // A database-scoped epoch plus restart-monotonic revisions keep a connected
+    // UI's long-wait cursor comparable across a Gateway restart. A per-process
+    // epoch invalidated every cursor on each restart and forced a full reload.
+    this.epoch = epoch ?? randomUUID();
+    this.reserveRevisions = reserveRevisions ?? (() => 0);
+    this.revision = this.reserveRevisions(CHANGE_REVISION_BLOCK);
+    this.revisionCeiling = this.revision + CHANGE_REVISION_BLOCK;
     this.externalDataVersion = readDataVersion?.();
+  }
+
+  private nextRevision(): number {
+    if (this.revision + 1 >= this.revisionCeiling) {
+      const base = Math.max(this.reserveRevisions(CHANGE_REVISION_BLOCK), this.revision);
+      this.revision = base;
+      this.revisionCeiling = base + CHANGE_REVISION_BLOCK;
+    }
+    return ++this.revision;
   }
 
   track<T>(store: FlowboardKeyedStore<T>): FlowboardKeyedStore<T> {
@@ -29,6 +57,17 @@ export class FlowboardChangeTracker {
         return deleted;
       },
       entries: async () => await store.entries(),
+      ...(store.compareAndSwap
+        ? {
+            compareAndSwap: async (key: string, expectedRevision: number, value: T) => {
+              const swapped = await store.compareAndSwap!(key, expectedRevision, value);
+              if (swapped) {
+                this.mutationRevision += 1;
+              }
+              return swapped;
+            },
+          }
+        : {}),
     };
   }
 
@@ -70,7 +109,7 @@ export class FlowboardChangeTracker {
   }
 
   private emit(): void {
-    const change = { epoch: this.epoch, revision: ++this.revision };
+    const change = { epoch: this.epoch, revision: this.nextRevision() };
     this.latestChange = change;
     for (const listener of this.listeners) {
       try {

@@ -916,7 +916,7 @@ class FlowboardProjectHost extends LitElement {
       async () => {
         await this.gateway.request("flowboard.cards.execution.start", {
           id,
-          expectedUpdatedAt: preparation.expectedUpdatedAt,
+          expectedRevision: preparation.expectedRevision,
         });
         this.state.modal = { kind: "card-detail", cardId: id };
         this.state.executionPreparation = null;

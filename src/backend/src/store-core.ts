@@ -33,7 +33,13 @@ import {
   appendEvent,
 } from "./store-card-helpers.js";
 import { FlowboardChangeTracker } from "./store-change-tracker.js";
-import { MAX_CARD_COMMENTS, MAX_CARD_WORKER_LOGS, POSITION_STEP } from "./store-constants.js";
+import {
+  FLOWBOARD_INITIAL_CARD_REVISION,
+  MAX_CARD_COMMENTS,
+  MAX_CARD_WORKER_LOGS,
+  nextFlowboardCardRevision,
+  POSITION_STEP,
+} from "./store-constants.js";
 import type {
   FlowboardBoardInput,
   FlowboardBoardSummary,
@@ -75,6 +81,46 @@ import {
   trimMetadataToBudget,
 } from "./store-normalizers.js";
 
+/** Raised when a compare-and-swap loses to a concurrent write. */
+export class FlowboardRevisionConflictError extends Error {
+  constructor(
+    readonly cardId: string,
+    readonly expectedRevision: number,
+  ) {
+    super(`card ${cardId} changed since revision ${expectedRevision}.`);
+    this.name = "FlowboardRevisionConflictError";
+  }
+}
+
+const CARD_CAS_MAX_ATTEMPTS = 3;
+
+/**
+ * Advances `revision` on every card write. Wrapping the store means no call site
+ * can persist a card without advancing it, which is what lets `revision` serve
+ * as the optimistic-concurrency token. The stamp is applied in place so the card
+ * object the caller returns matches what was persisted.
+ */
+function stampCardRevisions(store: FlowboardKeyedStore): FlowboardKeyedStore {
+  const stamp = (value: PersistedFlowboardCard): PersistedFlowboardCard => {
+    if (value?.version === 1 && value.card) {
+      value.card.revision = nextFlowboardCardRevision(value.card.revision);
+    }
+    return value;
+  };
+  return {
+    register: async (key, value) => await store.register(key, stamp(value)),
+    lookup: async (key) => await store.lookup(key),
+    delete: async (key) => await store.delete(key),
+    entries: async () => await store.entries(),
+    ...(store.compareAndSwap
+      ? {
+          compareAndSwap: async (key: string, expectedRevision: number, value) =>
+            await store.compareAndSwap!(key, expectedRevision, stamp(value)),
+        }
+      : {}),
+  };
+}
+
 export class FlowboardCoreStore {
   private mutationQueue: Promise<unknown> = Promise.resolve();
   private lastNotificationSequence = 0;
@@ -95,10 +141,16 @@ export class FlowboardCoreStore {
       subscriptions?: FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>;
       attachments?: FlowboardKeyedStore<PersistedFlowboardAttachment>;
       dataVersion?: () => number;
+      changeEpoch?: string;
+      reserveChangeRevisions?: (count: number) => number;
     } = {},
   ) {
-    this.changes = new FlowboardChangeTracker(stores.dataVersion);
-    this.store = this.changes.track(store);
+    this.changes = new FlowboardChangeTracker(
+      stores.dataVersion,
+      stores.changeEpoch,
+      stores.reserveChangeRevisions,
+    );
+    this.store = this.changes.track(stampCardRevisions(store));
     this.boardStore = this.changes.track(
       stores.boards ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardBoard>),
     );
@@ -480,6 +532,8 @@ export class FlowboardCoreStore {
       position,
       createdAt: now,
       updatedAt: now,
+      // Stamped to the first real revision by the persistence boundary below.
+      revision: 0,
       events: [
         {
           id: randomUUID(),
@@ -535,11 +589,22 @@ export class FlowboardCoreStore {
       allowMetadataDependencyLinks?: boolean;
       enforceStatusHolds?: boolean;
       preserveProofId?: string;
+      /**
+       * Compare-and-swap guard. When set, the write lands only if the card is
+       * still at this revision, and a losing write throws
+       * {@link FlowboardRevisionConflictError} instead of clobbering the winner.
+       * Required for admission decisions (claiming, dispatching) that must stay
+       * correct across processes rather than only within this one.
+       */
+      expectedRevision?: number;
     } = {},
   ): Promise<FlowboardCard> {
     const existing = await this.get(id);
     if (!existing) {
       throw new Error(`card not found: ${id}`);
+    }
+    if (options.expectedRevision !== undefined && existing.revision !== options.expectedRevision) {
+      throw new FlowboardRevisionConflictError(id, options.expectedRevision);
     }
     const lifecycleStatusSourceUpdatedAt = lifecycleStatusSourceUpdatedAtFromPatch(patch.metadata);
     const existingLifecycleStatusSourceUpdatedAt =
@@ -696,9 +761,45 @@ export class FlowboardCoreStore {
     if (metadataIsEmpty(next.metadata)) {
       delete next.metadata;
     }
-    await this.store.register(next.id, { version: 1, card: next });
+    await this.persistCard(next, options.expectedRevision);
     await this.deleteDetachedAttachments(existing, next);
     return next;
+  }
+
+  /**
+   * Single card write boundary. With `expectedRevision` the backend performs the
+   * check and the write atomically when it can; backends without that capability
+   * fall back to the plain write already guarded by the read-revision check in
+   * {@link updateCard} and the in-process mutation queue.
+   */
+  private async persistCard(card: FlowboardCard, expectedRevision?: number): Promise<void> {
+    if (expectedRevision === undefined || !this.store.compareAndSwap) {
+      await this.store.register(card.id, { version: 1, card });
+      return;
+    }
+    const swapped = await this.store.compareAndSwap(card.id, expectedRevision, {
+      version: 1,
+      card,
+    });
+    if (!swapped) {
+      throw new FlowboardRevisionConflictError(card.id, expectedRevision);
+    }
+  }
+
+  /**
+   * Retries `run` when it loses a compare-and-swap race. Callers must re-read the
+   * card inside `run` so each attempt swaps against the revision it actually saw.
+   */
+  protected async retryOnRevisionConflict<T>(run: () => Promise<T>): Promise<T> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await run();
+      } catch (error) {
+        if (!(error instanceof FlowboardRevisionConflictError) || attempt >= CARD_CAS_MAX_ATTEMPTS) {
+          throw error;
+        }
+      }
+    }
   }
 
   private async assertActiveStatusAllowed(

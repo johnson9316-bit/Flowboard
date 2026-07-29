@@ -180,7 +180,7 @@ export function registerFlowboardGatewayMethods(params: {
         const result = await startFlowboardCardExecution({
           store,
           id: request.params.id,
-          expectedUpdatedAt: request.params.expectedUpdatedAt,
+          expectedRevision: request.params.expectedRevision,
           options: executionOptions(request),
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });

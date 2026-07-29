@@ -896,6 +896,10 @@ var READY_STRANDED_MS = 60 * 60 * 1e3;
 var RUNNING_HEARTBEAT_STALE_MS = 20 * 60 * 1e3;
 var BLOCKED_TOO_LONG_MS = 24 * 60 * 60 * 1e3;
 var CLAIM_RECLAIM_MS = 5 * 60 * 1e3;
+var FLOWBOARD_INITIAL_CARD_REVISION = 1;
+function nextFlowboardCardRevision(current) {
+  return Number.isSafeInteger(current) && current > 0 ? current + 1 : FLOWBOARD_INITIAL_CARD_REVISION;
+}
 function isFlowboardClaimReclaimable(claim, now) {
   return Boolean(claim?.expiresAt && now - claim.expiresAt > CLAIM_RECLAIM_MS);
 }
@@ -2585,7 +2589,6 @@ async function createManagedFlowboardWorktree(params) {
     ownerId: params.ownerId
   });
 }
-var pendingFlowboardDispatches = /* @__PURE__ */ new WeakMap();
 function normalizePositiveInteger2(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : fallback;
 }
@@ -2740,20 +2743,7 @@ function selectStartableCards(cards, limit, candidates, ownerOverride, now) {
   return [...selected, ...fallback];
 }
 async function dispatchAndStartFlowboardCards(params) {
-  const previous = pendingFlowboardDispatches.get(params.store);
-  const dispatch = previous ? previous.then(() => runFlowboardDispatch(params)) : runFlowboardDispatch(params);
-  const settled = dispatch.then(
-    () => void 0,
-    () => void 0
-  );
-  pendingFlowboardDispatches.set(params.store, settled);
-  try {
-    return await dispatch;
-  } finally {
-    if (pendingFlowboardDispatches.get(params.store) === settled) {
-      pendingFlowboardDispatches.delete(params.store);
-    }
-  }
+  return await runFlowboardDispatch(params);
 }
 async function runFlowboardDispatch(params) {
   const now = params.options?.now ?? Date.now();
@@ -2918,7 +2908,10 @@ async function runFlowboardDispatch(params) {
         ...params.options?.provider ? { provider: params.options.provider } : {},
         ...params.options?.model ? { model: params.options.model } : {},
         lane: `flowboard:${cardBoardId(card)}:${card.id}`,
-        idempotencyKey: `flowboard:${card.id}:${claimed.card.updatedAt}`,
+        // Keyed on the winning claim token, which is minted once per claim and so
+        // identifies exactly this dispatch attempt. A millisecond timestamp could
+        // collide between two attempts and changed on unrelated card writes.
+        idempotencyKey: `flowboard:${card.id}:${claimValue}`,
         lightContext: true,
         deliver: false,
         ...runCwd ? { cwd: runCwd } : {}
@@ -2995,7 +2988,6 @@ var execFileAsync = promisify(execFile);
 var PREVIEW_LIMIT = 6;
 var PREVIEW_MAX_CHARS = 600;
 var CLAIM_TOKEN_PLACEHOLDER = "[generated after confirmation]";
-var executionLocks = /* @__PURE__ */ new WeakMap();
 function readOptionalString(value, maxLength = 4e3) {
   if (typeof value !== "string") {
     return void 0;
@@ -3005,27 +2997,6 @@ function readOptionalString(value, maxLength = 4e3) {
 }
 function activeExecution(card) {
   return card.execution?.status === "running" || Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"));
-}
-async function withCardExecutionLock(store, cardId, action) {
-  const locks = executionLocks.get(store) ?? /* @__PURE__ */ new Map();
-  executionLocks.set(store, locks);
-  const previous = locks.get(cardId) ?? Promise.resolve();
-  let release;
-  const current = previous.then(
-    async () => await new Promise((resolve) => {
-      release = resolve;
-    })
-  );
-  locks.set(cardId, current);
-  await previous;
-  try {
-    return await action();
-  } finally {
-    release?.();
-    if (locks.get(cardId) === current) {
-      locks.delete(cardId);
-    }
-  }
 }
 async function gitCheckout(path6) {
   try {
@@ -3190,7 +3161,7 @@ async function prepareFlowboardCardExecution(params) {
   const context = await params.store.buildWorkerContext(card.id);
   return {
     cardId: card.id,
-    expectedUpdatedAt: card.updatedAt,
+    expectedRevision: card.revision,
     active: activeExecution(card),
     agentId: ownerId,
     defaultProvider: params.options.runtime.agent.defaults.provider,
@@ -3204,7 +3175,7 @@ async function prepareFlowboardCardExecution(params) {
 }
 async function startFlowboardCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
-  return await withCardExecutionLock(params.store, card.id, async () => {
+  {
     const latest = await resolveCard(params.store, card.id);
     const sessionKey = buildSessionKey(latest);
     const source = await resolveExecutionSource(
@@ -3214,7 +3185,7 @@ async function startFlowboardCardExecution(params) {
     );
     await ensureTargetCanRun({ card: latest, source, options: params.options, sessionKey });
     const ownerId = latest.agentId ?? params.options.defaultAgentId;
-    const expectedUpdatedAt = typeof params.expectedUpdatedAt === "number" ? params.expectedUpdatedAt : void 0;
+    const expectedRevision = typeof params.expectedRevision === "number" ? params.expectedRevision : latest.revision;
     let claimToken;
     let materializedWorkspace;
     let runStarted = false;
@@ -3222,7 +3193,7 @@ async function startFlowboardCardExecution(params) {
     try {
       const claimed = await params.store.claimExecution(latest.id, {
         ownerId,
-        expectedUpdatedAt,
+        expectedRevision,
         ttlSeconds: latest.metadata?.automation?.maxRuntimeSeconds
       });
       claimToken = claimed.token;
@@ -3273,7 +3244,10 @@ async function startFlowboardCardExecution(params) {
           token: claimToken
         }),
         lane: `flowboard:${cardBoardId(current)}:${current.id}`,
-        idempotencyKey: `flowboard:execution:${current.id}:${claimed.card.updatedAt}`,
+        // The claim token is minted fresh per winning claim, so it identifies
+        // exactly this start attempt. A timestamp could collide inside one
+        // millisecond and changed on writes unrelated to starting a run.
+        idempotencyKey: `flowboard:execution:${current.id}:${claimed.token}`,
         lightContext: true,
         deliver: false,
         cwd: worktreePath
@@ -3322,7 +3296,7 @@ async function startFlowboardCardExecution(params) {
       }
       throw error;
     }
-  });
+  }
 }
 async function inspectFlowboardCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
@@ -4209,16 +4183,17 @@ function registerFlowboardProjectGatewayMethods(params) {
 }
 
 // src/backend/src/store.ts
-import { randomUUID as randomUUID10 } from "node:crypto";
+import { randomUUID as randomUUID11 } from "node:crypto";
 
 // src/backend/src/sqlite-store.ts
+import { randomUUID as randomUUID4 } from "node:crypto";
 import fs2 from "node:fs";
 import path3 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 6;
+var SCHEMA_VERSION = 7;
 var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var FLOWBOARD_SQLITE_DIR_MODE = 448;
 var FLOWBOARD_SQLITE_FILE_MODE = 384;
@@ -4302,6 +4277,10 @@ function ensureColumn(db, tableName, columnName, definition) {
   db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definition}`);
 }
 var FLOWBOARD_SCHEMA_SQL = `
+    CREATE TABLE IF NOT EXISTS flowboard_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    ) STRICT;
     CREATE TABLE IF NOT EXISTS flowboard_schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
@@ -4613,9 +4592,13 @@ function ensureFlowboardSchema(db) {
     "source",
     "source TEXT NOT NULL DEFAULT 'project'"
   );
+  ensureColumn(db, "flowboard_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "flowboard_cards", "claim_owner_id", "claim_owner_id TEXT");
   db.exec(`
     CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
       ON flowboard_cards(board_id, milestone_id, position);
+    CREATE INDEX IF NOT EXISTS flowboard_cards_claim_owner_idx
+      ON flowboard_cards(claim_owner_id, status);
   `);
   const migrationId = `schema-${SCHEMA_VERSION}`;
   const current = db.prepare("SELECT 1 AS found FROM flowboard_schema_migrations WHERE id = ?").get(migrationId);
@@ -4624,6 +4607,33 @@ function ensureFlowboardSchema(db) {
       "INSERT OR IGNORE INTO flowboard_schema_migrations (id, applied_at) VALUES (?, ?)"
     ).run(migrationId, Date.now());
   }
+}
+function ensureChangeEpoch(db) {
+  const existing = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'").get();
+  const current = existing ? stringValue(existing, "value") : void 0;
+  if (current) {
+    return current;
+  }
+  const epoch = randomUUID4();
+  db.prepare("INSERT OR IGNORE INTO flowboard_meta (key, value) VALUES ('change_epoch', ?)").run(
+    epoch
+  );
+  const stored = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'").get();
+  return (stored ? stringValue(stored, "value") : void 0) ?? epoch;
+}
+function reserveChangeRevisions(db, count) {
+  return runTransaction(db, () => {
+    const row = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_revision'").get();
+    const stored = Number.parseInt(row ? stringValue(row, "value") ?? "" : "", 10);
+    const base = Number.isSafeInteger(stored) && stored > 0 ? stored : 0;
+    db.prepare(
+      `
+        INSERT INTO flowboard_meta (key, value) VALUES ('change_revision', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `
+    ).run(String(base + count));
+    return base;
+  });
 }
 function chmodIfExists(targetPath, mode) {
   try {
@@ -5006,7 +5016,8 @@ function readCard(db, row) {
     labels: readLabels(db, requiredString(row, "id")),
     position: requiredNumber(row, "position"),
     createdAt: requiredNumber(row, "created_at"),
-    updatedAt: requiredNumber(row, "updated_at")
+    updatedAt: requiredNumber(row, "updated_at"),
+    revision: numberValue(row, "revision") ?? 0
   };
   const metadata = readMetadata(db, row);
   const delivery = readDelivery(db, card.id);
@@ -5053,14 +5064,14 @@ function insertCard(db, card) {
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
         execution_model, execution_session_key, execution_run_id, execution_started_at,
         execution_updated_at, automation_json, claim_json, template_id, archived_at, stale_json,
-        lifecycle_status_source_updated_at, failure_count
+        lifecycle_status_source_updated_at, failure_count, revision, claim_owner_id
       ) VALUES (
         @id, @board_id, @title, @notes, @status, @priority, @agent_id, @session_key, @run_id,
         @task_id, @source_url, @milestone_id, @position, @created_at, @updated_at, @started_at, @completed_at,
         @execution_id, @execution_kind, @execution_engine, @execution_mode, @execution_status,
         @execution_model, @execution_session_key, @execution_run_id, @execution_started_at,
         @execution_updated_at, @automation_json, @claim_json, @template_id, @archived_at,
-        @stale_json, @lifecycle_status_source_updated_at, @failure_count
+        @stale_json, @lifecycle_status_source_updated_at, @failure_count, @revision, @claim_owner_id
       )
       ON CONFLICT(id) DO UPDATE SET
         board_id = excluded.board_id,
@@ -5095,7 +5106,9 @@ function insertCard(db, card) {
         archived_at = excluded.archived_at,
         stale_json = excluded.stale_json,
         lifecycle_status_source_updated_at = excluded.lifecycle_status_source_updated_at,
-        failure_count = excluded.failure_count
+        failure_count = excluded.failure_count,
+        revision = excluded.revision,
+        claim_owner_id = excluded.claim_owner_id
     `
   ).run({
     id: card.id,
@@ -5131,7 +5144,9 @@ function insertCard(db, card) {
     archived_at: bindNull(metadata?.archivedAt),
     stale_json: jsonValue(metadata?.stale),
     lifecycle_status_source_updated_at: bindNull(metadata?.lifecycleStatusSourceUpdatedAt),
-    failure_count: bindNull(metadata?.failureCount)
+    failure_count: bindNull(metadata?.failureCount),
+    revision: card.revision,
+    claim_owner_id: bindNull(metadata?.claim?.ownerId)
   });
   insertChildren(db, "flowboard_card_labels", card.id, card.labels, (label, ordinal) => {
     db.prepare("INSERT INTO flowboard_card_labels (card_id, ordinal, label) VALUES (?, ?, ?)").run(
@@ -5408,6 +5423,19 @@ var FlowboardSqliteCardStore = class {
       throw new Error("invalid flowboard card payload");
     }
     runTransaction(this.db, () => insertCard(this.db, value.card));
+  }
+  async compareAndSwap(key, expectedRevision, value) {
+    if (value.version !== 1 || value.card.id !== key) {
+      throw new Error("invalid flowboard card payload");
+    }
+    return runTransaction(this.db, () => {
+      const row = this.db.prepare("SELECT revision FROM flowboard_cards WHERE id = ?").get(key);
+      if (!row || (numberValue(row, "revision") ?? 0) !== expectedRevision) {
+        return false;
+      }
+      insertCard(this.db, value.card);
+      return true;
+    });
   }
   async lookup(key) {
     const row = this.db.prepare("SELECT * FROM flowboard_cards WHERE id = ?").get(key);
@@ -5869,6 +5897,8 @@ function createFlowboardSqliteStores(options = {}) {
     attachments: new FlowboardSqliteAttachmentStore(db),
     // This connection-local primitive changes only after another connection commits.
     dataVersion: () => requiredNumber(db.prepare("PRAGMA data_version").get(), "data_version"),
+    changeEpoch: ensureChangeEpoch(db),
+    reserveChangeRevisions: (count) => reserveChangeRevisions(db, count),
     close: () => {
       maintenance.close();
       db.close();
@@ -5878,22 +5908,16 @@ function createFlowboardSqliteStores(options = {}) {
 
 // src/backend/src/store-projects.ts
 init_contract();
-import { randomUUID as randomUUID9 } from "node:crypto";
+import { randomUUID as randomUUID10 } from "node:crypto";
 
 // src/backend/src/store-workflow.ts
-import { randomUUID as randomUUID8 } from "node:crypto";
+import { randomUUID as randomUUID9 } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { isFutureDateTimestampMs as isFutureDateTimestampMs2 } from "openclaw/plugin-sdk/number-runtime";
 import { safeEqualSecret as safeEqualSecret2 } from "openclaw/plugin-sdk/security-runtime";
 
-// src/backend/src/store-promote.ts
-import { randomUUID as randomUUID7 } from "node:crypto";
-
-// src/backend/src/store-enrichment.ts
-import { randomUUID as randomUUID6 } from "node:crypto";
-
 // src/backend/src/store-core.ts
-import { randomUUID as randomUUID5 } from "node:crypto";
+import { randomUUID as randomUUID6 } from "node:crypto";
 
 // src/backend/src/store-automation.ts
 function normalizeTrustedWorkspaceAccess(value, fallback) {
@@ -5955,18 +5979,33 @@ function normalizeAutomationPatch(patch, current) {
 }
 
 // src/backend/src/store-change-tracker.ts
-import { randomUUID as randomUUID4 } from "node:crypto";
+import { randomUUID as randomUUID5 } from "node:crypto";
+var CHANGE_REVISION_BLOCK = 1e4;
 var FlowboardChangeTracker = class {
-  constructor(readDataVersion) {
+  constructor(readDataVersion, epoch, reserveRevisions) {
     this.readDataVersion = readDataVersion;
+    this.epoch = epoch ?? randomUUID5();
+    this.reserveRevisions = reserveRevisions ?? (() => 0);
+    this.revision = this.reserveRevisions(CHANGE_REVISION_BLOCK);
+    this.revisionCeiling = this.revision + CHANGE_REVISION_BLOCK;
     this.externalDataVersion = readDataVersion?.();
   }
-  epoch = randomUUID4();
-  revision = 0;
+  epoch;
+  revision;
+  revisionCeiling;
   latestChange;
   mutationRevision = 0;
   externalDataVersion;
   listeners = /* @__PURE__ */ new Set();
+  reserveRevisions;
+  nextRevision() {
+    if (this.revision + 1 >= this.revisionCeiling) {
+      const base = Math.max(this.reserveRevisions(CHANGE_REVISION_BLOCK), this.revision);
+      this.revision = base;
+      this.revisionCeiling = base + CHANGE_REVISION_BLOCK;
+    }
+    return ++this.revision;
+  }
   track(store) {
     return {
       register: async (key, value) => {
@@ -5981,7 +6020,16 @@ var FlowboardChangeTracker = class {
         }
         return deleted;
       },
-      entries: async () => await store.entries()
+      entries: async () => await store.entries(),
+      ...store.compareAndSwap ? {
+        compareAndSwap: async (key, expectedRevision, value) => {
+          const swapped = await store.compareAndSwap(key, expectedRevision, value);
+          if (swapped) {
+            this.mutationRevision += 1;
+          }
+          return swapped;
+        }
+      } : {}
     };
   }
   subscribe(listener) {
@@ -6017,7 +6065,7 @@ var FlowboardChangeTracker = class {
     }
   }
   emit() {
-    const change = { epoch: this.epoch, revision: ++this.revision };
+    const change = { epoch: this.epoch, revision: this.nextRevision() };
     this.latestChange = change;
     for (const listener of this.listeners) {
       try {
@@ -6029,6 +6077,32 @@ var FlowboardChangeTracker = class {
 };
 
 // src/backend/src/store-core.ts
+var FlowboardRevisionConflictError = class extends Error {
+  constructor(cardId, expectedRevision) {
+    super(`card ${cardId} changed since revision ${expectedRevision}.`);
+    this.cardId = cardId;
+    this.expectedRevision = expectedRevision;
+    this.name = "FlowboardRevisionConflictError";
+  }
+};
+var CARD_CAS_MAX_ATTEMPTS = 3;
+function stampCardRevisions(store) {
+  const stamp = (value) => {
+    if (value?.version === 1 && value.card) {
+      value.card.revision = nextFlowboardCardRevision(value.card.revision);
+    }
+    return value;
+  };
+  return {
+    register: async (key, value) => await store.register(key, stamp(value)),
+    lookup: async (key) => await store.lookup(key),
+    delete: async (key) => await store.delete(key),
+    entries: async () => await store.entries(),
+    ...store.compareAndSwap ? {
+      compareAndSwap: async (key, expectedRevision, value) => await store.compareAndSwap(key, expectedRevision, stamp(value))
+    } : {}
+  };
+}
 var FlowboardCoreStore = class {
   mutationQueue = Promise.resolve();
   lastNotificationSequence = 0;
@@ -6040,8 +6114,12 @@ var FlowboardCoreStore = class {
   subscriptionStore;
   attachmentStore;
   constructor(store, stores = {}) {
-    this.changes = new FlowboardChangeTracker(stores.dataVersion);
-    this.store = this.changes.track(store);
+    this.changes = new FlowboardChangeTracker(
+      stores.dataVersion,
+      stores.changeEpoch,
+      stores.reserveChangeRevisions
+    );
+    this.store = this.changes.track(stampCardRevisions(store));
     this.boardStore = this.changes.track(
       stores.boards ?? store
     );
@@ -6342,7 +6420,7 @@ var FlowboardCoreStore = class {
       ).map((card2) => card2.position)
     ) + POSITION_STEP;
     let card = {
-      id: randomUUID5(),
+      id: randomUUID6(),
       title: normalizeTitle(input.title),
       status,
       priority: normalizePriority(input.priority, "normal"),
@@ -6351,9 +6429,11 @@ var FlowboardCoreStore = class {
       position,
       createdAt: now,
       updatedAt: now,
+      // Stamped to the first real revision by the persistence boundary below.
+      revision: 0,
       events: [
         {
-          id: randomUUID5(),
+          id: randomUUID6(),
           kind: "created",
           at: now,
           toStatus: status,
@@ -6400,6 +6480,9 @@ var FlowboardCoreStore = class {
     const existing = await this.get(id);
     if (!existing) {
       throw new Error(`card not found: ${id}`);
+    }
+    if (options.expectedRevision !== void 0 && existing.revision !== options.expectedRevision) {
+      throw new FlowboardRevisionConflictError(id, options.expectedRevision);
     }
     const lifecycleStatusSourceUpdatedAt = lifecycleStatusSourceUpdatedAtFromPatch(patch.metadata);
     const existingLifecycleStatusSourceUpdatedAt = existing.metadata?.lifecycleStatusSourceUpdatedAt;
@@ -6499,9 +6582,43 @@ var FlowboardCoreStore = class {
     if (metadataIsEmpty(next.metadata)) {
       delete next.metadata;
     }
-    await this.store.register(next.id, { version: 1, card: next });
+    await this.persistCard(next, options.expectedRevision);
     await this.deleteDetachedAttachments(existing, next);
     return next;
+  }
+  /**
+   * Single card write boundary. With `expectedRevision` the backend performs the
+   * check and the write atomically when it can; backends without that capability
+   * fall back to the plain write already guarded by the read-revision check in
+   * {@link updateCard} and the in-process mutation queue.
+   */
+  async persistCard(card, expectedRevision) {
+    if (expectedRevision === void 0 || !this.store.compareAndSwap) {
+      await this.store.register(card.id, { version: 1, card });
+      return;
+    }
+    const swapped = await this.store.compareAndSwap(card.id, expectedRevision, {
+      version: 1,
+      card
+    });
+    if (!swapped) {
+      throw new FlowboardRevisionConflictError(card.id, expectedRevision);
+    }
+  }
+  /**
+   * Retries `run` when it loses a compare-and-swap race. Callers must re-read the
+   * card inside `run` so each attempt swaps against the revision it actually saw.
+   */
+  async retryOnRevisionConflict(run) {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await run();
+      } catch (error) {
+        if (!(error instanceof FlowboardRevisionConflictError) || attempt >= CARD_CAS_MAX_ATTEMPTS) {
+          throw error;
+        }
+      }
+    }
   }
   async assertActiveStatusAllowed(existing, next, now) {
     if (next.status !== "ready" && next.status !== "running" && next.status !== "review" && next.status !== "done") {
@@ -6548,7 +6665,7 @@ var FlowboardCoreStore = class {
     if (!body) {
       throw new Error("comment body is required.");
     }
-    const comment = { id: randomUUID5(), body, createdAt: now };
+    const comment = { id: randomUUID6(), body, createdAt: now };
     return await this.updateMetadata(id, (existing) => {
       assertCanMutateClaimedCard(existing, scope);
       return {
@@ -6568,7 +6685,7 @@ var FlowboardCoreStore = class {
     return await this.mutateSourceReferences(id, (references) => [
       ...references,
       {
-        id: randomUUID5(),
+        id: randomUUID6(),
         label,
         target,
         position: Math.max(0, ...references.map((reference) => reference.position)) + POSITION_STEP,
@@ -6696,7 +6813,7 @@ var FlowboardCoreStore = class {
       throw new Error("parent and child dependency links must use linkDependency.");
     }
     const link = {
-      id: randomUUID5(),
+      id: randomUUID6(),
       type,
       createdAt: now,
       ...targetCardId ? { targetCardId } : {},
@@ -6747,7 +6864,7 @@ var FlowboardCoreStore = class {
     const nextParentLinks = parentLinks.some(
       (link) => link.type === "child" && link.targetCardId === child.id
     ) ? parentLinks : appendLinkPreservingDependencies(parentLinks, {
-      id: randomUUID5(),
+      id: randomUUID6(),
       type: "child",
       targetCardId: child.id,
       createdAt: now
@@ -6755,7 +6872,7 @@ var FlowboardCoreStore = class {
     const nextChildLinks = childLinks.some(
       (link) => link.type === "parent" && link.targetCardId === parent.id
     ) ? childLinks : appendLinkPreservingDependencies(childLinks, {
-      id: randomUUID5(),
+      id: randomUUID6(),
       type: "parent",
       targetCardId: parent.id,
       createdAt: now
@@ -6840,7 +6957,7 @@ var FlowboardCoreStore = class {
       workerLogs: [
         ...card.metadata?.workerLogs ?? [],
         {
-          id: randomUUID5(),
+          id: randomUUID6(),
           level: "info",
           message: "Auto orchestration marked this triage card for specification or decomposition.",
           createdAt: now
@@ -6876,7 +6993,11 @@ var FlowboardCoreStore = class {
   }
 };
 
+// src/backend/src/store-promote.ts
+import { randomUUID as randomUUID8 } from "node:crypto";
+
 // src/backend/src/store-enrichment.ts
+import { randomUUID as randomUUID7 } from "node:crypto";
 var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
   async addProof(id, input, scope) {
     const now = Date.now();
@@ -7031,7 +7152,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
     const sessionKey = normalizeBoundedString(input.sessionKey, void 0, 240, "session key");
     const runId = normalizeBoundedString(input.runId, void 0, 160, "run id");
     const log = {
-      id: randomUUID6(),
+      id: randomUUID7(),
       level,
       message,
       createdAt: now,
@@ -7058,7 +7179,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
       const sessionKey = normalizeBoundedString(input.sessionKey, void 0, 240, "session key");
       const runId = normalizeBoundedString(input.runId, void 0, 160, "run id");
       const log = {
-        id: randomUUID6(),
+        id: randomUUID7(),
         level: "error",
         message: detail,
         createdAt: now,
@@ -7068,7 +7189,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
       const execution = card.execution?.status === "running" ? { ...card.execution, status: "blocked", updatedAt: now } : card.execution;
       const attempts = closeRunningAttempts(card.metadata?.attempts, now, "blocked", detail);
       const notification = {
-        id: randomUUID6(),
+        id: randomUUID7(),
         kind: "failed",
         createdAt: now,
         sequence: this.nextNotificationSequence(now),
@@ -7140,7 +7261,7 @@ var FlowboardPromoteStore = class extends FlowboardEnrichmentStore {
       const reason = normalizeBoundedString(input.reason, void 0, 1e3, "promote reason");
       const comments = reason ? [
         ...existing.metadata?.comments ?? [],
-        { id: randomUUID7(), body: reason, createdAt: Date.now() }
+        { id: randomUUID8(), body: reason, createdAt: Date.now() }
       ].slice(-MAX_CARD_COMMENTS) : existing.metadata?.comments;
       return await this.updateCard(
         id,
@@ -7175,17 +7296,18 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
     if (!ownerId) {
       throw new Error("claim ownerId is required.");
     }
-    if (typeof input.expectedUpdatedAt !== "number" || !Number.isSafeInteger(input.expectedUpdatedAt) || input.expectedUpdatedAt < 0) {
-      throw new Error("expectedUpdatedAt is required.");
+    if (typeof input.expectedRevision !== "number" || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0) {
+      throw new Error("expectedRevision is required.");
     }
+    const expectedRevision = input.expectedRevision;
     const ttlSeconds = typeof input.ttlSeconds === "number" && Number.isFinite(input.ttlSeconds) ? Math.max(1, Math.trunc(input.ttlSeconds)) : void 0;
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
         throw new Error(`card not found: ${id}`);
       }
-      if (existing.updatedAt !== input.expectedUpdatedAt) {
-        throw new Error("card changed since execution was prepared.");
+      if (existing.revision !== expectedRevision) {
+        throw new FlowboardRevisionConflictError(id, expectedRevision);
       }
       if (existing.metadata?.archivedAt) {
         throw new Error("card is archived.");
@@ -7201,17 +7323,22 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       if (existingClaim && (isFutureDateTimestampMs2(existingClaim.expiresAt, { nowMs: now }) || !isFlowboardClaimReclaimable(existingClaim, now))) {
         throw new Error(`card already claimed by ${existingClaim.ownerId}.`);
       }
-      const token = randomUUID8();
+      const token = randomUUID9();
       const expiresAt = addFlowboardDurationMs(
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS
       );
-      const card = await this.updateCard(id, {
-        metadata: {
-          ...clearDiagnostics(existing.metadata, ["stranded_ready"]),
-          claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt }
-        }
-      });
+      const card = await this.updateCard(
+        id,
+        {
+          metadata: {
+            ...clearDiagnostics(existing.metadata, ["stranded_ready"]),
+            claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt }
+          }
+        },
+        // Admission decision: the database, not this process, decides who won.
+        { expectedRevision }
+      );
       return { card, token };
     });
   }
@@ -7239,7 +7366,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
           attempts: closeRunningAttempts(existing.metadata?.attempts, now, "stopped", reason),
           comments: [
             ...existing.metadata?.comments ?? [],
-            { id: randomUUID8(), body: reason, createdAt: now }
+            { id: randomUUID9(), body: reason, createdAt: now }
           ].slice(-MAX_CARD_COMMENTS)
         }
       });
@@ -7290,7 +7417,13 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       throw new Error("claim ownerId is required.");
     }
     const ttlSeconds = typeof input.ttlSeconds === "number" && Number.isFinite(input.ttlSeconds) ? Math.max(1, Math.trunc(input.ttlSeconds)) : void 0;
-    const token = normalizeBoundedString(input.token, void 0, 160, "claim token") ?? randomUUID8();
+    const token = normalizeBoundedString(input.token, void 0, 160, "claim token") ?? randomUUID9();
+    return await this.retryOnRevisionConflict(
+      async () => await this.claimOnce(id, { ownerId, ttlSeconds, token }, options)
+    );
+  }
+  async claimOnce(id, input, options) {
+    const { ownerId, ttlSeconds, token } = input;
     return await this.enqueueMutation(async () => {
       const now = Date.now();
       const expiresAt = addFlowboardDurationMs(
@@ -7332,12 +7465,19 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       }
       const claimable = options.adoptWorkspaceAccess && !guarded.metadata?.automation?.workspaceAccess ? await this.updateCard(id, { workspaceAccess: options.adoptWorkspaceAccess }) : guarded;
       const metadata = clearDiagnostics(claimable.metadata, ["stranded_ready"]);
-      const card = await this.updateCard(id, {
-        metadata: {
-          ...metadata,
-          claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt }
-        }
-      });
+      const card = await this.updateCard(
+        id,
+        {
+          metadata: {
+            ...metadata,
+            claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt }
+          }
+        },
+        // Close the window between deciding the card is unclaimed and writing the
+        // claim. Another Gateway process claiming in that gap loses this swap
+        // instead of silently overwriting a live worker's token.
+        { expectedRevision: claimable.revision }
+      );
       const next = await this.updateCard(card.id, {
         status: card.status === "backlog" || card.status === "todo" || card.status === "ready" ? "running" : card.status,
         agentId: card.agentId ?? ownerId
@@ -7369,7 +7509,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       return {
         ...metadata,
         claim: removeUndefinedMetadataFields({ claim: nextClaim }).claim,
-        comments: note ? [...metadata.comments ?? [], { id: randomUUID8(), body: note, createdAt: now }].slice(
+        comments: note ? [...metadata.comments ?? [], { id: randomUUID9(), body: note, createdAt: now }].slice(
           -MAX_CARD_COMMENTS
         ) : metadata.comments
       };
@@ -7432,7 +7572,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
     const artifacts = Array.isArray(input.artifacts) ? input.artifacts.map((artifact) => normalizeArtifact({ ...artifact, createdAt: now })).filter((artifact) => artifact !== null).slice(-MAX_CARD_ARTIFACTS) : [];
     const metadata = clearDiagnostics(existing.metadata, ["missing_proof"]);
     const notification = {
-      id: randomUUID8(),
+      id: randomUUID9(),
       kind: "completed",
       createdAt: now,
       sequence: this.nextNotificationSequence(now),
@@ -7461,7 +7601,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
           ),
           comments: summary ? [
             ...metadata.comments ?? [],
-            { id: randomUUID8(), body: summary, createdAt: now }
+            { id: randomUUID9(), body: summary, createdAt: now }
           ].slice(-MAX_CARD_COMMENTS) : metadata.comments,
           proof: proof ? appendCompletionProof(metadata.proof, proof, proofId) : metadata.proof,
           artifacts: artifacts.length ? [...metadata.artifacts ?? [], ...artifacts].slice(-MAX_CARD_ARTIFACTS) : metadata.artifacts,
@@ -7487,7 +7627,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       const reason = normalizeBoundedString(input.reason, void 0, 2e3, "block reason") ?? "Flowboard card blocked.";
       const metadata = existing.metadata ?? {};
       const notification = {
-        id: randomUUID8(),
+        id: randomUUID9(),
         kind: "failed",
         createdAt: now,
         sequence: this.nextNotificationSequence(now),
@@ -7506,7 +7646,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
           failureCount: (metadata.failureCount ?? 0) + 1,
           comments: [
             ...metadata.comments ?? [],
-            { id: randomUUID8(), body: reason, createdAt: now }
+            { id: randomUUID9(), body: reason, createdAt: now }
           ].slice(-MAX_CARD_COMMENTS),
           notifications: [...metadata.notifications ?? [], notification].slice(
             -MAX_CARD_NOTIFICATIONS
@@ -7543,7 +7683,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
         ...shouldResetFailures ? { failureCount: 0 } : {},
         comments: reason ? [
           ...baseMetadata?.comments ?? [],
-          { id: randomUUID8(), body: reason, createdAt: Date.now() }
+          { id: randomUUID9(), body: reason, createdAt: Date.now() }
         ].slice(-MAX_CARD_COMMENTS) : baseMetadata?.comments
       };
       return await this.updateCard(id, { agentId, status, metadata }, { enforceStatusHolds: true });
@@ -7570,7 +7710,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
             attempts: closeRunningAttempts(existing.metadata?.attempts, now, "stopped", reason),
             comments: [
               ...existing.metadata?.comments ?? [],
-              { id: randomUUID8(), body: reason, createdAt: now }
+              { id: randomUUID9(), body: reason, createdAt: now }
             ].slice(-MAX_CARD_COMMENTS),
             stale: null
           }
@@ -7607,7 +7747,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
         ...existing.metadata,
         comments: summary ? [
           ...existing.metadata?.comments ?? [],
-          { id: randomUUID8(), body: summary, createdAt: now }
+          { id: randomUUID9(), body: summary, createdAt: now }
         ].slice(-MAX_CARD_COMMENTS) : existing.metadata?.comments,
         automation: normalizeAutomation(
           {
@@ -8194,7 +8334,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       )) + POSITION_STEP;
       nextPositionBySection.set(candidate.section, position);
       const document = {
-        id: randomUUID9(),
+        id: randomUUID10(),
         boardId: board.id,
         key: candidate.key,
         section: candidate.section,
@@ -8375,7 +8515,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
     const description = normalizeBoundedString(input.description, void 0, 2e3, "milestone description");
     const color = normalizeBoundedString(input.color, void 0, 40, "milestone color");
     return {
-      id: randomUUID9(),
+      id: randomUUID10(),
       boardId,
       title,
       position: normalizePosition(input.position, POSITION_STEP),
@@ -8648,7 +8788,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       );
       const now = Date.now();
       const document = {
-        id: randomUUID9(),
+        id: randomUUID10(),
         boardId,
         key,
         section,
@@ -8850,7 +8990,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
               notifications: [
                 ...latest.metadata?.notifications ?? [],
                 {
-                  id: randomUUID10(),
+                  id: randomUUID11(),
                   kind: "failed",
                   createdAt: now,
                   sequence: this.nextNotificationSequence(now),
@@ -8874,7 +9014,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
               notifications: [
                 ...latest.metadata?.notifications ?? [],
                 {
-                  id: randomUUID10(),
+                  id: randomUUID11(),
                   kind: "failed",
                   createdAt: now,
                   sequence: this.nextNotificationSequence(now),
@@ -9018,14 +9158,22 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
     );
   }
   static openSqlite() {
-    const stores = createFlowboardSqliteStores();
+    return _FlowboardStore.fromSqliteStores(createFlowboardSqliteStores());
+  }
+  /**
+   * Single wiring point from SQLite stores to a card store. Tests use this too,
+   * so a newly added capability cannot be silently missing under test only.
+   */
+  static fromSqliteStores(stores) {
     return new _FlowboardStore(stores.cards, {
       boards: stores.boards,
       milestones: stores.milestones,
       documents: stores.documents,
       subscriptions: stores.subscriptions,
       attachments: stores.attachments,
-      dataVersion: stores.dataVersion
+      dataVersion: stores.dataVersion,
+      changeEpoch: stores.changeEpoch,
+      reserveChangeRevisions: stores.reserveChangeRevisions
     });
   }
 };
@@ -9145,7 +9293,7 @@ function registerFlowboardGatewayMethods(params) {
         const result = await startFlowboardCardExecution({
           store,
           id: request.params.id,
-          expectedUpdatedAt: request.params.expectedUpdatedAt,
+          expectedRevision: request.params.expectedRevision,
           options: executionOptions(request)
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });

@@ -1,13 +1,30 @@
 {
-  "name": "flowboard",
-  "version": "0.1.0",
-  "description": "Flowboard is an external OpenClaw board plugin with an isolated namespace.",
+  "name": "@johnson9316-bit/flowboard",
+  "version": "0.1.1",
+  "description": "Project, milestone, documentation, and execution boards for OpenClaw.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnson9316-bit/Flowboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/johnson9316-bit/Flowboard/issues"
+  },
+  "homepage": "https://github.com/johnson9316-bit/Flowboard#readme",
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "kanban",
+    "project-management",
+    "milestones",
+    "worktree"
+  ],
   "files": [
     "dist/",
     "ui/dist/",
+    "docs/CLAW_HUB_PUBLISHING.md",
     "LICENSE",
     "README.md",
     "THIRD-PARTY-NOTICES",
@@ -50,6 +67,12 @@
   "openclaw": {
     "extensions": [
       "./dist/index.js"
-    ]
+    ],
+    "compat": {
+      "pluginApi": ">=2026.7.1"
+    },
+    "build": {
+      "openclawVersion": "2026.7.1-2"
+    }
   }
 }

@@ -25,6 +25,19 @@ export const RUNNING_HEARTBEAT_STALE_MS = 20 * 60 * 1000;
 export const BLOCKED_TOO_LONG_MS = 24 * 60 * 60 * 1000;
 const CLAIM_RECLAIM_MS = 5 * 60 * 1000;
 
+/** Revision assigned to a freshly created card before its first update. */
+export const FLOWBOARD_INITIAL_CARD_REVISION = 1;
+
+/**
+ * Next monotonic revision for a card write. Rows persisted before the revision
+ * column existed read back as 0, so an absent or non-finite value still advances.
+ */
+export function nextFlowboardCardRevision(current: number | undefined): number {
+  return Number.isSafeInteger(current) && (current as number) > 0
+    ? (current as number) + 1
+    : FLOWBOARD_INITIAL_CARD_REVISION;
+}
+
 export function isFlowboardClaimReclaimable(
   claim: FlowboardClaim | undefined,
   now: number,

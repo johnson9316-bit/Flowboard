@@ -196,10 +196,14 @@ describe("Flowboard SQLite schema migrations", () => {
       expect(columns("flowboard_project_documents")).toEqual(
         expect.arrayContaining(["document_key", "section", "source", "type", "system"]),
       );
+      expect(columns("flowboard_cards")).toEqual(
+        expect.arrayContaining(["revision", "claim_owner_id"]),
+      );
       expect(indexes("flowboard_cards")).toContain("flowboard_cards_board_milestone_position_idx");
+      expect(indexes("flowboard_cards")).toContain("flowboard_cards_claim_owner_idx");
       expect(
         db
-          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-6'")
+          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-7'")
           .get(),
       ).toBeTruthy();
       expect(legacy).toMatchObject({
@@ -231,7 +235,7 @@ describe("Flowboard SQLite schema migrations", () => {
       );
       expect(
         db
-          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-6'")
+          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-7'")
           .get(),
       ).toBeTruthy();
       expect(legacyDocument).toMatchObject({

@@ -57,6 +57,7 @@ import {
   normalizeStringList,
   removeUndefinedMetadataFields,
 } from "./store-normalizers.js";
+import { FlowboardRevisionConflictError } from "./store-core.js";
 import { FlowboardPromoteStore } from "./store-promote.js";
 
 function assertClaimIdentity(claim: FlowboardClaim, input: FlowboardHeartbeatInput): void {
@@ -73,19 +74,20 @@ function assertClaimIdentity(claim: FlowboardClaim, input: FlowboardHeartbeatInp
 export class FlowboardWorkflowStore extends FlowboardPromoteStore {
   async claimExecution(
     id: string,
-    input: { ownerId?: unknown; expectedUpdatedAt?: unknown; ttlSeconds?: unknown },
+    input: { ownerId?: unknown; expectedRevision?: unknown; ttlSeconds?: unknown },
   ): Promise<{ card: FlowboardCard; token: string }> {
     const ownerId = normalizeBoundedString(input.ownerId, undefined, 120, "claim owner");
     if (!ownerId) {
       throw new Error("claim ownerId is required.");
     }
     if (
-      typeof input.expectedUpdatedAt !== "number" ||
-      !Number.isSafeInteger(input.expectedUpdatedAt) ||
-      input.expectedUpdatedAt < 0
+      typeof input.expectedRevision !== "number" ||
+      !Number.isSafeInteger(input.expectedRevision) ||
+      input.expectedRevision < 0
     ) {
-      throw new Error("expectedUpdatedAt is required.");
+      throw new Error("expectedRevision is required.");
     }
+    const expectedRevision = input.expectedRevision;
     const ttlSeconds =
       typeof input.ttlSeconds === "number" && Number.isFinite(input.ttlSeconds)
         ? Math.max(1, Math.trunc(input.ttlSeconds))
@@ -95,8 +97,8 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       if (!existing) {
         throw new Error(`card not found: ${id}`);
       }
-      if (existing.updatedAt !== input.expectedUpdatedAt) {
-        throw new Error("card changed since execution was prepared.");
+      if (existing.revision !== expectedRevision) {
+        throw new FlowboardRevisionConflictError(id, expectedRevision);
       }
       if (existing.metadata?.archivedAt) {
         throw new Error("card is archived.");
@@ -124,12 +126,17 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS,
       );
-      const card = await this.updateCard(id, {
-        metadata: {
-          ...clearDiagnostics(existing.metadata, ["stranded_ready"]),
-          claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt },
+      const card = await this.updateCard(
+        id,
+        {
+          metadata: {
+            ...clearDiagnostics(existing.metadata, ["stranded_ready"]),
+            claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt },
+          },
         },
-      });
+        // Admission decision: the database, not this process, decides who won.
+        { expectedRevision },
+      );
       return { card, token };
     });
   }
@@ -237,6 +244,20 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
         : undefined;
     const token =
       normalizeBoundedString(input.token, undefined, 160, "claim token") ?? randomUUID();
+    // On a lost compare-and-swap the guards below re-evaluate against fresh
+    // state, so a genuine competing claim surfaces as "already claimed" rather
+    // than as a revision conflict the caller cannot act on.
+    return await this.retryOnRevisionConflict(
+      async () => await this.claimOnce(id, { ownerId, ttlSeconds, token }, options),
+    );
+  }
+
+  private async claimOnce(
+    id: string,
+    input: { ownerId: string; ttlSeconds: number | undefined; token: string },
+    options: FlowboardClaimOptions,
+  ): Promise<{ card: FlowboardCard; token: string }> {
+    const { ownerId, ttlSeconds, token } = input;
     return await this.enqueueMutation(async () => {
       const now = Date.now();
       const expiresAt = addFlowboardDurationMs(
@@ -293,12 +314,19 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
           ? await this.updateCard(id, { workspaceAccess: options.adoptWorkspaceAccess })
           : guarded;
       const metadata = clearDiagnostics(claimable.metadata, ["stranded_ready"]);
-      const card = await this.updateCard(id, {
-        metadata: {
-          ...metadata,
-          claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt },
+      const card = await this.updateCard(
+        id,
+        {
+          metadata: {
+            ...metadata,
+            claim: { ownerId, token, claimedAt: now, lastHeartbeatAt: now, expiresAt },
+          },
         },
-      });
+        // Close the window between deciding the card is unclaimed and writing the
+        // claim. Another Gateway process claiming in that gap loses this swap
+        // instead of silently overwriting a live worker's token.
+        { expectedRevision: claimable.revision },
+      );
       const next = await this.updateCard(card.id, {
         status:
           card.status === "backlog" || card.status === "todo" || card.status === "ready"

@@ -305,7 +305,14 @@ export class FlowboardStore extends FlowboardProjectStore {
   }
 
   static openSqlite() {
-    const stores = createFlowboardSqliteStores();
+    return FlowboardStore.fromSqliteStores(createFlowboardSqliteStores());
+  }
+
+  /**
+   * Single wiring point from SQLite stores to a card store. Tests use this too,
+   * so a newly added capability cannot be silently missing under test only.
+   */
+  static fromSqliteStores(stores: ReturnType<typeof createFlowboardSqliteStores>) {
     return new FlowboardStore(stores.cards, {
       boards: stores.boards,
       milestones: stores.milestones,
@@ -313,6 +320,8 @@ export class FlowboardStore extends FlowboardProjectStore {
       subscriptions: stores.subscriptions,
       attachments: stores.attachments,
       dataVersion: stores.dataVersion,
+      changeEpoch: stores.changeEpoch,
+      reserveChangeRevisions: stores.reserveChangeRevisions,
     });
   }
 }

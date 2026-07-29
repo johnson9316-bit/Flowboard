@@ -150,7 +150,7 @@ describe("Flowboard native card execution", () => {
 
     expect(prepared).toMatchObject({
       cardId: card.id,
-      expectedUpdatedAt: card.updatedAt,
+      expectedRevision: card.revision,
       active: false,
       agentId: "main",
       sourceCheckout: checkout,
@@ -164,10 +164,10 @@ describe("Flowboard native card execution", () => {
       startFlowboardCardExecution({
         store,
         id: card.id,
-        expectedUpdatedAt: prepared.expectedUpdatedAt,
+        expectedRevision: prepared.expectedRevision,
         options,
       }),
-    ).rejects.toThrow("changed since execution was prepared");
+    ).rejects.toThrow(`card ${card.id} changed since revision ${prepared.expectedRevision}`);
     expect(changed.status).toBe("done");
     expect((options.runtime.worktrees.create as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
     runId = "run-2";
@@ -190,7 +190,7 @@ describe("Flowboard native card execution", () => {
     const started = await startFlowboardCardExecution({
       store,
       id: card.id,
-      expectedUpdatedAt: prepared.expectedUpdatedAt,
+      expectedRevision: prepared.expectedRevision,
       options,
     });
     claimToken = started.card.metadata?.claim?.token ?? "";
@@ -229,7 +229,7 @@ describe("Flowboard native card execution", () => {
       startFlowboardCardExecution({
         store,
         id: card.id,
-        expectedUpdatedAt: activePreparation.expectedUpdatedAt,
+        expectedRevision: activePreparation.expectedRevision,
         options,
       }),
     ).rejects.toThrow("already has an active execution");
@@ -300,7 +300,7 @@ describe("Flowboard native card execution", () => {
     await startFlowboardCardExecution({
       store,
       id: card.id,
-      expectedUpdatedAt: prepared.expectedUpdatedAt,
+      expectedRevision: prepared.expectedRevision,
       options,
     });
 

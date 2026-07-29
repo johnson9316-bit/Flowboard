@@ -44,4 +44,12 @@ export type FlowboardKeyedStore<T = PersistedFlowboardCard> = {
   lookup(key: string): Promise<T | undefined>;
   delete(key: string): Promise<boolean>;
   entries(): Promise<Array<{ key: string; value: T }>>;
+  /**
+   * Conditional write: persist `value` only if the stored row still carries
+   * `expectedRevision`, and report whether it did. Backends that implement this
+   * must perform the check and the write in one atomic unit so concurrent
+   * processes cannot both win. Optional: callers fall back to a
+   * read-compare-write guarded only by the in-process mutation queue.
+   */
+  compareAndSwap?(key: string, expectedRevision: number, value: T): Promise<boolean>;
 };

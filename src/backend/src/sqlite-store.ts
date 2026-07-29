@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
@@ -32,7 +33,7 @@ import type {
   FlowboardKeyedStore,
 } from "./persistence-types.js";
 const FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"] as const;
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 const FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const FLOWBOARD_SQLITE_DIR_MODE = 0o700;
 const FLOWBOARD_SQLITE_FILE_MODE = 0o600;
@@ -45,6 +46,8 @@ type FlowboardSqliteStores = {
   subscriptions: FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>;
   attachments: FlowboardKeyedStore<PersistedFlowboardAttachment>;
   dataVersion: () => number;
+  changeEpoch: string;
+  reserveChangeRevisions: (count: number) => number;
   close: () => void;
 };
 
@@ -141,6 +144,10 @@ function ensureColumn(db: DatabaseSync, tableName: string, columnName: string, d
 }
 
 const FLOWBOARD_SCHEMA_SQL = `
+    CREATE TABLE IF NOT EXISTS flowboard_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    ) STRICT;
     CREATE TABLE IF NOT EXISTS flowboard_schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
@@ -453,9 +460,17 @@ function ensureFlowboardSchema(db: DatabaseSync): void {
     "source",
     "source TEXT NOT NULL DEFAULT 'project'",
   );
+  // Optimistic-concurrency token. Rows written before this column existed read
+  // back as 0, which the revision helper treats as "not yet stamped".
+  ensureColumn(db, "flowboard_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
+  // Claim owner is also inside claim_json, but only a real column can be indexed
+  // for the dispatcher's per-owner capacity aggregate.
+  ensureColumn(db, "flowboard_cards", "claim_owner_id", "claim_owner_id TEXT");
   db.exec(`
     CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
       ON flowboard_cards(board_id, milestone_id, position);
+    CREATE INDEX IF NOT EXISTS flowboard_cards_claim_owner_idx
+      ON flowboard_cards(claim_owner_id, status);
   `);
   const migrationId = `schema-${SCHEMA_VERSION}`;
   const current = db
@@ -466,6 +481,54 @@ function ensureFlowboardSchema(db: DatabaseSync): void {
       "INSERT OR IGNORE INTO flowboard_schema_migrations (id, applied_at) VALUES (?, ?)",
     ).run(migrationId, Date.now());
   }
+}
+
+/**
+ * Change-cursor identity for this database, created once and then reused by every
+ * process that opens it. A per-process identity would invalidate every connected
+ * UI's long-wait cursor on each Gateway restart and force a full board reload.
+ */
+function ensureChangeEpoch(db: DatabaseSync): string {
+  const existing = db
+    .prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'")
+    .get() as Row | undefined;
+  const current = existing ? stringValue(existing, "value") : undefined;
+  if (current) {
+    return current;
+  }
+  const epoch = randomUUID();
+  db.prepare("INSERT OR IGNORE INTO flowboard_meta (key, value) VALUES ('change_epoch', ?)").run(
+    epoch,
+  );
+  const stored = db
+    .prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'")
+    .get() as Row | undefined;
+  // Another process may have inserted first; its value is the one that counts.
+  return (stored ? stringValue(stored, "value") : undefined) ?? epoch;
+}
+
+/**
+ * Hands out a reserved range of change revisions and durably records that it is
+ * spent, so a restarted process resumes above every revision any previous process
+ * emitted. Reserving in blocks keeps this to one write per block rather than one
+ * per change; a clock-derived seed was rejected because two processes starting in
+ * the same millisecond can otherwise reuse a revision a client already saw.
+ */
+function reserveChangeRevisions(db: DatabaseSync, count: number): number {
+  return runTransaction(db, () => {
+    const row = db
+      .prepare("SELECT value FROM flowboard_meta WHERE key = 'change_revision'")
+      .get() as Row | undefined;
+    const stored = Number.parseInt(row ? (stringValue(row, "value") ?? "") : "", 10);
+    const base = Number.isSafeInteger(stored) && stored > 0 ? stored : 0;
+    db.prepare(
+      `
+        INSERT INTO flowboard_meta (key, value) VALUES ('change_revision', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `,
+    ).run(String(base + count));
+    return base;
+  });
 }
 
 function chmodIfExists(targetPath: string, mode: number): void {
@@ -886,6 +949,7 @@ function readCard(db: DatabaseSync, row: Row): FlowboardCard {
     position: requiredNumber(row, "position"),
     createdAt: requiredNumber(row, "created_at"),
     updatedAt: requiredNumber(row, "updated_at"),
+    revision: numberValue(row, "revision") ?? 0,
   };
   const metadata = readMetadata(db, row);
   const delivery = readDelivery(db, card.id);
@@ -953,14 +1017,14 @@ function insertCard(db: DatabaseSync, card: FlowboardCard): void {
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
         execution_model, execution_session_key, execution_run_id, execution_started_at,
         execution_updated_at, automation_json, claim_json, template_id, archived_at, stale_json,
-        lifecycle_status_source_updated_at, failure_count
+        lifecycle_status_source_updated_at, failure_count, revision, claim_owner_id
       ) VALUES (
         @id, @board_id, @title, @notes, @status, @priority, @agent_id, @session_key, @run_id,
         @task_id, @source_url, @milestone_id, @position, @created_at, @updated_at, @started_at, @completed_at,
         @execution_id, @execution_kind, @execution_engine, @execution_mode, @execution_status,
         @execution_model, @execution_session_key, @execution_run_id, @execution_started_at,
         @execution_updated_at, @automation_json, @claim_json, @template_id, @archived_at,
-        @stale_json, @lifecycle_status_source_updated_at, @failure_count
+        @stale_json, @lifecycle_status_source_updated_at, @failure_count, @revision, @claim_owner_id
       )
       ON CONFLICT(id) DO UPDATE SET
         board_id = excluded.board_id,
@@ -995,7 +1059,9 @@ function insertCard(db: DatabaseSync, card: FlowboardCard): void {
         archived_at = excluded.archived_at,
         stale_json = excluded.stale_json,
         lifecycle_status_source_updated_at = excluded.lifecycle_status_source_updated_at,
-        failure_count = excluded.failure_count
+        failure_count = excluded.failure_count,
+        revision = excluded.revision,
+        claim_owner_id = excluded.claim_owner_id
     `,
   ).run({
     id: card.id,
@@ -1032,6 +1098,8 @@ function insertCard(db: DatabaseSync, card: FlowboardCard): void {
     stale_json: jsonValue(metadata?.stale),
     lifecycle_status_source_updated_at: bindNull(metadata?.lifecycleStatusSourceUpdatedAt),
     failure_count: bindNull(metadata?.failureCount),
+    revision: card.revision,
+    claim_owner_id: bindNull(metadata?.claim?.ownerId),
   });
 
   insertChildren(db, "flowboard_card_labels", card.id, card.labels, (label, ordinal) => {
@@ -1309,6 +1377,28 @@ class FlowboardSqliteCardStore implements FlowboardKeyedStore {
       throw new Error("invalid flowboard card payload");
     }
     runTransaction(this.db, () => insertCard(this.db, value.card));
+  }
+
+  async compareAndSwap(
+    key: string,
+    expectedRevision: number,
+    value: PersistedFlowboardCard,
+  ): Promise<boolean> {
+    if (value.version !== 1 || value.card.id !== key) {
+      throw new Error("invalid flowboard card payload");
+    }
+    // BEGIN IMMEDIATE takes the write lock before the revision is read, so a
+    // concurrent process in another Gateway cannot pass the same check.
+    return runTransaction(this.db, () => {
+      const row = this.db.prepare("SELECT revision FROM flowboard_cards WHERE id = ?").get(key) as
+        | Row
+        | undefined;
+      if (!row || (numberValue(row, "revision") ?? 0) !== expectedRevision) {
+        return false;
+      }
+      insertCard(this.db, value.card);
+      return true;
+    });
   }
 
   async lookup(key: string): Promise<PersistedFlowboardCard | undefined> {
@@ -1879,6 +1969,8 @@ export function createFlowboardSqliteStores(
     // This connection-local primitive changes only after another connection commits.
     dataVersion: () =>
       requiredNumber(db.prepare("PRAGMA data_version").get() as Row, "data_version"),
+    changeEpoch: ensureChangeEpoch(db),
+    reserveChangeRevisions: (count: number) => reserveChangeRevisions(db, count),
     close: () => {
       maintenance.close();
       db.close();

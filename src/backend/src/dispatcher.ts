@@ -87,8 +87,6 @@ type FlowboardDispatchStartParams = {
   options?: FlowboardDispatchStartOptions;
 };
 
-const pendingFlowboardDispatches = new WeakMap<FlowboardStore, Promise<void>>();
-
 function normalizePositiveInteger(value: number | undefined, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.trunc(value))
@@ -310,24 +308,11 @@ function selectStartableCards(
 export async function dispatchAndStartFlowboardCards(
   params: FlowboardDispatchStartParams,
 ): Promise<FlowboardDispatchAndStartResult> {
-  const previous = pendingFlowboardDispatches.get(params.store);
-  // Board filters must share their store's owner-capacity snapshot; otherwise
-  // simultaneous passes can claim different cards for the same active worker.
-  const dispatch = previous
-    ? previous.then(() => runFlowboardDispatch(params))
-    : runFlowboardDispatch(params);
-  const settled = dispatch.then(
-    () => undefined,
-    () => undefined,
-  );
-  pendingFlowboardDispatches.set(params.store, settled);
-  try {
-    return await dispatch;
-  } finally {
-    if (pendingFlowboardDispatches.get(params.store) === settled) {
-      pendingFlowboardDispatches.delete(params.store);
-    }
-  }
+  // Simultaneous passes no longer need to be serialized here: each start commits
+  // its claim through a database compare-and-swap, so a card can only be claimed
+  // once even when the passes come from different Gateway processes. Overlapping
+  // passes may now select the same card, and the loser records a start failure.
+  return await runFlowboardDispatch(params);
 }
 
 async function runFlowboardDispatch(
@@ -504,7 +489,10 @@ async function runFlowboardDispatch(
         ...(params.options?.provider ? { provider: params.options.provider } : {}),
         ...(params.options?.model ? { model: params.options.model } : {}),
         lane: `flowboard:${cardBoardId(card)}:${card.id}`,
-        idempotencyKey: `flowboard:${card.id}:${claimed.card.updatedAt}`,
+        // Keyed on the winning claim token, which is minted once per claim and so
+        // identifies exactly this dispatch attempt. A millisecond timestamp could
+        // collide between two attempts and changed on unrelated card writes.
+        idempotencyKey: `flowboard:${card.id}:${claimValue}`,
         lightContext: true,
         deliver: false,
         ...(runCwd ? { cwd: runCwd } : {}),
