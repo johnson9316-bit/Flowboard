@@ -101,7 +101,7 @@ describe("Flowboard M2 project store", () => {
       name: "Alpha",
       initialMilestoneTitle: "Build",
     });
-    await store.createProject({
+    const beta = await store.createProject({
       id: "beta",
       name: "Beta",
       initialMilestoneTitle: "Launch",
@@ -122,7 +122,13 @@ describe("Flowboard M2 project store", () => {
     });
 
     const unassigned = await store.moveMilestone(card.id, {});
-    const moved = await store.moveProject(card.id, { boardId: "beta" });
+    await expect(store.moveProject(card.id, { boardId: "beta" })).rejects.toThrow(
+      "target milestone is required",
+    );
+    const moved = await store.moveProject(card.id, {
+      boardId: "beta",
+      milestoneId: beta.milestones[0]?.id,
+    });
 
     expect(unassigned).toMatchObject({
       id: card.id,
@@ -140,7 +146,7 @@ describe("Flowboard M2 project store", () => {
       execution: card.execution,
       metadata: { automation: { boardId: "beta" } },
     });
-    expect(moved.milestoneId).toBeUndefined();
+    expect(moved.milestoneId).toBe(beta.milestones[0]?.id);
   });
 
   it("uses Unassigned by default, inherits a parent milestone, and enforces milestone completion", async () => {

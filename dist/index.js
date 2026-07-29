@@ -7146,6 +7146,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       if (!card) {
         throw new Error(`card not found: ${id}`);
       }
+      const currentBoardId = cardBoardId(card);
       const boardId = normalizeBoardIdRequired(input.boardId);
       const targetBoard = await this.boardStore.lookup(boardId);
       if (!targetBoard && (await this.list({ boardId })).length === 0 && boardId !== "default") {
@@ -7154,6 +7155,9 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       await this.assertProjectCanReceiveCards(boardId);
       await this.ensureProjectDirect(boardId);
       const milestoneId = normalizeOptionalString(input.milestoneId);
+      if (boardId !== currentBoardId && !milestoneId) {
+        throw new Error("target milestone is required when moving a card to another project.");
+      }
       if (milestoneId) {
         const milestone = await this.milestoneStore.lookup(milestoneId);
         if (!milestone?.milestone || milestone.milestone.boardId !== boardId || milestone.milestone.state !== "active") {

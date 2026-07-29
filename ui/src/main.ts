@@ -188,7 +188,7 @@ class FlowboardProjectHost extends LitElement {
             "flowboard.projects.documents.list",
             {
               boardId: selectedId,
-              includeHidden: this.state.showHiddenDocuments,
+              includeHidden: true,
             },
           );
           if (generation !== this.refreshGeneration) {
@@ -364,19 +364,77 @@ class FlowboardProjectHost extends LitElement {
     }, { closeModal: false });
   }
 
-  private moveCardProject(id: string, boardId: string) {
+  private moveCardProject(id: string, boardId: string, milestoneId: string) {
     const target = this.state.projects.find((project) => project.id === boardId);
-    if (
-      !target ||
-      !window.confirm(
-        i18n.t("flowboardProject.moveProjectConfirm", { project: target.name || target.id }),
-      )
-    ) {
+    if (!target || !milestoneId) {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.moveProject", { id, boardId });
+      await this.gateway.request("flowboard.cards.moveProject", { id, boardId, milestoneId });
     });
+  }
+
+  private selectMoveCardProjectTarget(cardId: string, boardId: string) {
+    if (!boardId) {
+      this.state.modal = { kind: "move-project", cardId };
+      this.requestUpdate();
+      return;
+    }
+    this.state.modal = { kind: "move-project", cardId, boardId };
+    this.state.busy = true;
+    this.state.error = null;
+    this.requestUpdate();
+    void this.gateway
+      .request<ProjectResponse>("flowboard.projects.get", { id: boardId })
+      .then((response) => {
+        const modal = this.state.modal;
+        if (
+          modal?.kind === "move-project" &&
+          modal.cardId === cardId &&
+          modal.boardId === boardId
+        ) {
+          this.state.modal = { ...modal, targetProject: response.project };
+        }
+      })
+      .catch((error) => {
+        this.state.error = errorMessage(error);
+      })
+      .finally(() => {
+        this.state.busy = false;
+        this.requestUpdate();
+      });
+  }
+
+  private reorderProjects(ids: string[]) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.projects.reorder", { ids });
+    }, { closeModal: false });
+  }
+
+  private reorderMilestones(milestoneIds: string[]) {
+    const project = this.state.project;
+    if (!project || project.board.archivedAt) {
+      return;
+    }
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.projects.milestones.reorder", {
+        boardId: project.board.id,
+        milestoneIds,
+      });
+    }, { closeModal: false });
+  }
+
+  private reorderDocuments(documentIds: string[]) {
+    const project = this.state.project;
+    if (!project) {
+      return;
+    }
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.projects.documents.reorder", {
+        boardId: project.board.id,
+        documentIds,
+      });
+    }, { closeModal: false });
   }
 
   private saveMilestone(data: Record<string, string>) {
@@ -480,7 +538,13 @@ class FlowboardProjectHost extends LitElement {
       archiveCard: (id, archived) => this.archiveCard(id, archived),
       moveCardMilestone: (id, milestoneId, position) =>
         this.moveCardMilestone(id, milestoneId, position),
-      moveCardProject: (id, boardId) => this.moveCardProject(id, boardId),
+      moveCardProject: (id, boardId, milestoneId) =>
+        this.moveCardProject(id, boardId, milestoneId),
+      selectMoveCardProjectTarget: (cardId, boardId) =>
+        this.selectMoveCardProjectTarget(cardId, boardId),
+      reorderProjects: (ids) => this.reorderProjects(ids),
+      reorderMilestones: (ids) => this.reorderMilestones(ids),
+      reorderDocuments: (ids) => this.reorderDocuments(ids),
       saveMilestone: (data) => this.saveMilestone(data),
       completeMilestone: (id) => this.completeMilestone(id),
       archiveMilestone: (id, archived) => this.archiveMilestone(id, archived),

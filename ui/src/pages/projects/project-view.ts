@@ -46,7 +46,14 @@ export type FlowboardProjectModal =
   | { kind: "card"; milestoneId?: string }
   | { kind: "milestone"; milestone?: FlowboardMilestone }
   | { kind: "document"; document?: FlowboardProjectDocument }
-  | { kind: "card-detail"; cardId: string };
+  | { kind: "card-detail"; cardId: string }
+  | {
+      kind: "move-project";
+      cardId: string;
+      boardId?: string;
+      milestoneId?: string;
+      targetProject?: FlowboardProjectView;
+    };
 
 export type FlowboardProjectUiState = {
   loading: boolean;
@@ -81,7 +88,11 @@ export type FlowboardProjectViewController = {
   updateCardStatus: (id: string, status: FlowboardStatus) => void;
   archiveCard: (id: string, archived: boolean) => void;
   moveCardMilestone: (id: string, milestoneId?: string, position?: number) => void;
-  moveCardProject: (id: string, boardId: string) => void;
+  moveCardProject: (id: string, boardId: string, milestoneId: string) => void;
+  selectMoveCardProjectTarget: (cardId: string, boardId: string) => void;
+  reorderProjects: (ids: string[]) => void;
+  reorderMilestones: (ids: string[]) => void;
+  reorderDocuments: (ids: string[]) => void;
   saveMilestone: (data: Record<string, string>) => void;
   completeMilestone: (id: string) => void;
   archiveMilestone: (id: string, archived: boolean) => void;
@@ -156,6 +167,27 @@ function readForm(event: SubmitEvent): Record<string, string> {
   );
 }
 
+export function reorderVisibleItemIds<T extends { id: string }>(
+  allItems: readonly T[],
+  visibleItems: readonly T[],
+  id: string,
+  direction: -1 | 1,
+): string[] | undefined {
+  const visibleIndex = visibleItems.findIndex((item) => item.id === id);
+  const target = visibleItems[visibleIndex + direction];
+  if (visibleIndex < 0 || !target) {
+    return undefined;
+  }
+  const ids = allItems.map((item) => item.id);
+  const sourceIndex = ids.indexOf(id);
+  const targetIndex = ids.indexOf(target.id);
+  if (sourceIndex < 0 || targetIndex < 0) {
+    return undefined;
+  }
+  [ids[sourceIndex], ids[targetIndex]] = [ids[targetIndex]!, ids[sourceIndex]!];
+  return ids;
+}
+
 function renderStatusOptions(selected: FlowboardStatus) {
   return STATUSES.map(
     (status) =>
@@ -168,6 +200,34 @@ function renderPriorityOptions(selected: FlowboardPriority) {
     (priority) =>
       html`<option value=${priority} ?selected=${priority === selected}>${priority}</option>`,
   );
+}
+
+function renderOrderControls(params: {
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  return html`
+    <div class="flowboard-project__order-actions">
+      <button
+        class="flowboard-project__icon-button flowboard-project__order-button"
+        type="button"
+        title=${t("flowboardProject.moveUp")}
+        aria-label=${t("flowboardProject.moveUp")}
+        ?disabled=${!params.canMoveUp}
+        @click=${params.onMoveUp}
+      >&#8593;</button>
+      <button
+        class="flowboard-project__icon-button flowboard-project__order-button"
+        type="button"
+        title=${t("flowboardProject.moveDown")}
+        aria-label=${t("flowboardProject.moveDown")}
+        ?disabled=${!params.canMoveDown}
+        @click=${params.onMoveDown}
+      >&#8595;</button>
+    </div>
+  `;
 }
 
 function renderProjectList(controller: FlowboardProjectViewController) {
@@ -215,22 +275,33 @@ function renderProjectList(controller: FlowboardProjectViewController) {
       <div class="flowboard-project__project-list" role="list">
         ${projects.length
           ? projects.map(
-              (project) => html`
-                <button
-                  class="flowboard-project__nav-project ${state.selectedProjectId === project.id
-                    ? "is-selected"
-                    : ""}"
-                  type="button"
-                  role="listitem"
-                  @click=${() => controller.selectProject(project.id)}
-                >
-                  <span class="flowboard-project__project-color" style=${project.color ? `--project-color:${project.color}` : ""}></span>
-                  <span class="flowboard-project__nav-project-name">${boardName(project)}</span>
-                  ${project.archivedAt
-                    ? html`<small>${t("flowboardProject.archived")}</small>`
-                    : html`<small>${projectCardCount(project)}</small>`}
-                </button>
-              `,
+              (project) => {
+                const moveUp = reorderVisibleItemIds(state.projects, projects, project.id, -1);
+                const moveDown = reorderVisibleItemIds(state.projects, projects, project.id, 1);
+                return html`
+                  <div class="flowboard-project__project-row" role="listitem">
+                    <button
+                      class="flowboard-project__nav-project ${state.selectedProjectId === project.id
+                        ? "is-selected"
+                        : ""}"
+                      type="button"
+                      @click=${() => controller.selectProject(project.id)}
+                    >
+                      <span class="flowboard-project__project-color" style=${project.color ? `--project-color:${project.color}` : ""}></span>
+                      <span class="flowboard-project__nav-project-name">${boardName(project)}</span>
+                      ${project.archivedAt
+                        ? html`<small>${t("flowboardProject.archived")}</small>`
+                        : html`<small>${projectCardCount(project)}</small>`}
+                    </button>
+                    ${renderOrderControls({
+                      canMoveUp: Boolean(moveUp),
+                      canMoveDown: Boolean(moveDown),
+                      onMoveUp: () => moveUp && controller.reorderProjects(moveUp),
+                      onMoveDown: () => moveDown && controller.reorderProjects(moveDown),
+                    })}
+                  </div>
+                `;
+              },
             )
           : html`<p class="flowboard-project__empty-side">${t("flowboardProject.emptyProject")}</p>`}
       </div>
@@ -297,6 +368,7 @@ function renderCard(
   controller: FlowboardProjectViewController,
   card: FlowboardCard,
   milestoneId: string | undefined,
+  cards: readonly FlowboardCard[],
 ) {
   const { state } = controller;
   const project = state.project;
@@ -305,6 +377,9 @@ function renderCard(
   }
   const archived = isArchivedCard(card);
   const isProjectArchived = Boolean(project.board.archivedAt);
+  const cardIndex = cards.findIndex((candidate) => candidate.id === card.id);
+  const previousCard = cards[cardIndex - 1];
+  const nextCard = cards[cardIndex + 1];
   return html`
     <article
       class="flowboard-project__card ${archived ? "is-archived" : ""}"
@@ -371,6 +446,20 @@ function renderCard(
               `,
             )}
         </select>
+        ${renderOrderControls({
+          canMoveUp: !archived && !isProjectArchived && Boolean(previousCard),
+          canMoveDown: !archived && !isProjectArchived && Boolean(nextCard),
+          onMoveUp: () =>
+            previousCard &&
+            controller.moveCardMilestone(
+              card.id,
+              milestoneId,
+              Math.max(0, previousCard.position - 1),
+            ),
+          onMoveDown: () =>
+            nextCard &&
+            controller.moveCardMilestone(card.id, milestoneId, nextCard.position + 1),
+        })}
       </div>
       ${archived ? html`<span class="flowboard-project__card-archived">${t("flowboardProject.archived")}</span>` : nothing}
     </article>
@@ -391,6 +480,13 @@ function renderColumn(
   const { state } = controller;
   const projectArchived = Boolean(state.project?.board.archivedAt);
   const { milestone } = params;
+  const milestones = state.project?.milestones ?? [];
+  const moveMilestoneUp = milestone
+    ? reorderVisibleItemIds(milestones, milestones, milestone.id, -1)
+    : undefined;
+  const moveMilestoneDown = milestone
+    ? reorderVisibleItemIds(milestones, milestones, milestone.id, 1)
+    : undefined;
   return html`
     <section
       class="flowboard-project__column ${params.state ? `is-${params.state}` : "is-unassigned"}"
@@ -411,6 +507,13 @@ function renderColumn(
         <div class="flowboard-project__column-actions">
           ${milestone
             ? html`
+                ${renderOrderControls({
+                  canMoveUp: !projectArchived && Boolean(moveMilestoneUp),
+                  canMoveDown: !projectArchived && Boolean(moveMilestoneDown),
+                  onMoveUp: () => moveMilestoneUp && controller.reorderMilestones(moveMilestoneUp),
+                  onMoveDown: () =>
+                    moveMilestoneDown && controller.reorderMilestones(moveMilestoneDown),
+                })}
                 <button
                   class="flowboard-project__icon-button"
                   type="button"
@@ -453,7 +556,7 @@ function renderColumn(
       </header>
       <div class="flowboard-project__card-list">
         ${params.cards.length
-          ? params.cards.map((card) => renderCard(controller, card, params.id))
+          ? params.cards.map((card) => renderCard(controller, card, params.id, params.cards))
           : html`<p class="flowboard-project__empty-column">${t("flowboardProject.emptyColumn")}</p>`}
       </div>
     </section>
@@ -608,15 +711,22 @@ function renderDocumentSection(
   controller: FlowboardProjectViewController,
   section: FlowboardProjectDocumentSection,
 ) {
-  const documents = controller.state.documents.filter((document) => document.section === section);
+  const sectionDocuments = controller.state.documents.filter(
+    (document) => document.section === section,
+  );
+  const documents = sectionDocuments.filter(
+    (document) => controller.state.showHiddenDocuments || !document.hiddenAt,
+  );
   return html`
     <section class="flowboard-project__document-section">
       <h2>${sectionLabel(section)}</h2>
       ${documents.length
         ? html`
             <div class="flowboard-project__document-list">
-              ${documents.map(
-                (document) => html`
+              ${documents.map((document) => {
+                const moveUp = reorderVisibleItemIds(sectionDocuments, documents, document.id, -1);
+                const moveDown = reorderVisibleItemIds(sectionDocuments, documents, document.id, 1);
+                return html`
                   <article class="flowboard-project__document ${document.hiddenAt ? "is-hidden" : ""}">
                     <button
                       class="flowboard-project__document-main"
@@ -628,6 +738,12 @@ function renderDocumentSection(
                       ${document.summary ? html`<p>${document.summary}</p>` : nothing}
                     </button>
                     <div class="flowboard-project__document-actions">
+                      ${renderOrderControls({
+                        canMoveUp: Boolean(moveUp),
+                        canMoveDown: Boolean(moveDown),
+                        onMoveUp: () => moveUp && controller.reorderDocuments(moveUp),
+                        onMoveDown: () => moveDown && controller.reorderDocuments(moveDown),
+                      })}
                       <button
                         class="flowboard-project__icon-button"
                         type="button"
@@ -646,8 +762,8 @@ function renderDocumentSection(
                         : nothing}
                     </div>
                   </article>
-                `,
-              )}
+                `;
+              })}
             </div>
           `
         : html`<p class="flowboard-project__empty-column">${t("flowboardProject.noDocuments")}</p>`}
@@ -751,23 +867,14 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
         </label>
         ${otherProjects.length
           ? html`
-              <label>
+              <button
+                class="btn"
+                type="button"
+                ?disabled=${Boolean(project.board.archivedAt)}
+                @click=${() => controller.openModal({ kind: "move-project", cardId: card.id })}
+              >
                 ${t("flowboardProject.moveToProject")}
-                <select
-                  @change=${(event: Event) => {
-                    const target = (event.currentTarget as HTMLSelectElement).value;
-                    if (target) {
-                      controller.moveCardProject(card.id, target);
-                    }
-                  }}
-                >
-                  <option value="">${t("flowboardProject.moveToProject")}</option>
-                  ${otherProjects.map(
-                    (candidate) =>
-                      html`<option value=${candidate.id}>${boardName(candidate)}</option>`,
-                  )}
-                </select>
-              </label>
+              </button>
             `
           : nothing}
       </div>
@@ -797,6 +904,81 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
   `;
 }
 
+function renderMoveProjectModal(
+  controller: FlowboardProjectViewController,
+  modal: Extract<FlowboardProjectModal, { kind: "move-project" }>,
+) {
+  const project = controller.state.project;
+  const card = project?.cards.find((candidate) => candidate.id === modal.cardId);
+  if (!card) {
+    return nothing;
+  }
+  const otherProjects = controller.state.projects.filter(
+    (candidate) => candidate.id !== boardId(card) && !candidate.archivedAt,
+  );
+  const activeMilestones = modal.targetProject?.milestones.filter(
+    (milestone) => milestone.state === "active",
+  ) ?? [];
+  const canMove = Boolean(modal.boardId && modal.milestoneId && !controller.state.busy);
+  return html`
+    <form
+      class="flowboard-project__modal-panel"
+      @submit=${(event: SubmitEvent) => {
+        event.preventDefault();
+        if (modal.boardId && modal.milestoneId) {
+          controller.moveCardProject(card.id, modal.boardId, modal.milestoneId);
+        }
+      }}
+    >
+      <header><h2>${t("flowboardProject.moveToProject")}</h2></header>
+      <p class="flowboard-project__move-card-title">${card.title}</p>
+      <label>
+        ${t("flowboardProject.moveToProject")}
+        <select
+          .value=${modal.boardId ?? ""}
+          ?disabled=${controller.state.busy}
+          @change=${(event: Event) =>
+            controller.selectMoveCardProjectTarget(
+              card.id,
+              (event.currentTarget as HTMLSelectElement).value,
+            )}
+        >
+          <option value="">${t("flowboardProject.selectTargetProject")}</option>
+          ${otherProjects.map(
+            (candidate) => html`<option value=${candidate.id}>${boardName(candidate)}</option>`,
+          )}
+        </select>
+      </label>
+      <label>
+        ${t("flowboardProject.targetMilestone")}
+        <select
+          .value=${modal.milestoneId ?? ""}
+          ?disabled=${controller.state.busy || !modal.targetProject || activeMilestones.length === 0}
+          @change=${(event: Event) =>
+            controller.openModal({
+              ...modal,
+              milestoneId: (event.currentTarget as HTMLSelectElement).value || undefined,
+            })}
+        >
+          <option value="">${t("flowboardProject.selectTargetMilestone")}</option>
+          ${activeMilestones.map(
+            (milestone) => html`<option value=${milestone.id}>${milestone.title}</option>`,
+          )}
+        </select>
+      </label>
+      ${modal.targetProject && activeMilestones.length === 0
+        ? html`<p class="flowboard-project__empty-column">${t("flowboardProject.noActiveMilestones")}</p>`
+        : nothing}
+      <footer>
+        <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
+        <button class="btn btn--primary" type="submit" ?disabled=${!canMove}>
+          ${t("flowboardProject.moveCard")}
+        </button>
+      </footer>
+    </form>
+  `;
+}
+
 function renderModal(controller: FlowboardProjectViewController) {
   const { modal, project } = controller.state;
   if (!modal) {
@@ -814,6 +996,13 @@ function renderModal(controller: FlowboardProjectViewController) {
           ${renderCardDetail(controller, card)}
         </openclaw-modal-dialog>`
       : nothing;
+  }
+  if (modal.kind === "move-project") {
+    return html`
+      <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
+        ${renderMoveProjectModal(controller, modal)}
+      </openclaw-modal-dialog>
+    `;
   }
   if (modal.kind === "project") {
     return html`

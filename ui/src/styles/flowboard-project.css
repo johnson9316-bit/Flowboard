@@ -74,6 +74,24 @@
   color: var(--text);
 }
 
+.flowboard-project__icon-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.flowboard-project__order-actions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 1px;
+}
+
+.flowboard-project__order-button {
+  font-size: 14px;
+  height: 24px;
+  width: 24px;
+}
+
 .flowboard-project__layout {
   display: grid;
   flex: 1;
@@ -103,6 +121,17 @@
   padding: 6px 8px;
   text-align: left;
   width: 100%;
+}
+
+.flowboard-project__project-row {
+  align-items: center;
+  display: flex;
+  gap: 2px;
+}
+
+.flowboard-project__project-row .flowboard-project__nav-project {
+  flex: 1;
+  min-width: 0;
 }
 
 .flowboard-project__nav-item:hover,
@@ -372,6 +401,10 @@
   flex-wrap: nowrap;
 }
 
+.flowboard-project__column-actions .flowboard-project__order-actions {
+  margin-right: 2px;
+}
+
 .flowboard-project__card-list {
   display: flex;
   flex: 1;
@@ -561,6 +594,13 @@
   display: flex;
   flex: 0 0 auto;
   gap: 2px;
+}
+
+.flowboard-project__move-card-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
 }
 
 .flowboard-project__modal-panel {
