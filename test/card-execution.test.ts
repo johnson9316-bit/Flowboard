@@ -78,8 +78,8 @@ function createGitCheckout(): string {
 
 function executionOptions(params: {
   worktreeRoot: string;
-  gatewayRequest?: ReturnType<typeof vi.fn>;
   run?: ReturnType<typeof vi.fn>;
+  sessionMessages?: () => unknown[];
   taskRunId: () => string;
 }): FlowboardCardExecutionOptions {
   const createWorktree = vi.fn(async ({ name }: { name: string }) => {
@@ -90,13 +90,19 @@ function executionOptions(params: {
   return {
     runtime: {
       agent: { defaults: { provider: "openai", model: "gpt-5.5" } },
-      gateway: { request: params.gatewayRequest ?? vi.fn() },
       subagent: {
         run: params.run ?? vi.fn(async () => ({ runId: params.taskRunId() })),
+        getSessionMessages: vi.fn(async () => ({
+          messages: params.sessionMessages?.() ?? [],
+        })),
       },
       tasks: {
         runs: {
           bindSession: () => ({
+            get: (taskId: string) =>
+              taskId === `task-${params.taskRunId()}`
+                ? { taskId, status: "running", runId: params.taskRunId() }
+                : undefined,
             findLatest: () => ({
               runId: params.taskRunId(),
               taskId: `task-${params.taskRunId()}`,
@@ -173,33 +179,11 @@ describe("Flowboard native card execution", () => {
     const card = await createProjectCard(store, checkout);
     let currentRunId = "run-1";
     let claimToken = "";
-    const gatewayRequest = vi.fn(async (method: string, params?: Record<string, unknown>) => {
-      if (method === "sessions.describe") {
-        return { key: params?.key, summary: `Claim token: ${claimToken}` };
-      }
-      if (method === "sessions.preview") {
-        return { previews: [`Claim token: ${claimToken}`] };
-      }
-      if (method === "tasks.get") {
-        return { taskId: params?.taskId, status: "running" };
-      }
-      if (method === "sessions.steer") {
-        currentRunId = "run-2";
-        return { runId: currentRunId };
-      }
-      if (method === "sessions.abort") {
-        throw new Error("session is unavailable");
-      }
-      if (method === "tasks.cancel") {
-        return { cancelled: true };
-      }
-      throw new Error(`unexpected Gateway request: ${method}`);
-    });
     const run = vi.fn(async () => ({ runId: currentRunId }));
     const options = executionOptions({
       worktreeRoot: path.join(checkout, ".flowboard-worktrees"),
-      gatewayRequest,
       run,
+      sessionMessages: () => [{ role: "assistant", text: `Claim token: ${claimToken}` }],
       taskRunId: () => currentRunId,
     });
     const prepared = await prepareFlowboardCardExecution({ store, id: card.id, options });
@@ -253,21 +237,26 @@ describe("Flowboard native card execution", () => {
     const inspected = await inspectFlowboardCardExecution({
       store,
       id: card.id,
-      runtime: { gateway: { request: gatewayRequest } } as never,
+      runtime: options.runtime,
     });
     expect(inspected).toMatchObject({
       active: true,
       sessionKey: started.sessionKey,
       runId: "run-1",
       taskId: "task-run-1",
-      session: { summary: "Claim token: [redacted]" },
-      preview: { previews: ["Claim token: [redacted]"] },
+      preview: { messages: [{ role: "assistant", text: "Claim token: [redacted]" }] },
+      task: { taskId: "task-run-1", status: "running" },
+    });
+    expect(options.runtime.subagent.getSessionMessages).toHaveBeenCalledWith({
+      sessionKey: started.sessionKey,
+      limit: 6,
     });
 
+    currentRunId = "run-2";
     const steered = await steerFlowboardCardExecution({
       store,
       id: card.id,
-      message: "Stop and verify the deployment output.",
+      nextRunId: currentRunId,
       runtime: options.runtime,
     });
     expect(steered.card.execution).toMatchObject({ status: "running", runId: "run-2" });
@@ -276,7 +265,7 @@ describe("Flowboard native card execution", () => {
     const stopped = await abortFlowboardCardExecution({
       store,
       id: card.id,
-      runtime: { gateway: { request: gatewayRequest } } as never,
+      expectedRunId: currentRunId,
     });
     expect(stopped.card).toMatchObject({
       status: "done",
@@ -286,10 +275,6 @@ describe("Flowboard native card execution", () => {
     expect(stopped.card.metadata?.attempts?.at(-1)).toMatchObject({
       status: "stopped",
       runId: "run-2",
-    });
-    expect(gatewayRequest).toHaveBeenCalledWith("tasks.cancel", {
-      taskId: "task-run-2",
-      reason: "Flowboard execution stopped by operator.",
     });
   });
 });

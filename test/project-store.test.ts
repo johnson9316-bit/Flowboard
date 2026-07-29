@@ -245,6 +245,36 @@ describe("Flowboard M2 project store", () => {
     await expect(store.deleteProjectDocument("legacy-stack")).resolves.toEqual({ deleted: true });
   });
 
+  it("reserves automatic document key prefixes for discovery", async () => {
+    const { store } = createStore();
+    await store.createProject({
+      id: "alpha",
+      name: "Alpha",
+      initialMilestoneTitle: "Build",
+    });
+
+    await expect(
+      store.createProjectDocument({
+        boardId: "alpha",
+        key: "file.manual",
+        section: "project",
+        type: "text",
+        title: "Manual",
+        content: "Notes",
+      }),
+    ).rejects.toThrow("reserved for automatic documents");
+    await expect(
+      store.createProjectDocument({
+        boardId: "alpha",
+        key: "ai.manual",
+        section: "project",
+        type: "text",
+        title: "Manual",
+        content: "Notes",
+      }),
+    ).rejects.toThrow("reserved for automatic documents");
+  });
+
   it("keeps delivery facts and source references independent from execution state", async () => {
     const { store } = createStore();
     const project = await store.createProject({

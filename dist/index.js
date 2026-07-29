@@ -3139,6 +3139,23 @@ function redactExecutionPayload(value, token) {
   }
   return value;
 }
+function boundExecutionPreview(value, depth = 0) {
+  if (typeof value === "string") {
+    return value.length <= PREVIEW_MAX_CHARS ? value : `${value.slice(0, PREVIEW_MAX_CHARS)}...`;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(-PREVIEW_LIMIT).map((entry) => boundExecutionPreview(entry, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    if (depth >= 4) {
+      return "[truncated]";
+    }
+    return Object.fromEntries(
+      Object.entries(value).slice(0, 24).map(([key, entry]) => [key, boundExecutionPreview(entry, depth + 1)])
+    );
+  }
+  return value;
+}
 function taskIdFromRuntime(runtime, sessionKey, runId) {
   try {
     const task = runtime.tasks.runs.bindSession({ sessionKey }).findLatest();
@@ -3316,15 +3333,8 @@ async function inspectFlowboardCardExecution(params) {
     return { card, active: false, execution: card.execution ?? null };
   }
   const token = card.metadata?.claim?.token;
-  const [describe, preview, task] = await Promise.all([
-    params.runtime.gateway.request("sessions.describe", { key: sessionKey }).catch((error) => ({ error: formatErrorMessage2(error) })),
-    params.runtime.gateway.request("sessions.preview", {
-      keys: [sessionKey],
-      limit: PREVIEW_LIMIT,
-      maxChars: PREVIEW_MAX_CHARS
-    }).catch((error) => ({ error: formatErrorMessage2(error) })),
-    card.taskId ? params.runtime.gateway.request("tasks.get", { taskId: card.taskId }).catch((error) => ({ error: formatErrorMessage2(error) })) : Promise.resolve(void 0)
-  ]);
+  const preview = await params.runtime.subagent.getSessionMessages({ sessionKey, limit: PREVIEW_LIMIT }).then(({ messages }) => ({ messages })).catch((error) => ({ error: formatErrorMessage2(error) }));
+  const task = card.taskId ? params.runtime.tasks.runs.bindSession({ sessionKey }).get(card.taskId) : void 0;
   return {
     card,
     active: true,
@@ -3332,17 +3342,12 @@ async function inspectFlowboardCardExecution(params) {
     sessionKey,
     runId,
     ...card.taskId ? { taskId: card.taskId } : {},
-    session: redactExecutionPayload(describe, token),
-    preview: redactExecutionPayload(preview, token),
-    ...task ? { task: redactExecutionPayload(task, token) } : {}
+    preview: boundExecutionPreview(redactExecutionPayload(preview, token)),
+    ...task ? { task: boundExecutionPreview(redactExecutionPayload(task, token)) } : {}
   };
 }
 async function steerFlowboardCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
-  const message = readOptionalString(params.message);
-  if (!message) {
-    throw new Error("message is required.");
-  }
   if (!activeExecution(card) || card.execution?.status !== "running") {
     throw new Error("card has no active Flowboard execution.");
   }
@@ -3350,11 +3355,7 @@ async function steerFlowboardCardExecution(params) {
   if (!sessionKey) {
     throw new Error("active execution has no session.");
   }
-  const response = await params.runtime.gateway.request("sessions.steer", {
-    key: sessionKey,
-    message
-  });
-  const nextRunId = readOptionalString(response.runId, 200);
+  const nextRunId = readOptionalString(params.nextRunId, 200);
   let updated = card;
   if (nextRunId) {
     const taskId = taskIdFromRuntime(params.runtime, sessionKey, nextRunId);
@@ -3364,44 +3365,25 @@ async function steerFlowboardCardExecution(params) {
       execution: { ...card.execution, runId: nextRunId, updatedAt: Date.now() }
     });
   }
-  return { card: updated, response: redactExecutionPayload(response, card.metadata?.claim?.token) };
+  return { card: updated };
 }
 async function abortFlowboardCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
     throw new Error("card has no active Flowboard execution.");
   }
-  const sessionKey = card.execution.sessionKey ?? card.sessionKey;
+  const expectedRunId = readOptionalString(params.expectedRunId, 200);
   const runId = card.execution.runId ?? card.runId;
-  const reason = readOptionalString(params.reason, 1e3) ?? "Flowboard execution stopped by operator.";
-  let control;
-  if (sessionKey && runId) {
-    try {
-      control = await params.runtime.gateway.request("sessions.abort", { key: sessionKey, runId });
-    } catch (sessionError) {
-      if (!card.taskId) {
-        throw sessionError;
-      }
-      control = await params.runtime.gateway.request("tasks.cancel", {
-        taskId: card.taskId,
-        reason
-      });
-    }
-  } else if (card.taskId) {
-    control = await params.runtime.gateway.request("tasks.cancel", {
-      taskId: card.taskId,
-      reason
-    });
-  } else {
-    throw new Error("active execution has no controllable session or task.");
+  if (expectedRunId && runId && expectedRunId !== runId) {
+    throw new Error("card execution changed before it could be stopped.");
   }
+  const reason = readOptionalString(params.reason, 1e3) ?? "Flowboard execution stopped by operator.";
   const stopped = await params.store.stopExecution(card.id, {
     ...runId ? { expectedRunId: runId } : {},
     reason
   });
   return {
-    card: stopped,
-    control: redactExecutionPayload(control, card.metadata?.claim?.token)
+    card: stopped
   };
 }
 
@@ -7815,10 +7797,9 @@ import fs3 from "node:fs/promises";
 import path4 from "node:path";
 var MAX_DISCOVERED_DOCUMENTS = 500;
 var MARKDOWN_EXTENSIONS2 = /* @__PURE__ */ new Set([".md", ".markdown"]);
-var EXCLUDED_DIRECTORIES = /* @__PURE__ */ new Set([
-  ".claude",
+var TOP_LEVEL_AI_INSTRUCTION_NAMES = /* @__PURE__ */ new Set(["agents.md", "claude.md"]);
+var EXCLUDED_TOP_LEVEL_AI_INSTRUCTION_DIRECTORIES = /* @__PURE__ */ new Set([
   ".git",
-  ".github",
   ".next",
   "build",
   "coverage",
@@ -7828,7 +7809,7 @@ var EXCLUDED_DIRECTORIES = /* @__PURE__ */ new Set([
   "tpm",
   "vendor"
 ]);
-var INCLUDED_HIDDEN_DIRECTORIES = /* @__PURE__ */ new Set([".planning", ".trae"]);
+var PLANNING_DOCUMENT_DIRECTORIES = /* @__PURE__ */ new Set(["codebase", "intel", "notes", "research", "seeds"]);
 var EXTRA_DOCUMENT_PATHS = [
   ".github/copilot-instructions.md",
   ".claude/skills/deploy-test/SKILL.md",
@@ -7874,6 +7855,13 @@ function candidateKey(relativePath, source) {
 function candidateTitle(relativePath) {
   return path4.basename(relativePath).replace(/\.(?:md|markdown)$/i, "");
 }
+async function directoryEntries(directory) {
+  try {
+    return await fs3.readdir(directory, { encoding: "utf8", withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
 async function addCandidate(params) {
   if (params.results.length >= MAX_DISCOVERED_DOCUMENTS || !isMarkdownPath(params.relativePath)) {
     return;
@@ -7910,46 +7898,33 @@ async function addCandidate(params) {
   });
   params.targets.add(target);
 }
-async function walkDirectory(params) {
-  if (params.results.length >= MAX_DISCOVERED_DOCUMENTS) {
-    return;
-  }
-  let entries;
-  try {
-    entries = await fs3.readdir(params.directory, { encoding: "utf8", withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries.toSorted(
-    (left, right) => Number(right.isFile()) - Number(left.isFile()) || left.name.localeCompare(right.name)
-  )) {
-    if (params.results.length >= MAX_DISCOVERED_DOCUMENTS || entry.isSymbolicLink()) {
-      continue;
-    }
-    const relativePath = params.relativeDirectory ? path4.join(params.relativeDirectory, entry.name) : entry.name;
-    if (entry.isFile()) {
-      await addCandidate({
-        root: params.root,
-        relativePath,
-        results: params.results,
-        targets: params.targets
-      });
-      continue;
-    }
-    if (!entry.isDirectory()) {
-      continue;
-    }
-    if (EXCLUDED_DIRECTORIES.has(entry.name) || entry.name.startsWith(".") && !INCLUDED_HIDDEN_DIRECTORIES.has(entry.name)) {
-      continue;
-    }
-    await walkDirectory({
+async function addDirectoryMarkdownFiles(params) {
+  const directory = path4.join(params.root, params.relativeDirectory);
+  const entries = await directoryEntries(directory);
+  for (const entry of entries.filter((entry2) => entry2.isFile() && isMarkdownPath(entry2.name)).toSorted((left, right) => left.name.localeCompare(right.name))) {
+    await addCandidate({
       ...params,
-      directory: path4.join(params.directory, entry.name),
-      relativeDirectory: relativePath
+      relativePath: path4.join(params.relativeDirectory, entry.name)
     });
   }
 }
-async function discoverFlowboardProjectDocuments(workspacePath) {
+async function addTopLevelModuleAiInstructions(params) {
+  const entries = await directoryEntries(params.root);
+  for (const entry of entries.filter(
+    (entry2) => entry2.isDirectory() && !entry2.isSymbolicLink() && !entry2.name.startsWith(".") && !EXCLUDED_TOP_LEVEL_AI_INSTRUCTION_DIRECTORIES.has(entry2.name)
+  ).toSorted((left, right) => left.name.localeCompare(right.name))) {
+    const moduleEntries = await directoryEntries(path4.join(params.root, entry.name));
+    for (const instruction of moduleEntries.filter(
+      (moduleEntry) => moduleEntry.isFile() && TOP_LEVEL_AI_INSTRUCTION_NAMES.has(moduleEntry.name.toLocaleLowerCase())
+    ).toSorted((left, right) => left.name.localeCompare(right.name))) {
+      await addCandidate({
+        ...params,
+        relativePath: path4.join(entry.name, instruction.name)
+      });
+    }
+  }
+}
+async function resolveFlowboardProjectDocumentWorkspacePath(workspacePath) {
   let root;
   try {
     root = await fs3.realpath(workspacePath);
@@ -7965,22 +7940,58 @@ async function discoverFlowboardProjectDocuments(workspacePath) {
   if (!rootStat.isDirectory()) {
     throw new Error("project default workspace must be a directory.");
   }
+  return root;
+}
+function isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, target) {
+  if (!target || !path4.isAbsolute(target)) {
+    return false;
+  }
+  const root = path4.resolve(workspaceRoot);
+  const resolvedTarget = path4.resolve(target);
+  if (!isPathInside2(root, resolvedTarget)) {
+    return false;
+  }
+  const relativePath = normalizedRelativePath(root, resolvedTarget);
+  if (!isMarkdownPath(relativePath)) {
+    return false;
+  }
+  const segments = relativePath.split("/");
+  if (segments.length === 1) {
+    return true;
+  }
+  if (segments.length === 2 && TOP_LEVEL_AI_INSTRUCTION_NAMES.has(segments[1].toLocaleLowerCase()) && !segments[0].startsWith(".") && !EXCLUDED_TOP_LEVEL_AI_INSTRUCTION_DIRECTORIES.has(segments[0])) {
+    return true;
+  }
+  if (segments.length === 2 && segments[0] === ".planning") {
+    return true;
+  }
+  if (segments.length === 3 && segments[0] === ".planning" && PLANNING_DOCUMENT_DIRECTORIES.has(segments[1])) {
+    return true;
+  }
+  return EXTRA_DOCUMENT_PATHS.includes(relativePath);
+}
+async function discoverFlowboardProjectDocuments(workspacePath) {
+  const root = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
   const results = [];
   const targets = /* @__PURE__ */ new Set();
-  for (const relativePath of EXTRA_DOCUMENT_PATHS) {
-    await addCandidate({ root, relativePath, results, targets });
+  const params = { root, results, targets };
+  await addDirectoryMarkdownFiles({ ...params, relativeDirectory: "" });
+  await addTopLevelModuleAiInstructions(params);
+  await addDirectoryMarkdownFiles({ ...params, relativeDirectory: ".planning" });
+  for (const directory of PLANNING_DOCUMENT_DIRECTORIES) {
+    await addDirectoryMarkdownFiles({
+      ...params,
+      relativeDirectory: path4.join(".planning", directory)
+    });
   }
-  await walkDirectory({
-    root,
-    directory: root,
-    relativeDirectory: "",
-    results,
-    targets
-  });
+  for (const relativePath of EXTRA_DOCUMENT_PATHS) {
+    await addCandidate({ ...params, relativePath });
+  }
   return results;
 }
 
 // src/backend/src/store-projects.ts
+var RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES = ["file.", "ai."];
 function presentProjectDocument(document) {
   const next = {
     ...document,
@@ -8001,6 +8012,12 @@ function normalizeDocumentKey(value, fallback) {
     throw new Error("document key must match [a-z0-9][a-z0-9._-]{0,79}.");
   }
   return key;
+}
+function hasReservedAutomaticDocumentKeyPrefix(key) {
+  return RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+function isAutomaticProjectDocument(document) {
+  return document.system === true || hasReservedAutomaticDocumentKeyPrefix(document.key);
 }
 function normalizeDocumentSection(value, fallback) {
   if (value === void 0) {
@@ -8068,7 +8085,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
     }
     for (const entry of await this.documentStore.entries()) {
       const document = entry.value?.version === 1 ? entry.value.document : void 0;
-      if (document?.boardId === board.id && document.system === true && document.type === "path") {
+      if (document?.boardId === board.id && document.system === true && document.type === "path" && !hasReservedAutomaticDocumentKeyPrefix(document.key)) {
         await this.documentStore.delete(entry.key);
       }
     }
@@ -8078,11 +8095,19 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
     if (!workspacePath || board.defaultWorkspace?.kind !== "dir" && board.defaultWorkspace?.kind !== "worktree") {
       return;
     }
+    let workspaceRoot;
     let candidates;
     try {
-      candidates = await discoverFlowboardProjectDocuments(workspacePath);
+      workspaceRoot = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
+      candidates = await discoverFlowboardProjectDocuments(workspaceRoot);
     } catch {
       return;
+    }
+    for (const entry of await this.documentStore.entries()) {
+      const document = entry.value?.version === 1 ? entry.value.document : void 0;
+      if (document?.boardId === board.id && isAutomaticProjectDocument(document) && !isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, document.target)) {
+        await this.documentStore.delete(entry.key);
+      }
     }
     const existing = (await this.documentStore.entries()).map((entry) => entry.value).filter(
       (entry) => entry?.version === 1 && entry.document?.boardId === board.id
@@ -8112,6 +8137,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
         summary: candidate.summary,
         target: candidate.target,
         position,
+        system: true,
         createdAt: now,
         updatedAt: now
       };
@@ -8536,6 +8562,9 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       await this.assertProjectCanReceiveCards(boardId);
       await this.ensureProjectDirect(boardId);
       const key = normalizeDocumentKey(input.key);
+      if (hasReservedAutomaticDocumentKeyPrefix(key)) {
+        throw new Error("document key prefixes file. and ai. are reserved for automatic documents.");
+      }
       const section = normalizeDocumentSection(input.section);
       const type = normalizeDocumentType(input.type);
       const title = normalizeTitle(input.title);
@@ -9066,7 +9095,7 @@ function registerFlowboardGatewayMethods(params) {
         const result = await steerFlowboardCardExecution({
           store,
           id: request.params.id,
-          message: request.params.message,
+          nextRunId: request.params.nextRunId,
           runtime: api.runtime
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
@@ -9084,7 +9113,7 @@ function registerFlowboardGatewayMethods(params) {
           store,
           id: request.params.id,
           reason: request.params.reason,
-          runtime: api.runtime
+          expectedRunId: request.params.expectedRunId
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
       } catch (error) {

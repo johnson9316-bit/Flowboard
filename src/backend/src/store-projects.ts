@@ -45,7 +45,13 @@ import {
   normalizeTitle,
 } from "./store-normalizers.js";
 import { FlowboardNotificationStore } from "./store-notifications.js";
-import { discoverFlowboardProjectDocuments } from "./project-document-discovery.js";
+import {
+  discoverFlowboardProjectDocuments,
+  isFlowboardProjectDocumentDiscoveryPath,
+  resolveFlowboardProjectDocumentWorkspacePath,
+} from "./project-document-discovery.js";
+
+const RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES = ["file.", "ai."] as const;
 
 function presentProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
   const next: FlowboardProjectDocument = {
@@ -76,6 +82,14 @@ function normalizeDocumentKey(value: unknown, fallback?: string): string {
     throw new Error("document key must match [a-z0-9][a-z0-9._-]{0,79}.");
   }
   return key;
+}
+
+function hasReservedAutomaticDocumentKeyPrefix(key: string): boolean {
+  return RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+function isAutomaticProjectDocument(document: FlowboardProjectDocument): boolean {
+  return document.system === true || hasReservedAutomaticDocumentKeyPrefix(document.key);
 }
 
 function normalizeDocumentSection(
@@ -181,7 +195,8 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       if (
         document?.boardId === board.id &&
         document.system === true &&
-        document.type === "path"
+        document.type === "path" &&
+        !hasReservedAutomaticDocumentKeyPrefix(document.key)
       ) {
         await this.documentStore.delete(entry.key);
       }
@@ -199,12 +214,24 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     ) {
       return;
     }
+    let workspaceRoot: string;
     let candidates: Awaited<ReturnType<typeof discoverFlowboardProjectDocuments>>;
     try {
-      candidates = await discoverFlowboardProjectDocuments(workspacePath);
+      workspaceRoot = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
+      candidates = await discoverFlowboardProjectDocuments(workspaceRoot);
     } catch {
       // A stale optional workspace must not make the document library unavailable.
       return;
+    }
+    for (const entry of await this.documentStore.entries()) {
+      const document = entry.value?.version === 1 ? entry.value.document : undefined;
+      if (
+        document?.boardId === board.id &&
+        isAutomaticProjectDocument(document) &&
+        !isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, document.target)
+      ) {
+        await this.documentStore.delete(entry.key);
+      }
     }
     const existing = (await this.documentStore.entries())
       .map((entry) => entry.value)
@@ -244,6 +271,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         summary: candidate.summary,
         target: candidate.target,
         position,
+        system: true,
         createdAt: now,
         updatedAt: now,
       };
@@ -759,6 +787,9 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       await this.assertProjectCanReceiveCards(boardId);
       await this.ensureProjectDirect(boardId);
       const key = normalizeDocumentKey(input.key);
+      if (hasReservedAutomaticDocumentKeyPrefix(key)) {
+        throw new Error("document key prefixes file. and ai. are reserved for automatic documents.");
+      }
       const section = normalizeDocumentSection(input.section);
       const type = normalizeDocumentType(input.type);
       const title = normalizeTitle(input.title);

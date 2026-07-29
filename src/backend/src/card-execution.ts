@@ -31,7 +31,7 @@ const CLAIM_TOKEN_PLACEHOLDER = "[generated after confirmation]";
 
 type FlowboardExecutionRuntime = Pick<
   PluginRuntime,
-  "agent" | "gateway" | "subagent" | "tasks" | "worktrees"
+  "agent" | "subagent" | "tasks" | "worktrees"
 >;
 
 export type FlowboardCardExecutionOptions = {
@@ -237,8 +237,30 @@ function redactExecutionPayload(value: unknown, token?: string): unknown {
   return value;
 }
 
+function boundExecutionPreview(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") {
+    return value.length <= PREVIEW_MAX_CHARS
+      ? value
+      : `${value.slice(0, PREVIEW_MAX_CHARS)}...`;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(-PREVIEW_LIMIT).map((entry) => boundExecutionPreview(entry, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    if (depth >= 4) {
+      return "[truncated]";
+    }
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .slice(0, 24)
+        .map(([key, entry]) => [key, boundExecutionPreview(entry, depth + 1)]),
+    );
+  }
+  return value;
+}
+
 function taskIdFromRuntime(
-  runtime: FlowboardExecutionRuntime,
+  runtime: Pick<PluginRuntime, "tasks">,
   sessionKey: string,
   runId: string,
 ): string | undefined {
@@ -439,7 +461,7 @@ export async function startFlowboardCardExecution(params: {
 export async function inspectFlowboardCardExecution(params: {
   store: FlowboardStore;
   id: unknown;
-  runtime: Pick<PluginRuntime, "gateway">;
+  runtime: Pick<PluginRuntime, "subagent" | "tasks">;
 }) {
   const card = await resolveCard(params.store, params.id);
   const sessionKey = card.execution?.sessionKey ?? card.sessionKey;
@@ -449,23 +471,13 @@ export async function inspectFlowboardCardExecution(params: {
     return { card, active: false, execution: card.execution ?? null };
   }
   const token = card.metadata?.claim?.token;
-  const [describe, preview, task] = await Promise.all([
-    params.runtime.gateway
-      .request("sessions.describe", { key: sessionKey })
-      .catch((error) => ({ error: formatErrorMessage(error) })),
-    params.runtime.gateway
-      .request("sessions.preview", {
-        keys: [sessionKey],
-        limit: PREVIEW_LIMIT,
-        maxChars: PREVIEW_MAX_CHARS,
-      })
-      .catch((error) => ({ error: formatErrorMessage(error) })),
-    card.taskId
-      ? params.runtime.gateway
-          .request("tasks.get", { taskId: card.taskId })
-          .catch((error) => ({ error: formatErrorMessage(error) }))
-      : Promise.resolve(undefined),
-  ]);
+  const preview = await params.runtime.subagent
+    .getSessionMessages({ sessionKey, limit: PREVIEW_LIMIT })
+    .then(({ messages }) => ({ messages }))
+    .catch((error) => ({ error: formatErrorMessage(error) }));
+  const task = card.taskId
+    ? params.runtime.tasks.runs.bindSession({ sessionKey }).get(card.taskId)
+    : undefined;
   return {
     card,
     active: true,
@@ -473,23 +485,18 @@ export async function inspectFlowboardCardExecution(params: {
     sessionKey,
     runId,
     ...(card.taskId ? { taskId: card.taskId } : {}),
-    session: redactExecutionPayload(describe, token),
-    preview: redactExecutionPayload(preview, token),
-    ...(task ? { task: redactExecutionPayload(task, token) } : {}),
+    preview: boundExecutionPreview(redactExecutionPayload(preview, token)),
+    ...(task ? { task: boundExecutionPreview(redactExecutionPayload(task, token)) } : {}),
   };
 }
 
 export async function steerFlowboardCardExecution(params: {
   store: FlowboardStore;
   id: unknown;
-  message: unknown;
-  runtime: FlowboardExecutionRuntime;
+  nextRunId?: unknown;
+  runtime: Pick<PluginRuntime, "tasks">;
 }) {
   const card = await resolveCard(params.store, params.id);
-  const message = readOptionalString(params.message);
-  if (!message) {
-    throw new Error("message is required.");
-  }
   if (!activeExecution(card) || card.execution?.status !== "running") {
     throw new Error("card has no active Flowboard execution.");
   }
@@ -497,11 +504,7 @@ export async function steerFlowboardCardExecution(params: {
   if (!sessionKey) {
     throw new Error("active execution has no session.");
   }
-  const response = await params.runtime.gateway.request<Record<string, unknown>>("sessions.steer", {
-    key: sessionKey,
-    message,
-  });
-  const nextRunId = readOptionalString(response.runId, 200);
+  const nextRunId = readOptionalString(params.nextRunId, 200);
   let updated = card;
   if (nextRunId) {
     const taskId = taskIdFromRuntime(params.runtime, sessionKey, nextRunId);
@@ -511,49 +514,30 @@ export async function steerFlowboardCardExecution(params: {
       execution: { ...card.execution, runId: nextRunId, updatedAt: Date.now() },
     });
   }
-  return { card: updated, response: redactExecutionPayload(response, card.metadata?.claim?.token) };
+  return { card: updated };
 }
 
 export async function abortFlowboardCardExecution(params: {
   store: FlowboardStore;
   id: unknown;
   reason?: unknown;
-  runtime: Pick<PluginRuntime, "gateway">;
+  expectedRunId?: unknown;
 }) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
     throw new Error("card has no active Flowboard execution.");
   }
-  const sessionKey = card.execution.sessionKey ?? card.sessionKey;
+  const expectedRunId = readOptionalString(params.expectedRunId, 200);
   const runId = card.execution.runId ?? card.runId;
-  const reason = readOptionalString(params.reason, 1_000) ?? "Flowboard execution stopped by operator.";
-  let control: unknown;
-  if (sessionKey && runId) {
-    try {
-      control = await params.runtime.gateway.request("sessions.abort", { key: sessionKey, runId });
-    } catch (sessionError) {
-      if (!card.taskId) {
-        throw sessionError;
-      }
-      control = await params.runtime.gateway.request("tasks.cancel", {
-        taskId: card.taskId,
-        reason,
-      });
-    }
-  } else if (card.taskId) {
-    control = await params.runtime.gateway.request("tasks.cancel", {
-      taskId: card.taskId,
-      reason,
-    });
-  } else {
-    throw new Error("active execution has no controllable session or task.");
+  if (expectedRunId && runId && expectedRunId !== runId) {
+    throw new Error("card execution changed before it could be stopped.");
   }
+  const reason = readOptionalString(params.reason, 1_000) ?? "Flowboard execution stopped by operator.";
   const stopped = await params.store.stopExecution(card.id, {
     ...(runId ? { expectedRunId: runId } : {}),
     reason,
   });
   return {
     card: stopped,
-    control: redactExecutionPayload(control, card.metadata?.claim?.token),
   };
 }

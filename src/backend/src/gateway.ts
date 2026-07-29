@@ -197,7 +197,7 @@ export function registerFlowboardGatewayMethods(params: {
         const result = await steerFlowboardCardExecution({
           store,
           id: request.params.id,
-          message: request.params.message,
+          nextRunId: request.params.nextRunId,
           runtime: api.runtime,
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
@@ -216,7 +216,7 @@ export function registerFlowboardGatewayMethods(params: {
           store,
           id: request.params.id,
           reason: request.params.reason,
-          runtime: api.runtime,
+          expectedRunId: request.params.expectedRunId,
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
       } catch (error) {

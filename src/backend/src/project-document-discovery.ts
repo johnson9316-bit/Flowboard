@@ -19,10 +19,9 @@ export type FlowboardProjectDocumentCandidate = {
 
 const MAX_DISCOVERED_DOCUMENTS = 500;
 const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown"]);
-const EXCLUDED_DIRECTORIES = new Set([
-  ".claude",
+const TOP_LEVEL_AI_INSTRUCTION_NAMES = new Set(["agents.md", "claude.md"]);
+const EXCLUDED_TOP_LEVEL_AI_INSTRUCTION_DIRECTORIES = new Set([
   ".git",
-  ".github",
   ".next",
   "build",
   "coverage",
@@ -32,7 +31,7 @@ const EXCLUDED_DIRECTORIES = new Set([
   "tpm",
   "vendor",
 ]);
-const INCLUDED_HIDDEN_DIRECTORIES = new Set([".planning", ".trae"]);
+const PLANNING_DOCUMENT_DIRECTORIES = new Set(["codebase", "intel", "notes", "research", "seeds"]);
 const EXTRA_DOCUMENT_PATHS = [
   ".github/copilot-instructions.md",
   ".claude/skills/deploy-test/SKILL.md",
@@ -99,6 +98,14 @@ function candidateTitle(relativePath: string): string {
   return path.basename(relativePath).replace(/\.(?:md|markdown)$/i, "");
 }
 
+async function directoryEntries(directory: string): Promise<Dirent<string>[]> {
+  try {
+    return await fs.readdir(directory, { encoding: "utf8", withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
 async function addCandidate(params: {
   root: string;
   relativePath: string;
@@ -141,61 +148,58 @@ async function addCandidate(params: {
   params.targets.add(target);
 }
 
-async function walkDirectory(params: {
+async function addDirectoryMarkdownFiles(params: {
   root: string;
-  directory: string;
   relativeDirectory: string;
   results: FlowboardProjectDocumentCandidate[];
   targets: Set<string>;
 }): Promise<void> {
-  if (params.results.length >= MAX_DISCOVERED_DOCUMENTS) {
-    return;
-  }
-  let entries: Dirent<string>[];
-  try {
-    entries = await fs.readdir(params.directory, { encoding: "utf8", withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries.toSorted(
-    (left, right) =>
-      Number(right.isFile()) - Number(left.isFile()) || left.name.localeCompare(right.name),
-  )) {
-    if (params.results.length >= MAX_DISCOVERED_DOCUMENTS || entry.isSymbolicLink()) {
-      continue;
-    }
-    const relativePath = params.relativeDirectory
-      ? path.join(params.relativeDirectory, entry.name)
-      : entry.name;
-    if (entry.isFile()) {
-      await addCandidate({
-        root: params.root,
-        relativePath,
-        results: params.results,
-        targets: params.targets,
-      });
-      continue;
-    }
-    if (!entry.isDirectory()) {
-      continue;
-    }
-    if (
-      EXCLUDED_DIRECTORIES.has(entry.name) ||
-      (entry.name.startsWith(".") && !INCLUDED_HIDDEN_DIRECTORIES.has(entry.name))
-    ) {
-      continue;
-    }
-    await walkDirectory({
+  const directory = path.join(params.root, params.relativeDirectory);
+  const entries = await directoryEntries(directory);
+  for (const entry of entries
+    .filter((entry) => entry.isFile() && isMarkdownPath(entry.name))
+    .toSorted((left, right) => left.name.localeCompare(right.name))) {
+    await addCandidate({
       ...params,
-      directory: path.join(params.directory, entry.name),
-      relativeDirectory: relativePath,
+      relativePath: path.join(params.relativeDirectory, entry.name),
     });
   }
 }
 
-export async function discoverFlowboardProjectDocuments(
+async function addTopLevelModuleAiInstructions(params: {
+  root: string;
+  results: FlowboardProjectDocumentCandidate[];
+  targets: Set<string>;
+}): Promise<void> {
+  const entries = await directoryEntries(params.root);
+  for (const entry of entries
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        !entry.isSymbolicLink() &&
+        !entry.name.startsWith(".") &&
+        !EXCLUDED_TOP_LEVEL_AI_INSTRUCTION_DIRECTORIES.has(entry.name),
+    )
+    .toSorted((left, right) => left.name.localeCompare(right.name))) {
+    const moduleEntries = await directoryEntries(path.join(params.root, entry.name));
+    for (const instruction of moduleEntries
+      .filter(
+        (moduleEntry) =>
+          moduleEntry.isFile() &&
+          TOP_LEVEL_AI_INSTRUCTION_NAMES.has(moduleEntry.name.toLocaleLowerCase()),
+      )
+      .toSorted((left, right) => left.name.localeCompare(right.name))) {
+      await addCandidate({
+        ...params,
+        relativePath: path.join(entry.name, instruction.name),
+      });
+    }
+  }
+}
+
+export async function resolveFlowboardProjectDocumentWorkspacePath(
   workspacePath: string,
-): Promise<FlowboardProjectDocumentCandidate[]> {
+): Promise<string> {
   let root: string;
   try {
     root = await fs.realpath(workspacePath);
@@ -211,18 +215,69 @@ export async function discoverFlowboardProjectDocuments(
   if (!rootStat.isDirectory()) {
     throw new Error("project default workspace must be a directory.");
   }
+  return root;
+}
 
+export function isFlowboardProjectDocumentDiscoveryPath(
+  workspaceRoot: string,
+  target: string | undefined,
+): boolean {
+  if (!target || !path.isAbsolute(target)) {
+    return false;
+  }
+  const root = path.resolve(workspaceRoot);
+  const resolvedTarget = path.resolve(target);
+  if (!isPathInside(root, resolvedTarget)) {
+    return false;
+  }
+  const relativePath = normalizedRelativePath(root, resolvedTarget);
+  if (!isMarkdownPath(relativePath)) {
+    return false;
+  }
+  const segments = relativePath.split("/");
+  if (segments.length === 1) {
+    return true;
+  }
+  if (
+    segments.length === 2 &&
+    TOP_LEVEL_AI_INSTRUCTION_NAMES.has(segments[1]!.toLocaleLowerCase()) &&
+    !segments[0]!.startsWith(".") &&
+    !EXCLUDED_TOP_LEVEL_AI_INSTRUCTION_DIRECTORIES.has(segments[0]!)
+  ) {
+    return true;
+  }
+  if (segments.length === 2 && segments[0] === ".planning") {
+    return true;
+  }
+  if (
+    segments.length === 3 &&
+    segments[0] === ".planning" &&
+    PLANNING_DOCUMENT_DIRECTORIES.has(segments[1]!)
+  ) {
+    return true;
+  }
+  return EXTRA_DOCUMENT_PATHS.includes(relativePath as (typeof EXTRA_DOCUMENT_PATHS)[number]);
+}
+
+export async function discoverFlowboardProjectDocuments(
+  workspacePath: string,
+): Promise<FlowboardProjectDocumentCandidate[]> {
+  const root = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
   const results: FlowboardProjectDocumentCandidate[] = [];
   const targets = new Set<string>();
-  for (const relativePath of EXTRA_DOCUMENT_PATHS) {
-    await addCandidate({ root, relativePath, results, targets });
+  const params = { root, results, targets };
+
+  await addDirectoryMarkdownFiles({ ...params, relativeDirectory: "" });
+  await addTopLevelModuleAiInstructions(params);
+  await addDirectoryMarkdownFiles({ ...params, relativeDirectory: ".planning" });
+  for (const directory of PLANNING_DOCUMENT_DIRECTORIES) {
+    await addDirectoryMarkdownFiles({
+      ...params,
+      relativeDirectory: path.join(".planning", directory),
+    });
   }
-  await walkDirectory({
-    root,
-    directory: root,
-    relativeDirectory: "",
-    results,
-    targets,
-  });
+  for (const relativePath of EXTRA_DOCUMENT_PATHS) {
+    await addCandidate({ ...params, relativePath });
+  }
   return results;
 }

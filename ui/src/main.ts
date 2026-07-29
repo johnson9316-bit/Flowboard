@@ -934,7 +934,21 @@ class FlowboardProjectHost extends LitElement {
     }
     void this.mutate(
       async () => {
-        await this.gateway.request("flowboard.cards.execution.steer", { id, message });
+        const card = this.state.project?.cards.find((candidate) => candidate.id === id);
+        const sessionKey = card?.execution?.sessionKey ?? card?.sessionKey;
+        if (!sessionKey) {
+          throw new Error("active execution has no session.");
+        }
+        const response = await this.gateway.request<{ runId?: unknown }>("sessions.steer", {
+          key: sessionKey,
+          message,
+        });
+        await this.gateway.request("flowboard.cards.execution.steer", {
+          id,
+          ...(typeof response.runId === "string" && response.runId.trim()
+            ? { nextRunId: response.runId }
+            : {}),
+        });
         this.refreshCardExecution(id);
       },
       { closeModal: false },
@@ -947,7 +961,29 @@ class FlowboardProjectHost extends LitElement {
     }
     void this.mutate(
       async () => {
-        await this.gateway.request("flowboard.cards.execution.abort", { id });
+        const card = this.state.project?.cards.find((candidate) => candidate.id === id);
+        const sessionKey = card?.execution?.sessionKey ?? card?.sessionKey;
+        const runId = card?.execution?.runId ?? card?.runId;
+        if (!sessionKey) {
+          throw new Error("active execution has no session.");
+        }
+        const aborted = await this.gateway.request<{ aborted?: unknown; runIds?: unknown }>(
+          "chat.abort",
+          {
+            sessionKey,
+            ...(runId ? { runId } : {}),
+          },
+        );
+        const confirmed =
+          aborted.aborted === true ||
+          (Array.isArray(aborted.runIds) && aborted.runIds.some((candidate) => candidate === runId));
+        if (!confirmed) {
+          throw new Error("OpenClaw did not confirm that the active run was stopped.");
+        }
+        await this.gateway.request("flowboard.cards.execution.abort", {
+          id,
+          ...(runId ? { expectedRunId: runId } : {}),
+        });
         this.refreshCardExecution(id);
       },
       { closeModal: false },
