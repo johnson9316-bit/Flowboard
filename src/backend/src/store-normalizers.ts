@@ -784,6 +784,12 @@ function normalizeAttempt(value: unknown): FlowboardRunAttempt | null {
   const error = normalizeBoundedString(record.error, undefined, 800, "attempt error");
   const engine = normalizeBoundedString(record.engine, undefined, 160, "attempt engine");
   const model = normalizeBoundedString(record.model, undefined, 160, "attempt model");
+  const promptVersion =
+    typeof record.promptVersion === "number" &&
+    Number.isSafeInteger(record.promptVersion) &&
+    record.promptVersion > 0
+      ? record.promptVersion
+      : undefined;
   return {
     id,
     status: normalizeAttemptStatus(record.status, "running"),
@@ -798,6 +804,7 @@ function normalizeAttempt(value: unknown): FlowboardRunAttempt | null {
     ...(sessionKey ? { sessionKey } : {}),
     ...(runId ? { runId } : {}),
     ...(error ? { error } : {}),
+    ...(promptVersion !== undefined ? { promptVersion } : {}),
   };
 }
 

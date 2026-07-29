@@ -407,6 +407,7 @@ function ensureFlowboardSchema(db) {
   );
   ensureColumn(db, "flowboard_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "flowboard_cards", "claim_owner_id", "claim_owner_id TEXT");
+  ensureColumn(db, "flowboard_card_attempts", "prompt_version", "prompt_version INTEGER");
   db.exec(`
     CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
       ON flowboard_cards(board_id, milestone_id, position);
@@ -570,6 +571,10 @@ function readMetadata(db, row) {
     const sessionKey = stringValue(child, "session_key");
     const runId = stringValue(child, "run_id");
     const error = stringValue(child, "error");
+    const promptVersion = numberValue(child, "prompt_version");
+    if (promptVersion !== void 0) {
+      entry.promptVersion = promptVersion;
+    }
     if (endedAt !== void 0) {
       entry.endedAt = endedAt;
     }
@@ -993,8 +998,8 @@ function insertCard(db, card) {
     db.prepare(
       `
         INSERT INTO flowboard_card_attempts
-          (id, card_id, ordinal, status, started_at, ended_at, engine, mode, model, session_key, run_id, error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, card_id, ordinal, status, started_at, ended_at, engine, mode, model, session_key, run_id, error, prompt_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
       entry.id,
@@ -1008,7 +1013,8 @@ function insertCard(db, card) {
       bindNull(entry.model),
       bindNull(entry.sessionKey),
       bindNull(entry.runId),
-      bindNull(entry.error)
+      bindNull(entry.error),
+      bindNull(entry.promptVersion)
     );
   });
   insertChildren(db, "flowboard_card_comments", card.id, metadata?.comments, (entry, ordinal) => {

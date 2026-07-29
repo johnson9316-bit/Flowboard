@@ -12,9 +12,9 @@ import {
 import {
   buildExecution,
   buildSessionKey,
-  buildWorkerPrompt,
   createManagedFlowboardWorktree,
 } from "./dispatcher.js";
+import { buildWorkerPrompt } from "./worker-prompt.js";
 import { cardBoardId } from "./store-card-helpers.js";
 import { FlowboardStore } from "./store.js";
 import {

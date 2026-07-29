@@ -23,6 +23,24 @@ Simplified Chinese.
 - Independent English/Simplified Chinese UI language preference, while still
   inheriting the host Control UI theme.
 
+## How State Converges
+
+Card state is reconciled by a **Gateway-side service**, not by the browser. It
+sweeps active cards on a timer and once at startup, comparing each against live
+host session and task state. A card therefore reaches its true status whether or
+not anyone has the board open, and runs left in flight by a Gateway restart get
+closed out instead of sitting at `running` forever. The Control UI is a pure
+observer: it reads state and never writes lifecycle status.
+
+Admission decisions — claiming a card, starting a run — commit through a database
+compare-and-swap on a monotonic card `revision`, so a card cannot be claimed
+twice even by two Gateway processes sharing one database.
+
+Idle UI refresh waits on the `flowboard.changes.wait` long-wait RPC instead of
+polling `cards.list`. Its cursor is scoped to the database and advances
+monotonically across restarts, so restarting the Gateway does not invalidate a
+connected client's cursor.
+
 ## Requirements
 
 - OpenClaw `>=2026.7.1 <2027.0.0`
@@ -130,5 +148,7 @@ recorded in [docs/CLAW_HUB_PUBLISHING.md](docs/CLAW_HUB_PUBLISHING.md).
 ## License and Attribution
 
 Flowboard is distributed under the [MIT License](LICENSE). It began from an
-imported OpenClaw Workboard baseline; the exact source commit and local changes
-are documented in [UPSTREAM.md](UPSTREAM.md).
+imported OpenClaw Workboard baseline and has since diverged; that provenance is
+recorded in [UPSTREAM.md](UPSTREAM.md) and attribution in
+[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES). Flowboard is not synchronized with
+upstream.

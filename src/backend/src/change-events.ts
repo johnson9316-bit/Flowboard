@@ -1,24 +1,21 @@
-import type { FlowboardChange } from "../../contract/index.js";
 import type { OpenClawPluginService } from "../api.js";
 import type { FlowboardStore } from "./store.js";
 
 const FLOWBOARD_EXTERNAL_CHANGE_CHECK_MS = 1000;
 
 export function createFlowboardChangeEventService(store: FlowboardStore): OpenClawPluginService {
-  let unsubscribe: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
 
   return {
     id: "flowboard-change-events",
     start(ctx) {
-      if (unsubscribe) {
+      if (timer) {
         return;
       }
-      // OpenClaw 2026.7.1-2 exposes no plugin gateway event bus. Keep the
-      // store reconciliation service active; newer hosts can layer events on
-      // top without changing the persistence contract.
-      unsubscribe = store.subscribeChanges((_change: FlowboardChange) => undefined);
       store.announceChangeEpoch();
+      // Picks up writes committed by another process on the same database, which
+      // an in-process listener cannot observe. Waiting clients are notified
+      // through the change cursor they already long-wait on.
       timer = setInterval(() => {
         try {
           store.reconcileExternalChanges();
@@ -29,8 +26,6 @@ export function createFlowboardChangeEventService(store: FlowboardStore): OpenCl
       timer.unref?.();
     },
     stop() {
-      unsubscribe?.();
-      unsubscribe = undefined;
       if (timer) {
         clearInterval(timer);
         timer = undefined;

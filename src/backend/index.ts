@@ -4,6 +4,7 @@ import { registerFlowboardGatewayMethods } from "./runtime-api.js";
 import { createFlowboardChangeEventService } from "./src/change-events.js";
 import { registerFlowboardCommand } from "./src/command.js";
 import { cleanupFlowboardRunWorktree } from "./src/dispatcher-workspace.js";
+import { createFlowboardReconcilerService } from "./src/reconciler.js";
 import { FlowboardStore } from "./src/store.js";
 import { createFlowboardTools } from "./src/tools.js";
 import { createFlowboardStaticUiHandler } from "../ui-static.js";
@@ -52,6 +53,9 @@ export default definePluginEntry({
     registerFlowboardGatewayMethods({ api, store });
     registerFlowboardCommand({ api, store });
     api.registerService(createFlowboardChangeEventService(store));
+    // Server-side control loop: converges card state against live host state even
+    // with no browser attached, and recovers runs orphaned by a Gateway restart.
+    api.registerService(createFlowboardReconcilerService({ store, runtime: api.runtime }));
     api.on("subagent_ended", async (event) => {
       if (event.runId) {
         await store.finishExecutionForRun(event.runId, {

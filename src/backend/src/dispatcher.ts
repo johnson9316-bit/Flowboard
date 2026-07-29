@@ -16,6 +16,7 @@ import {
   type ResolveAgentWorkspaceRuntime,
 } from "./dispatcher-workspace.js";
 import { cardBoardId } from "./store-card-helpers.js";
+import { buildWorkerPrompt } from "./worker-prompt.js";
 import { isFlowboardClaimReclaimable } from "./store-constants.js";
 import { FlowboardStore, type FlowboardDispatchResult } from "./store.js";
 import {
@@ -205,29 +206,6 @@ async function materializeWorkspace(params: {
       ...(sourceBranch ? { sourceBranch } : {}),
     },
   };
-}
-
-export function buildWorkerPrompt(params: {
-  card: FlowboardCard;
-  context: string;
-  ownerId: string;
-  token: string;
-}): string {
-  return [
-    `Work on this OpenClaw Flowboard card: ${params.card.title}`,
-    "",
-    "## Worker protocol",
-    `Card id: ${params.card.id}`,
-    `Claim ownerId: ${params.ownerId}`,
-    `Claim token: ${params.token}`,
-    "",
-    "Heartbeat with flowboard_heartbeat using the card id and token while working.",
-    "When done, call flowboard_complete with the card id, token, summary, and proof.",
-    "If you called flowboard_proof separately, pass its returned proofId to flowboard_complete.",
-    "If blocked, call flowboard_block with the card id, token, and reason.",
-    "",
-    params.context,
-  ].join("\n");
 }
 
 function sortReadyCards(a: FlowboardCard, b: FlowboardCard): number {

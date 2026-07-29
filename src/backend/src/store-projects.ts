@@ -946,7 +946,11 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  override async update(id: string, patch: FlowboardCardPatch): Promise<FlowboardCard> {
+  override async update(
+    id: string,
+    patch: FlowboardCardPatch,
+    options: { expectedRevision?: number } = {},
+  ): Promise<FlowboardCard> {
     const raw = patch as Record<string, unknown>;
     if (
       Object.hasOwn(raw, "boardId") ||
@@ -955,7 +959,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     ) {
       throw new Error("use the dedicated project or milestone move operation for card placement.");
     }
-    return await super.update(id, patch);
+    return await super.update(id, patch, options);
   }
 
   override async deleteBoard(id: unknown): Promise<{ deleted: boolean }> {

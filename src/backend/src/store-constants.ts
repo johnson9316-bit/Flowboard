@@ -29,6 +29,15 @@ const CLAIM_RECLAIM_MS = 5 * 60 * 1000;
 export const FLOWBOARD_INITIAL_CARD_REVISION = 1;
 
 /**
+ * Worker-prompt version, recorded on every run attempt so runs stay attributable
+ * to the prompt that drove them. Bump it from `worker-prompt.ts` — which owns the
+ * prompt itself — on any change that could alter worker behavior. It lives here
+ * only because both the prompt builder and the attempt recorder need it, and this
+ * is the module neither of them depends on transitively.
+ */
+export const FLOWBOARD_PROMPT_VERSION = 1;
+
+/**
  * Next monotonic revision for a card write. Rows persisted before the revision
  * column existed read back as 0, so an absent or non-finite value still advances.
  */

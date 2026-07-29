@@ -180,6 +180,11 @@ export type FlowboardRunAttempt = {
   sessionKey?: string;
   runId?: string;
   error?: string;
+  /**
+   * Worker-prompt version that drove this attempt. Without it, changing the
+   * prompt silently changes how past attempts should be read.
+   */
+  promptVersion?: number;
 };
 
 export type FlowboardComment = {

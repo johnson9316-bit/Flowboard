@@ -5,8 +5,8 @@ flowboard includes adapted source from OpenClaw's Workboard extension:
 - Commit: 78d6c6c0471723721243d67fb053f3810c622bf8
 - License: MIT
 
-The complete import inventory and upstream blob hashes are in
-UPSTREAM-IMPORT.json.
+See UPSTREAM.md for provenance. Flowboard has diverged from that baseline and is
+no longer synchronized with it.
 
 This package also distributes dependencies under their respective licenses:
 

@@ -58,14 +58,6 @@ type CardExecutionPreparationResponse = FlowboardCardExecutionPreparation;
 
 type CardExecutionInspectionResponse = FlowboardCardExecutionInspection;
 
-type NativeSessionDescriptionResponse = {
-  session?: {
-    status?: unknown;
-    hasActiveSubagentRun?: unknown;
-    endedAt?: unknown;
-  } | null;
-};
-
 function validChange(value: unknown): value is ChangeCursor {
   return Boolean(
     value &&
@@ -77,41 +69,6 @@ function validChange(value: unknown): value is ChangeCursor {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function nativeSessionIsActive(session: NativeSessionDescriptionResponse["session"]): boolean {
-  return session?.hasActiveSubagentRun === true;
-}
-
-function nativeSessionTerminalState(session: NativeSessionDescriptionResponse["session"]): {
-  outcome: "ok" | "error" | "timeout" | "killed" | "reset" | "deleted";
-  reason: string;
-  endedAt?: number;
-} {
-  const status = typeof session?.status === "string" ? session.status.toLowerCase() : "";
-  const outcome =
-    status === "done"
-      ? "ok"
-      : status === "timeout"
-        ? "timeout"
-        : status === "killed"
-          ? "killed"
-          : status === "reset"
-            ? "reset"
-            : status === "deleted"
-              ? "deleted"
-              : "error";
-  const endedAt =
-    typeof session?.endedAt === "number" && Number.isSafeInteger(session.endedAt)
-      ? session.endedAt
-      : undefined;
-  return {
-    outcome,
-    reason: session
-      ? `Native subagent session is no longer active (status: ${status || "unknown"}).`
-      : "Native subagent session no longer exists.",
-    ...(endedAt !== undefined ? { endedAt } : {}),
-  };
 }
 
 function normalizeProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
@@ -937,30 +894,12 @@ class FlowboardProjectHost extends LitElement {
     this.state.executionInspectionLoading = true;
     this.state.executionInspectionError = null;
     this.requestUpdate();
+    // Read-only. Card state is converged by the Gateway-side reconciler service,
+    // so the UI never writes lifecycle state — it would only be correct while a
+    // browser happened to be open on the right card.
     void this.gateway
       .request<CardExecutionInspectionResponse>("flowboard.cards.execution.inspect", { id })
-      .then(async (inspection) => {
-        if (this.state.executionInspectionCardId !== id) {
-          return;
-        }
-        if (inspection.active && inspection.sessionKey && inspection.runId) {
-          const native = await this.gateway.request<NativeSessionDescriptionResponse>(
-            "sessions.describe",
-            { key: inspection.sessionKey },
-          );
-          if (!nativeSessionIsActive(native.session)) {
-            const terminal = nativeSessionTerminalState(native.session);
-            await this.gateway.request("flowboard.cards.execution.reconcile", {
-              id,
-              expectedRunId: inspection.runId,
-              ...terminal,
-            });
-            inspection = await this.gateway.request<CardExecutionInspectionResponse>(
-              "flowboard.cards.execution.inspect",
-              { id },
-            );
-          }
-        }
+      .then((inspection) => {
         if (this.state.executionInspectionCardId !== id) {
           return;
         }
@@ -1162,8 +1101,9 @@ class FlowboardProjectHost extends LitElement {
   }
 }
 
-if (!customElements.get("flowboard-workboard")) {
-  customElements.define("flowboard-workboard", FlowboardProjectHost);
+// Matches the mount point in index.html. The element previously registered under
+// a different name and then replaced the whole body to compensate, which left the
+// declared mount point dead and the page dependent on that side effect.
+if (!customElements.get("flowboard-app")) {
+  customElements.define("flowboard-app", FlowboardProjectHost);
 }
-
-document.body.replaceChildren(document.createElement("flowboard-workboard"));

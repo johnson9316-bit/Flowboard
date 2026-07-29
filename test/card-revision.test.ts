@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createFlowboardSqliteStores } from "../src/backend/src/sqlite-store.js";
 import { FlowboardRevisionConflictError } from "../src/backend/src/store-core.js";
 import { FlowboardStore } from "../src/backend/src/store.js";
+import { FLOWBOARD_PROMPT_VERSION } from "../src/backend/src/worker-prompt.js";
 
 const roots: string[] = [];
 const closers: Array<() => void> = [];
@@ -116,6 +117,32 @@ describe("Flowboard card revision", () => {
     expect(after?.epoch).toBe(before.epoch);
     expect(after?.revision).toBeGreaterThan(before.revision);
     await expect(second.waitForChange(before, 50)).resolves.toMatchObject({ timedOut: false });
+  });
+
+  it("records the prompt version on a run attempt and keeps it across updates", async () => {
+    const { open } = openSharedDatabase();
+    const store = open();
+    const card = await store.create({ title: "Attempt attribution" });
+
+    const started = await store.update(card.id, {
+      execution: {
+        id: "exec-1",
+        kind: "agent-session",
+        mode: "autonomous",
+        status: "running",
+        sessionKey: "session-1",
+        runId: "run-1",
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+    const attempt = started.metadata?.attempts?.at(-1);
+    expect(attempt?.promptVersion).toBe(FLOWBOARD_PROMPT_VERSION);
+
+    // Survives a reopen, so the attribution is persisted rather than in-memory.
+    expect((await open().get(card.id))?.metadata?.attempts?.at(-1)?.promptVersion).toBe(
+      FLOWBOARD_PROMPT_VERSION,
+    );
   });
 
   it("mirrors the claim owner into its indexed column and clears it on release", async () => {

@@ -29,7 +29,6 @@
     "README.md",
     "THIRD-PARTY-NOTICES",
     "UPSTREAM.md",
-    "UPSTREAM-IMPORT.json",
     "openclaw.plugin.json"
   ],
   "scripts": {
@@ -37,7 +36,6 @@
     "build:backend": "esbuild src/backend/index.ts src/backend/doctor-contract-api.ts --bundle --format=esm --platform=node --target=node22 --outdir=dist --external:openclaw --external:openclaw/*",
     "build:ui": "vite build --config ui/vite.config.ts",
     "check:public-names": "node scripts/check-public-names.mjs",
-    "generate:upstream-import": "node scripts/generate-upstream-import.mjs",
     "dev": "vite --config ui/vite.config.ts --host 127.0.0.1",
     "pack:check": "npm pack --dry-run",
     "test": "vitest run --config vitest.config.ts",

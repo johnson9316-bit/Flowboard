@@ -29,18 +29,24 @@ describe("Flowboard M2 project UI host", () => {
     expect(page).toContain("?disabled=${controller.state.busy || !controller.connected}");
   });
 
-  it("keeps all imported locale bundles and their source metadata", () => {
-    const manifest = JSON.parse(
-      fs.readFileSync(path.join(root, "UPSTREAM-IMPORT.json"), "utf8"),
-    ) as { upstream: { sourceTrees: Array<{ upstreamPath: string; files?: unknown[] }> } };
+  it("keeps every locale bundle registered and loadable", () => {
     const locales = path.join(root, "ui/src/i18n/locales");
+    const registry = fs.readFileSync(path.join(root, "ui/src/i18n/lib/registry.ts"), "utf8");
+    const translate = fs.readFileSync(path.join(root, "ui/src/i18n/lib/translate.ts"), "utf8");
+    // en-agents.ts is a fragment en.ts pulls in, not a locale of its own.
+    const files = fs
+      .readdirSync(locales)
+      .filter((name) => name.endsWith(".ts") && name !== "en-agents.ts");
 
-    expect(fs.existsSync(path.join(locales, "zh-CN.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(locales, "zh-TW.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(locales, "en.ts"))).toBe(true);
-    expect(
-      manifest.upstream.sourceTrees.find((entry) => entry.upstreamPath === "ui/src/i18n/locales")
-        ?.files?.length,
-    ).toBeGreaterThan(20);
+    expect(files.length).toBeGreaterThan(20);
+    for (const name of ["zh-CN.ts", "zh-TW.ts", "en.ts"]) {
+      expect(files).toContain(name);
+    }
+    // en is the eager fallback bundle; every other locale ships only via the
+    // registry's dynamic imports, so one nothing imports would silently vanish.
+    expect(translate).toContain('import { en } from "../locales/en.ts"');
+    for (const name of files.filter((name) => name !== "en.ts")) {
+      expect(registry).toContain(`import("../locales/${name}")`);
+    }
   });
 });

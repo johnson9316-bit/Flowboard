@@ -180,7 +180,7 @@ var cli_exports = {};
 __export(cli_exports, {
   registerFlowboardCli: () => registerFlowboardCli
 });
-import { formatErrorMessage as formatErrorMessage4 } from "openclaw/plugin-sdk/error-runtime";
+import { formatErrorMessage as formatErrorMessage5 } from "openclaw/plugin-sdk/error-runtime";
 import { addGatewayClientOptions, callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
 import { parseStrictPositiveInteger as parseStrictPositiveInteger2 } from "openclaw/plugin-sdk/number-runtime";
 import { getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
@@ -244,7 +244,7 @@ async function callFlowboardGateway(method, options, params) {
   });
 }
 function isGatewayUnavailableError(error) {
-  const message = formatErrorMessage4(error).toLowerCase();
+  const message = formatErrorMessage5(error).toLowerCase();
   if ([
     "econnrefused",
     "econnreset",
@@ -897,6 +897,7 @@ var RUNNING_HEARTBEAT_STALE_MS = 20 * 60 * 1e3;
 var BLOCKED_TOO_LONG_MS = 24 * 60 * 60 * 1e3;
 var CLAIM_RECLAIM_MS = 5 * 60 * 1e3;
 var FLOWBOARD_INITIAL_CARD_REVISION = 1;
+var FLOWBOARD_PROMPT_VERSION = 1;
 function nextFlowboardCardRevision(current) {
   return Number.isSafeInteger(current) && current > 0 ? current + 1 : FLOWBOARD_INITIAL_CARD_REVISION;
 }
@@ -1448,6 +1449,7 @@ function normalizeAttempt(value) {
   const error = normalizeBoundedString(record.error, void 0, 800, "attempt error");
   const engine = normalizeBoundedString(record.engine, void 0, 160, "attempt engine");
   const model = normalizeBoundedString(record.model, void 0, 160, "attempt model");
+  const promptVersion = typeof record.promptVersion === "number" && Number.isSafeInteger(record.promptVersion) && record.promptVersion > 0 ? record.promptVersion : void 0;
   return {
     id,
     status: normalizeAttemptStatus(record.status, "running"),
@@ -1458,7 +1460,8 @@ function normalizeAttempt(value) {
     ...model ? { model } : {},
     ...sessionKey ? { sessionKey } : {},
     ...runId ? { runId } : {},
-    ...error ? { error } : {}
+    ...error ? { error } : {},
+    ...promptVersion !== void 0 ? { promptVersion } : {}
   };
 }
 function normalizeComment(value) {
@@ -2085,7 +2088,10 @@ function syncExecutionAttemptMetadata(metadata, execution, now) {
     ...execution.sessionKey ? { sessionKey: execution.sessionKey } : {},
     ...execution.runId ? { runId: execution.runId } : {},
     ...attemptStatus !== "running" && { endedAt: execution.updatedAt || now },
-    ...attemptStatus !== "succeeded" && existingAttempt?.error ? { error: existingAttempt.error } : {}
+    ...attemptStatus !== "succeeded" && existingAttempt?.error ? { error: existingAttempt.error } : {},
+    // Stamped once when the attempt appears, then carried forward, so a prompt
+    // change mid-run cannot relabel an attempt already under way.
+    promptVersion: existingAttempt?.promptVersion ?? FLOWBOARD_PROMPT_VERSION
   };
   if (existingIndex >= 0) {
     attempts[existingIndex] = nextAttempt;
@@ -2401,10 +2407,87 @@ function capText(value, max) {
 function cardBoardId(card) {
   return card.metadata?.automation?.boardId ?? "default";
 }
+function cardParentIds(card) {
+  return (card.metadata?.links ?? []).filter((link) => link.type === "parent" && link.targetCardId).map((link) => link.targetCardId).filter((id, index, ids) => ids.indexOf(id) === index);
+}
+function cardChildIds(card) {
+  return (card.metadata?.links ?? []).filter((link) => link.type === "child" && link.targetCardId).map((link) => link.targetCardId).filter((id, index, ids) => ids.indexOf(id) === index);
+}
+function latestRunningAttempt(card) {
+  return card.metadata?.attempts?.findLast((attempt) => attempt.status === "running");
+}
+function isDependencyPromotableStatus(status) {
+  return status === "backlog" || status === "triage" || status === "todo" || status === "scheduled" || status === "ready";
+}
+function isActiveDependencyTarget(card, options = {}) {
+  return Boolean(card.metadata?.claim) || card.execution?.status === "running" || Boolean(latestRunningAttempt(card)) || !options.allowStatusOnly && (card.status === "running" || card.status === "review");
+}
+function closeRunningAttempts(attempts, now, status, reason) {
+  if (!attempts?.some((attempt) => attempt.status === "running")) {
+    return attempts;
+  }
+  return attempts.map(
+    (attempt) => attempt.status === "running" ? { ...attempt, status, endedAt: now, ...reason ? { error: reason } : {} } : attempt
+  );
+}
+function notificationSequence(event) {
+  return typeof event.sequence === "number" && Number.isFinite(event.sequence) ? Math.trunc(event.sequence) : void 0;
+}
+function compareNotifications(a, b) {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+  const aSequence = notificationSequence(a);
+  const bSequence = notificationSequence(b);
+  if (aSequence !== void 0 && bSequence !== void 0) {
+    return aSequence - bSequence || a.id.localeCompare(b.id);
+  }
+  if (aSequence !== void 0) {
+    return -1;
+  }
+  if (bSequence !== void 0) {
+    return 1;
+  }
+  return a.id.localeCompare(b.id);
+}
+
+// src/backend/src/worker-prompt.ts
+var RECENT_ATTEMPTS = 8;
+var FAILED_ATTEMPT_DETAIL = 3;
 function cardResultSummary(card) {
   return card.metadata?.automation?.summary ?? card.metadata?.comments?.findLast((comment) => comment.body.trim())?.body ?? card.metadata?.proof?.findLast((proof) => proof.note?.trim())?.note;
 }
-function buildWorkerContext(card, cards = []) {
+function isFailedAttempt(attempt) {
+  return attempt.status === "failed" || attempt.status === "blocked" || attempt.status === "stopped";
+}
+function retryGuidance(card) {
+  const attempts = card.metadata?.attempts ?? [];
+  const failed = attempts.filter(isFailedAttempt);
+  if (failed.length === 0) {
+    return [];
+  }
+  const lines = ["", "## This is a retry"];
+  lines.push(
+    `${failed.length} previous attempt${failed.length === 1 ? "" : "s"} on this card did not succeed. Do not simply repeat the previous approach.`
+  );
+  const detailed = failed.slice(-FAILED_ATTEMPT_DETAIL);
+  for (const attempt of detailed) {
+    const reason = capText(attempt.error, 300) ?? "no reason recorded";
+    lines.push(`- ${attempt.status}: ${reason}`);
+  }
+  lines.push(
+    "Before you start: state what you believe went wrong last time and what you are doing differently. If the previous failure looks environmental rather than a code defect, say so instead of retrying blindly."
+  );
+  const maxRetries = card.metadata?.automation?.maxRetries;
+  const failureCount = card.metadata?.failureCount ?? 0;
+  if (maxRetries && failureCount >= maxRetries) {
+    lines.push(
+      "This is the final attempt within the card's retry budget. If you cannot finish, call flowboard_block with a precise diagnosis and record what you learned \u2014 a bare failure leaves the next person with nothing."
+    );
+  }
+  return lines;
+}
+function buildWorkerContext(card, cards = [], now = Date.now()) {
   const lines = [
     `# Flowboard card ${card.id}`,
     `Title: ${card.title}`,
@@ -2416,7 +2499,7 @@ function buildWorkerContext(card, cards = []) {
   if (card.notes) {
     lines.push("", "## Notes", capText(card.notes, 4e3) ?? "");
   }
-  const attempts = card.metadata?.attempts?.slice(-8) ?? [];
+  const attempts = card.metadata?.attempts?.slice(-RECENT_ATTEMPTS) ?? [];
   if (attempts.length) {
     lines.push("", "## Recent attempts");
     for (const attempt of attempts) {
@@ -2425,6 +2508,7 @@ function buildWorkerContext(card, cards = []) {
       );
     }
   }
+  lines.push(...retryGuidance(card));
   const comments = card.metadata?.comments?.slice(-12) ?? [];
   if (comments.length) {
     lines.push("", "## Recent comments");
@@ -2522,7 +2606,7 @@ function buildWorkerContext(card, cards = []) {
       lines.push(`Summary: ${capText(automation.summary, 400)}`);
     }
   }
-  const diagnostics = computeCardDiagnostics(card, Date.now());
+  const diagnostics = computeCardDiagnostics(card, now);
   if (diagnostics.length) {
     lines.push("", "## Active diagnostics");
     for (const entry of diagnostics) {
@@ -2531,48 +2615,22 @@ function buildWorkerContext(card, cards = []) {
   }
   return lines.join("\n");
 }
-function cardParentIds(card) {
-  return (card.metadata?.links ?? []).filter((link) => link.type === "parent" && link.targetCardId).map((link) => link.targetCardId).filter((id, index, ids) => ids.indexOf(id) === index);
-}
-function cardChildIds(card) {
-  return (card.metadata?.links ?? []).filter((link) => link.type === "child" && link.targetCardId).map((link) => link.targetCardId).filter((id, index, ids) => ids.indexOf(id) === index);
-}
-function latestRunningAttempt(card) {
-  return card.metadata?.attempts?.findLast((attempt) => attempt.status === "running");
-}
-function isDependencyPromotableStatus(status) {
-  return status === "backlog" || status === "triage" || status === "todo" || status === "scheduled" || status === "ready";
-}
-function isActiveDependencyTarget(card, options = {}) {
-  return Boolean(card.metadata?.claim) || card.execution?.status === "running" || Boolean(latestRunningAttempt(card)) || !options.allowStatusOnly && (card.status === "running" || card.status === "review");
-}
-function closeRunningAttempts(attempts, now, status, reason) {
-  if (!attempts?.some((attempt) => attempt.status === "running")) {
-    return attempts;
-  }
-  return attempts.map(
-    (attempt) => attempt.status === "running" ? { ...attempt, status, endedAt: now, ...reason ? { error: reason } : {} } : attempt
-  );
-}
-function notificationSequence(event) {
-  return typeof event.sequence === "number" && Number.isFinite(event.sequence) ? Math.trunc(event.sequence) : void 0;
-}
-function compareNotifications(a, b) {
-  if (a.createdAt !== b.createdAt) {
-    return a.createdAt - b.createdAt;
-  }
-  const aSequence = notificationSequence(a);
-  const bSequence = notificationSequence(b);
-  if (aSequence !== void 0 && bSequence !== void 0) {
-    return aSequence - bSequence || a.id.localeCompare(b.id);
-  }
-  if (aSequence !== void 0) {
-    return -1;
-  }
-  if (bSequence !== void 0) {
-    return 1;
-  }
-  return a.id.localeCompare(b.id);
+function buildWorkerPrompt(params) {
+  return [
+    `Work on this OpenClaw Flowboard card: ${params.card.title}`,
+    "",
+    "## Worker protocol",
+    `Card id: ${params.card.id}`,
+    `Claim ownerId: ${params.ownerId}`,
+    `Claim token: ${params.token}`,
+    "",
+    "Heartbeat with flowboard_heartbeat using the card id and token while working.",
+    "When done, call flowboard_complete with the card id, token, summary, and proof.",
+    "If you called flowboard_proof separately, pass its returned proofId to flowboard_complete.",
+    "If blocked, call flowboard_block with the card id, token, and reason.",
+    "",
+    params.context
+  ].join("\n");
 }
 
 // src/backend/src/dispatcher.ts
@@ -2679,23 +2737,6 @@ async function materializeWorkspace(params) {
       ...sourceBranch ? { sourceBranch } : {}
     }
   };
-}
-function buildWorkerPrompt(params) {
-  return [
-    `Work on this OpenClaw Flowboard card: ${params.card.title}`,
-    "",
-    "## Worker protocol",
-    `Card id: ${params.card.id}`,
-    `Claim ownerId: ${params.ownerId}`,
-    `Claim token: ${params.token}`,
-    "",
-    "Heartbeat with flowboard_heartbeat using the card id and token while working.",
-    "When done, call flowboard_complete with the card id, token, summary, and proof.",
-    "If you called flowboard_proof separately, pass its returned proofId to flowboard_complete.",
-    "If blocked, call flowboard_block with the card id, token, and reason.",
-    "",
-    params.context
-  ].join("\n");
 }
 function sortReadyCards(a, b) {
   const priorityRank = {
@@ -4594,6 +4635,7 @@ function ensureFlowboardSchema(db) {
   );
   ensureColumn(db, "flowboard_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "flowboard_cards", "claim_owner_id", "claim_owner_id TEXT");
+  ensureColumn(db, "flowboard_card_attempts", "prompt_version", "prompt_version INTEGER");
   db.exec(`
     CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
       ON flowboard_cards(board_id, milestone_id, position);
@@ -4757,6 +4799,10 @@ function readMetadata(db, row) {
     const sessionKey = stringValue(child, "session_key");
     const runId = stringValue(child, "run_id");
     const error = stringValue(child, "error");
+    const promptVersion = numberValue(child, "prompt_version");
+    if (promptVersion !== void 0) {
+      entry.promptVersion = promptVersion;
+    }
     if (endedAt !== void 0) {
       entry.endedAt = endedAt;
     }
@@ -5180,8 +5226,8 @@ function insertCard(db, card) {
     db.prepare(
       `
         INSERT INTO flowboard_card_attempts
-          (id, card_id, ordinal, status, started_at, ended_at, engine, mode, model, session_key, run_id, error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, card_id, ordinal, status, started_at, ended_at, engine, mode, model, session_key, run_id, error, prompt_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
       entry.id,
@@ -5195,7 +5241,8 @@ function insertCard(db, card) {
       bindNull(entry.model),
       bindNull(entry.sessionKey),
       bindNull(entry.runId),
-      bindNull(entry.error)
+      bindNull(entry.error),
+      bindNull(entry.promptVersion)
     );
   });
   insertChildren(db, "flowboard_card_comments", card.id, metadata?.comments, (entry, ordinal) => {
@@ -6132,9 +6179,6 @@ var FlowboardCoreStore = class {
     this.subscriptionStore = stores.subscriptions ?? store;
     this.attachmentStore = stores.attachments ?? store;
   }
-  subscribeChanges(listener) {
-    return this.changes.subscribe(listener);
-  }
   announceChangeEpoch() {
     this.changes.announceEpoch();
   }
@@ -6468,11 +6512,12 @@ var FlowboardCoreStore = class {
     }
     return card;
   }
-  async update(id, patch) {
+  async update(id, patch, options = {}) {
     return await this.enqueueMutation(
       async () => await this.updateCard(id, patch, {
         allowMetadataDependencyLinks: false,
-        enforceStatusHolds: true
+        enforceStatusHolds: true,
+        ...options.expectedRevision !== void 0 ? { expectedRevision: options.expectedRevision } : {}
       })
     );
   }
@@ -8898,12 +8943,12 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       return { documents: reordered };
     });
   }
-  async update(id, patch) {
+  async update(id, patch, options = {}) {
     const raw = patch;
     if (Object.hasOwn(raw, "boardId") || Object.hasOwn(raw, "milestoneId") || Object.hasOwn(raw, "position")) {
       throw new Error("use the dedicated project or milestone move operation for card placement.");
     }
-    return await super.update(id, patch);
+    return await super.update(id, patch, options);
   }
   async deleteBoard(id) {
     const boardId = normalizeBoardIdRequired(id);
@@ -9889,15 +9934,13 @@ function registerFlowboardGatewayMethods(params) {
 // src/backend/src/change-events.ts
 var FLOWBOARD_EXTERNAL_CHANGE_CHECK_MS = 1e3;
 function createFlowboardChangeEventService(store) {
-  let unsubscribe;
   let timer;
   return {
     id: "flowboard-change-events",
     start(ctx) {
-      if (unsubscribe) {
+      if (timer) {
         return;
       }
-      unsubscribe = store.subscribeChanges((_change) => void 0);
       store.announceChangeEpoch();
       timer = setInterval(() => {
         try {
@@ -9909,8 +9952,6 @@ function createFlowboardChangeEventService(store) {
       timer.unref?.();
     },
     stop() {
-      unsubscribe?.();
-      unsubscribe = void 0;
       if (timer) {
         clearInterval(timer);
         timer = void 0;
@@ -10183,6 +10224,349 @@ function registerFlowboardCommand(params) {
       })
     })
   });
+}
+
+// src/backend/src/reconciler.ts
+import { formatErrorMessage as formatErrorMessage4 } from "openclaw/plugin-sdk/error-runtime";
+
+// src/backend/src/lifecycle.ts
+var STALE_SESSION_MS = 30 * 60 * 1e3;
+function isFailedSessionStatus(status) {
+  return status === "failed" || status === "killed" || status === "timeout";
+}
+function findFlowboardSession(card, sessions) {
+  const sessionKey = cardSessionKey(card);
+  if (!sessionKey) {
+    return null;
+  }
+  return sessions.find((session) => session.key === sessionKey) ?? null;
+}
+function sessionUpdatedAt(session) {
+  return typeof session.updatedAt === "number" && Number.isFinite(session.updatedAt) ? session.updatedAt : void 0;
+}
+function taskUpdatedAt(task) {
+  if (typeof task.updatedAt === "number") {
+    return task.updatedAt > 0 ? task.updatedAt : void 0;
+  }
+  if (typeof task.updatedAt === "string") {
+    const parsed = Date.parse(task.updatedAt);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : void 0;
+  }
+  return void 0;
+}
+function staleSessionState(session, now) {
+  if (session.status !== "running" || session.hasActiveRun !== false) {
+    return void 0;
+  }
+  const updatedAt = sessionUpdatedAt(session);
+  if (updatedAt === void 0 || now - updatedAt < STALE_SESSION_MS) {
+    return void 0;
+  }
+  return {
+    detectedAt: now,
+    lastSessionUpdatedAt: updatedAt,
+    reason: "Linked thread has not reported recent activity."
+  };
+}
+function getFlowboardLifecycle(params) {
+  const { card, sessions, task, now } = params;
+  const session = findFlowboardSession(card, sessions);
+  if (task) {
+    const sourceUpdatedAt2 = taskUpdatedAt(task);
+    switch (task.status) {
+      case "queued":
+      case "running":
+        if (!session || !(session.abortedLastRun || session.status === "done" || isFailedSessionStatus(session.status))) {
+          return { session, state: "running", targetStatus: "running", ...sourceUpdatedAt2 !== void 0 ? { sourceUpdatedAt: sourceUpdatedAt2 } : {} };
+        }
+        break;
+      case "completed":
+        return { session, state: "succeeded", targetStatus: "review", ...sourceUpdatedAt2 !== void 0 ? { sourceUpdatedAt: sourceUpdatedAt2 } : {} };
+      case "failed":
+      case "cancelled":
+      case "timed_out":
+        return { session, state: "failed", targetStatus: "blocked", ...sourceUpdatedAt2 !== void 0 ? { sourceUpdatedAt: sourceUpdatedAt2 } : {} };
+    }
+  }
+  if (!cardSessionKey(card)) {
+    return { session: null, state: "unlinked" };
+  }
+  if (!session) {
+    return { session: null, state: "missing" };
+  }
+  const sourceUpdatedAt = sessionUpdatedAt(session);
+  const withSource = (verdict) => ({
+    session,
+    ...verdict,
+    ...sourceUpdatedAt !== void 0 ? { sourceUpdatedAt } : {}
+  });
+  if (staleSessionState(session, now)) {
+    return withSource({ state: "stale", targetStatus: "running" });
+  }
+  if (session.hasActiveRun === true || session.status === "running") {
+    return withSource({ state: "running", targetStatus: "running" });
+  }
+  if (session.abortedLastRun || isFailedSessionStatus(session.status)) {
+    return withSource({ state: "failed", targetStatus: "blocked" });
+  }
+  if (session.status === "done") {
+    return withSource({ state: "succeeded", targetStatus: "review" });
+  }
+  return { session, state: "idle" };
+}
+function executionStatusForLifecycle(lifecycle) {
+  switch (lifecycle.state) {
+    case "running":
+    case "stale":
+      return "running";
+    case "succeeded":
+      return "review";
+    case "failed":
+      return "blocked";
+    case "idle":
+      return "idle";
+    case "missing":
+    case "unlinked":
+      return void 0;
+  }
+}
+function shouldSyncCardStatus(card, targetStatus) {
+  if (!targetStatus || card.status === targetStatus) {
+    return false;
+  }
+  if (targetStatus === "running") {
+    return card.status === "backlog" || card.status === "todo" || card.status === "ready";
+  }
+  if (targetStatus === "blocked" || targetStatus === "review") {
+    return card.status === "running" || card.status === "todo" || card.status === "ready";
+  }
+  return false;
+}
+function shouldSyncExecutionStatus(card, targetStatus) {
+  return Boolean(card.execution && targetStatus && card.execution.status !== targetStatus);
+}
+
+// src/backend/src/reconciler.ts
+var RECONCILE_INTERVAL_MS = 15e3;
+var SESSIONS_REQUEST_TIMEOUT_MS = 1e4;
+var HOST_TASK_STATUSES = /* @__PURE__ */ new Set([
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+  "timed_out"
+]);
+function readHostSession(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return void 0;
+  }
+  const row = value;
+  const key = typeof row.key === "string" ? row.key.trim() : "";
+  if (!key) {
+    return void 0;
+  }
+  return {
+    key,
+    ...typeof row.status === "string" ? { status: row.status } : {},
+    ...typeof row.updatedAt === "number" && Number.isFinite(row.updatedAt) ? { updatedAt: row.updatedAt } : {},
+    ...typeof row.hasActiveRun === "boolean" ? { hasActiveRun: row.hasActiveRun } : {},
+    ...typeof row.abortedLastRun === "boolean" ? { abortedLastRun: row.abortedLastRun } : {}
+  };
+}
+function readHostTask(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return void 0;
+  }
+  const row = value;
+  const status = typeof row.status === "string" ? row.status : "";
+  if (!HOST_TASK_STATUSES.has(status)) {
+    return void 0;
+  }
+  return {
+    status,
+    ...typeof row.updatedAt === "number" || typeof row.updatedAt === "string" ? { updatedAt: row.updatedAt } : {}
+  };
+}
+async function readHostSessions(runtime) {
+  if (!await runtime.gateway.isAvailable()) {
+    return void 0;
+  }
+  const response = await runtime.gateway.request("sessions.list", void 0, {
+    timeoutMs: SESSIONS_REQUEST_TIMEOUT_MS
+  });
+  if (!Array.isArray(response?.sessions)) {
+    return void 0;
+  }
+  return response.sessions.flatMap((row) => {
+    const session = readHostSession(row);
+    return session ? [session] : [];
+  });
+}
+function readCardTask(runtime, card) {
+  const sessionKey = cardSessionKey(card);
+  if (!sessionKey) {
+    return void 0;
+  }
+  try {
+    const runs = runtime.tasks.runs.bindSession({ sessionKey });
+    const record = card.taskId ? runs.get(card.taskId) : runs.findLatest();
+    return readHostTask(record);
+  } catch {
+    return void 0;
+  }
+}
+function hasRunningAttempt(card) {
+  return Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"));
+}
+function activeCards(cards) {
+  return cards.filter(
+    (card) => !card.metadata?.archivedAt && (card.status === "running" || card.execution?.status === "running" || hasRunningAttempt(card) || Boolean(card.metadata?.claim))
+  );
+}
+async function applyLifecycle(params) {
+  const { store, card, sessions, runtime, now } = params;
+  const task = readCardTask(runtime, card);
+  const lifecycle = getFlowboardLifecycle({
+    card,
+    sessions,
+    ...task ? { task } : {},
+    now
+  });
+  const executionStatus = executionStatusForLifecycle(lifecycle);
+  const patch = {};
+  const metadataPatch = {};
+  if (lifecycle.sourceUpdatedAt !== void 0 && shouldSyncCardStatus(card, lifecycle.targetStatus)) {
+    patch.status = lifecycle.targetStatus;
+    metadataPatch.lifecycleStatusSourceUpdatedAt = lifecycle.sourceUpdatedAt;
+  }
+  if (shouldSyncExecutionStatus(card, executionStatus)) {
+    patch.execution = { ...card.execution, status: executionStatus, updatedAt: now };
+  }
+  const stale = lifecycle.session ? staleSessionState(lifecycle.session, now) : void 0;
+  const existingStale = card.metadata?.stale;
+  if (stale) {
+    const changed = !existingStale || existingStale.lastSessionUpdatedAt !== stale.lastSessionUpdatedAt || existingStale.reason !== stale.reason;
+    if (changed) {
+      metadataPatch.stale = { ...stale, detectedAt: existingStale?.detectedAt ?? stale.detectedAt };
+    }
+  } else if (existingStale) {
+    metadataPatch.stale = void 0;
+  }
+  if (Object.keys(metadataPatch).length > 0) {
+    patch.metadata = { ...card.metadata, ...metadataPatch };
+  }
+  if (Object.keys(patch).length === 0) {
+    return false;
+  }
+  await store.update(card.id, patch, { expectedRevision: card.revision });
+  return true;
+}
+async function finishOrphanedRun(params) {
+  const { store, card, sessions, runtime, now } = params;
+  const runId = cardRunId(card);
+  const sessionKey = cardSessionKey(card);
+  if (!runId || !sessionKey) {
+    return false;
+  }
+  if (sessions.some((session) => session.key === sessionKey)) {
+    return false;
+  }
+  await store.finishExecutionForRun(runId, {
+    outcome: "failed",
+    endedAt: now,
+    reason: "Run did not survive a Gateway restart."
+  });
+  await cleanupFlowboardRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
+    () => void 0
+  );
+  return true;
+}
+async function reconcileFlowboardCards(params) {
+  const now = params.now ?? Date.now();
+  const outcome = {
+    checked: 0,
+    updated: 0,
+    finished: 0,
+    reclaimed: 0,
+    skipped: 0
+  };
+  const sessions = await readHostSessions(params.runtime);
+  if (!sessions) {
+    return outcome;
+  }
+  for (const card of activeCards(await params.store.list())) {
+    outcome.checked += 1;
+    try {
+      if (params.finishOrphanedRuns && await finishOrphanedRun({ ...params, card, sessions, now })) {
+        outcome.finished += 1;
+        continue;
+      }
+      if (await applyLifecycle({ ...params, card, sessions, now })) {
+        outcome.updated += 1;
+      }
+      if (isFlowboardClaimReclaimable(card.metadata?.claim, now)) {
+        const latest = await params.store.get(card.id);
+        if (latest && isFlowboardClaimReclaimable(latest.metadata?.claim, now)) {
+          await params.store.update(latest.id, {
+            metadata: { ...latest.metadata, claim: void 0 }
+          });
+          outcome.reclaimed += 1;
+        }
+      }
+    } catch (error) {
+      outcome.skipped += 1;
+      if (!(error instanceof FlowboardRevisionConflictError)) {
+        params.onCardError?.(card.id, error);
+      }
+    }
+  }
+  return outcome;
+}
+function createFlowboardReconcilerService(params) {
+  let timer;
+  let running = false;
+  return {
+    id: "flowboard-reconciler",
+    start(ctx) {
+      if (timer) {
+        return;
+      }
+      const pass = async (finishOrphanedRuns) => {
+        if (running) {
+          return;
+        }
+        running = true;
+        try {
+          const outcome = await reconcileFlowboardCards({
+            ...params,
+            finishOrphanedRuns,
+            onCardError: (cardId, error) => ctx.logger.warn(
+              `flowboard could not reconcile card ${cardId}: ${formatErrorMessage4(error)}`
+            )
+          });
+          if (outcome.updated || outcome.finished || outcome.reclaimed) {
+            ctx.logger.info(
+              `flowboard reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`
+            );
+          }
+        } catch (error) {
+          ctx.logger.warn(`flowboard reconcile failed: ${formatErrorMessage4(error)}`);
+        } finally {
+          running = false;
+        }
+      };
+      void pass(true);
+      timer = setInterval(() => void pass(false), RECONCILE_INTERVAL_MS);
+      timer.unref?.();
+    },
+    stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = void 0;
+      }
+    }
+  };
 }
 
 // src/backend/src/tools.ts
@@ -15807,6 +16191,7 @@ var index_default = definePluginEntry({
     registerFlowboardGatewayMethods({ api, store });
     registerFlowboardCommand({ api, store });
     api.registerService(createFlowboardChangeEventService(store));
+    api.registerService(createFlowboardReconcilerService({ store, runtime: api.runtime }));
     api.on("subagent_ended", async (event) => {
       if (event.runId) {
         await store.finishExecutionForRun(event.runId, {

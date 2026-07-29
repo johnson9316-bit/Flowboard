@@ -18,6 +18,7 @@ import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import { truncateUtf16Safe } from "openclaw/plugin-sdk/text-utility-runtime";
 import {
   BLOCKED_TOO_LONG_MS,
+  FLOWBOARD_PROMPT_VERSION,
   MAX_CARD_ATTEMPTS,
   MAX_CARD_EVENTS,
   READY_STRANDED_MS,
@@ -98,6 +99,9 @@ export function syncExecutionAttemptMetadata(
     ...(attemptStatus !== "succeeded" && existingAttempt?.error
       ? { error: existingAttempt.error }
       : {}),
+    // Stamped once when the attempt appears, then carried forward, so a prompt
+    // change mid-run cannot relabel an attempt already under way.
+    promptVersion: existingAttempt?.promptVersion ?? FLOWBOARD_PROMPT_VERSION,
   };
   if (existingIndex >= 0) {
     attempts[existingIndex] = nextAttempt;
@@ -517,160 +521,6 @@ export function capText(value: string | undefined, max: number): string | undefi
 
 export function cardBoardId(card: FlowboardCard): string {
   return card.metadata?.automation?.boardId ?? "default";
-}
-
-function cardResultSummary(card: FlowboardCard): string | undefined {
-  return (
-    card.metadata?.automation?.summary ??
-    card.metadata?.comments?.findLast((comment) => comment.body.trim())?.body ??
-    card.metadata?.proof?.findLast((proof) => proof.note?.trim())?.note
-  );
-}
-
-export function buildWorkerContext(
-  card: FlowboardCard,
-  cards: readonly FlowboardCard[] = [],
-): string {
-  const lines = [
-    `# Flowboard card ${card.id}`,
-    `Title: ${card.title}`,
-    `Status: ${card.status}`,
-    `Priority: ${card.priority}`,
-    `Board: ${cardBoardId(card)}`,
-    `Agent: ${card.agentId ?? "(default)"}`,
-  ];
-  if (card.notes) {
-    lines.push("", "## Notes", capText(card.notes, 4000) ?? "");
-  }
-  const attempts = card.metadata?.attempts?.slice(-8) ?? [];
-  if (attempts.length) {
-    lines.push("", "## Recent attempts");
-    for (const attempt of attempts) {
-      lines.push(
-        `- ${attempt.status} ${attempt.model ?? ""} ${attempt.error ? `error=${capText(attempt.error, 240)}` : ""}`.trim(),
-      );
-    }
-  }
-  const comments = card.metadata?.comments?.slice(-12) ?? [];
-  if (comments.length) {
-    lines.push("", "## Recent comments");
-    for (const comment of comments) {
-      lines.push(`- ${capText(comment.body, 400)}`);
-    }
-  }
-  const proof = card.metadata?.proof?.slice(-8) ?? [];
-  if (proof.length) {
-    lines.push("", "## Proof");
-    for (const entry of proof) {
-      lines.push(
-        `- ${entry.status}: ${capText(entry.label ?? entry.command ?? entry.url ?? entry.note, 400)}`,
-      );
-    }
-  }
-  const artifacts = card.metadata?.artifacts?.slice(-8) ?? [];
-  if (artifacts.length) {
-    lines.push("", "## Artifacts");
-    for (const artifact of artifacts) {
-      lines.push(`- ${capText(artifact.label ?? artifact.url ?? artifact.path, 400)}`);
-    }
-  }
-  const attachments = card.metadata?.attachments?.slice(-8) ?? [];
-  if (attachments.length) {
-    lines.push("", "## Attachments");
-    for (const attachment of attachments) {
-      const detail = [
-        attachment.fileName,
-        `${attachment.byteSize} bytes`,
-        attachment.mimeType,
-        attachment.note,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      lines.push(`- ${capText(detail, 500)}`);
-    }
-  }
-  if (card.metadata?.workerProtocol) {
-    const protocol = card.metadata.workerProtocol;
-    lines.push("", "## Worker protocol");
-    lines.push(`${protocol.state}: ${capText(protocol.detail, 500) ?? "no detail"}`);
-  }
-  const workerLogs = card.metadata?.workerLogs?.slice(-8) ?? [];
-  if (workerLogs.length) {
-    lines.push("", "## Worker logs");
-    for (const log of workerLogs) {
-      lines.push(`- ${log.level}: ${capText(log.message, 500)}`);
-    }
-  }
-  const links = card.metadata?.links?.slice(-8) ?? [];
-  if (links.length) {
-    lines.push("", "## Links");
-    for (const link of links) {
-      lines.push(`- ${link.type}: ${link.title ?? link.url ?? link.targetCardId ?? ""}`);
-    }
-  }
-  const cardsById = new Map(cards.map((entry) => [entry.id, entry]));
-  const parentResults = cardParentIds(card)
-    .map((parentId) => cardsById.get(parentId))
-    .filter((parent): parent is FlowboardCard => parent !== undefined && parent.status === "done")
-    .slice(-6);
-  if (parentResults.length) {
-    lines.push("", "## Parent results");
-    for (const parent of parentResults) {
-      lines.push(
-        `- ${parent.id} ${parent.title}: ${capText(cardResultSummary(parent), 500) ?? "done"}`,
-      );
-    }
-  }
-  const recentAgentWork =
-    card.agentId && cards.length
-      ? cards
-          .filter(
-            (entry) =>
-              entry.id !== card.id &&
-              cardBoardId(entry) === cardBoardId(card) &&
-              entry.agentId === card.agentId &&
-              entry.status === "done",
-          )
-          .toSorted((a, b) => b.updatedAt - a.updatedAt)
-          .slice(0, 5)
-      : [];
-  if (recentAgentWork.length) {
-    lines.push("", `## Recent done work by ${card.agentId}`);
-    for (const entry of recentAgentWork) {
-      lines.push(
-        `- ${entry.id} ${entry.title}: ${capText(cardResultSummary(entry), 300) ?? "done"}`,
-      );
-    }
-  }
-  const automation = card.metadata?.automation;
-  if (automation) {
-    lines.push("", "## Automation");
-    if (automation.tenant) {
-      lines.push(`Tenant: ${automation.tenant}`);
-    }
-    if (automation.boardId) {
-      lines.push(`Board: ${automation.boardId}`);
-    }
-    if (automation.skills?.length) {
-      lines.push(`Skills: ${automation.skills.join(", ")}`);
-    }
-    if (automation.workspace) {
-      lines.push(
-        `Workspace: ${automation.workspace.kind}${automation.workspace.path ? ` ${automation.workspace.path}` : ""}`,
-      );
-    }
-    if (automation.summary) {
-      lines.push(`Summary: ${capText(automation.summary, 400)}`);
-    }
-  }
-  const diagnostics = computeCardDiagnostics(card, Date.now());
-  if (diagnostics.length) {
-    lines.push("", "## Active diagnostics");
-    for (const entry of diagnostics) {
-      lines.push(`- ${entry.severity}: ${entry.title}`);
-    }
-  }
-  return lines.join("\n");
 }
 
 export function cardParentIds(card: FlowboardCard): string[] {

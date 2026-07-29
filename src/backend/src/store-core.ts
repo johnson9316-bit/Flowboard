@@ -34,7 +34,6 @@ import {
 } from "./store-card-helpers.js";
 import { FlowboardChangeTracker } from "./store-change-tracker.js";
 import {
-  FLOWBOARD_INITIAL_CARD_REVISION,
   MAX_CARD_COMMENTS,
   MAX_CARD_WORKER_LOGS,
   nextFlowboardCardRevision,
@@ -166,10 +165,6 @@ export class FlowboardCoreStore {
       (store as unknown as FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>);
     this.attachmentStore =
       stores.attachments ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardAttachment>);
-  }
-
-  subscribeChanges(listener: (change: FlowboardChange) => void): () => void {
-    return this.changes.subscribe(listener);
   }
 
   announceChangeEpoch(): void {
@@ -572,12 +567,22 @@ export class FlowboardCoreStore {
     return card;
   }
 
-  async update(id: string, patch: FlowboardCardPatch): Promise<FlowboardCard> {
+  async update(
+    id: string,
+    patch: FlowboardCardPatch,
+    options: {
+      /** See {@link updateCard}: write only if the card is still at this revision. */
+      expectedRevision?: number;
+    } = {},
+  ): Promise<FlowboardCard> {
     return await this.enqueueMutation(
       async () =>
         await this.updateCard(id, patch, {
           allowMetadataDependencyLinks: false,
           enforceStatusHolds: true,
+          ...(options.expectedRevision !== undefined
+            ? { expectedRevision: options.expectedRevision }
+            : {}),
         }),
     );
   }

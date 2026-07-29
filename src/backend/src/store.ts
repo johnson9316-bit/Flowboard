@@ -11,7 +11,6 @@ import type {
 } from "./persistence-types.js";
 import { createFlowboardSqliteStores } from "./sqlite-store.js";
 import {
-  buildWorkerContext,
   cardBoardId,
   closeRunningAttempts,
   computeCardDiagnostics,
@@ -21,6 +20,7 @@ import {
   removeUndefinedCardFields,
   retryBudgetExhausted,
 } from "./store-card-helpers.js";
+import { buildWorkerContext } from "./worker-prompt.js";
 import {
   isFlowboardClaimReclaimable,
   MAX_ATTACHMENT_ENTRIES,
