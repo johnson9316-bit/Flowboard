@@ -35,7 +35,7 @@ var init_card_redaction = __esm({
 function isValidFlowboardBoardId(value) {
   return typeof value === "string" && FLOWBOARD_BOARD_ID_PATTERN.test(value);
 }
-var FLOWBOARD_STATUSES, FLOWBOARD_PRIORITIES, FLOWBOARD_EXECUTION_MODES, FLOWBOARD_EXECUTION_STATUSES, FLOWBOARD_EVENT_KINDS, FLOWBOARD_ATTEMPT_STATUSES, FLOWBOARD_LINK_TYPES, FLOWBOARD_PROOF_STATUSES, FLOWBOARD_TEMPLATE_IDS, FLOWBOARD_DIAGNOSTIC_KINDS, FLOWBOARD_DIAGNOSTIC_SEVERITIES, FLOWBOARD_NOTIFICATION_KINDS, FLOWBOARD_MILESTONE_STATES, FLOWBOARD_PROJECT_DOCUMENT_SECTIONS, FLOWBOARD_PROJECT_DOCUMENT_TYPES, FLOWBOARD_BOARD_ID_PATTERN;
+var FLOWBOARD_STATUSES, FLOWBOARD_PRIORITIES, FLOWBOARD_EXECUTION_MODES, FLOWBOARD_EXECUTION_STATUSES, FLOWBOARD_EVENT_KINDS, FLOWBOARD_ATTEMPT_STATUSES, FLOWBOARD_LINK_TYPES, FLOWBOARD_PROOF_STATUSES, FLOWBOARD_TEMPLATE_IDS, FLOWBOARD_DIAGNOSTIC_KINDS, FLOWBOARD_DIAGNOSTIC_SEVERITIES, FLOWBOARD_NOTIFICATION_KINDS, FLOWBOARD_MILESTONE_STATES, FLOWBOARD_PROJECT_DOCUMENT_SECTIONS, FLOWBOARD_PROJECT_DOCUMENT_TYPES, FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES, FLOWBOARD_DELIVERY_VERIFICATION_STATES, FLOWBOARD_DELIVERY_RELEASE_STATES, FLOWBOARD_BOARD_ID_PATTERN;
 var init_contract = __esm({
   "src/contract/index.ts"() {
     "use strict";
@@ -125,6 +125,29 @@ var init_contract = __esm({
       "link",
       "path",
       "secret_ref"
+    ];
+    FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES = [
+      "not_started",
+      "in_progress",
+      "code_complete",
+      "not_applicable",
+      "unknown"
+    ];
+    FLOWBOARD_DELIVERY_VERIFICATION_STATES = [
+      "not_started",
+      "partial",
+      "passed",
+      "failed",
+      "human_required",
+      "not_required",
+      "unknown"
+    ];
+    FLOWBOARD_DELIVERY_RELEASE_STATES = [
+      "not_started",
+      "pending",
+      "released",
+      "not_required",
+      "unknown"
     ];
     FLOWBOARD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
   }
@@ -1071,6 +1094,59 @@ function normalizeNotes(value) {
     throw new Error("notes must be 4000 characters or fewer.");
   }
   return notes;
+}
+function normalizeOptionalBoundedString(value, maxLength, fieldName) {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return void 0;
+  }
+  if (normalized.length > maxLength) {
+    throw new Error(`${fieldName} must be ${maxLength} characters or fewer.`);
+  }
+  return normalized;
+}
+function normalizeDeliveryState(value, allowed, fieldName) {
+  if (typeof value !== "string" || !value.trim()) {
+    return void 0;
+  }
+  if (!allowed.includes(value)) {
+    throw new Error(`${fieldName} must be one of: ${allowed.join(", ")}.`);
+  }
+  return value;
+}
+function normalizeDelivery(value, fallback, now = Date.now()) {
+  if (value === null) {
+    return void 0;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return fallback;
+  }
+  const record = value;
+  const readText = (key, maxLength, fieldName) => Object.hasOwn(record, key) ? normalizeOptionalBoundedString(record[key], maxLength, fieldName) : fallback?.[key];
+  const implementationState = Object.hasOwn(record, "implementationState") ? normalizeDeliveryState(
+    record.implementationState,
+    FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES,
+    "implementation state"
+  ) : fallback?.implementationState;
+  const verificationState = Object.hasOwn(record, "verificationState") ? normalizeDeliveryState(
+    record.verificationState,
+    FLOWBOARD_DELIVERY_VERIFICATION_STATES,
+    "verification state"
+  ) : fallback?.verificationState;
+  const releaseState = Object.hasOwn(record, "releaseState") ? normalizeDeliveryState(
+    record.releaseState,
+    FLOWBOARD_DELIVERY_RELEASE_STATES,
+    "release state"
+  ) : fallback?.releaseState;
+  const delivery = {
+    ...readText("objective", 2e3, "delivery objective") ? { objective: readText("objective", 2e3, "delivery objective") } : {},
+    ...readText("deliverySummary", 4e3, "delivery summary") ? { deliverySummary: readText("deliverySummary", 4e3, "delivery summary") } : {},
+    ...readText("openItems", 4e3, "delivery open items") ? { openItems: readText("openItems", 4e3, "delivery open items") } : {},
+    ...implementationState ? { implementationState } : {},
+    ...verificationState ? { verificationState } : {},
+    ...releaseState ? { releaseState } : {}
+  };
+  return Object.keys(delivery).length ? { ...delivery, updatedAt: now } : void 0;
 }
 function normalizeBoundedString(value, fallback, maxLength, fieldName) {
   const normalized = normalizeOptionalString(value);
@@ -2162,6 +2238,8 @@ function removeUndefinedCardFields(card) {
     "taskId",
     "sourceUrl",
     "execution",
+    "delivery",
+    "sourceReferences",
     "startedAt",
     "completedAt",
     "metadata"
@@ -3139,6 +3217,73 @@ function registerFlowboardWorkspaceWorkflowMethods(params) {
   );
 }
 
+// src/backend/src/project-document-reader.ts
+import fs from "node:fs/promises";
+import path2 from "node:path";
+var MAX_PROJECT_DOCUMENT_BYTES = 1024 * 1024;
+var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set([".md", ".markdown"]);
+async function readFlowboardProjectDocument(params) {
+  const { document } = params;
+  if (document.type === "markdown") {
+    return {
+      document,
+      content: document.content ?? "",
+      source: "stored"
+    };
+  }
+  if (document.type !== "path" || !document.target) {
+    throw new Error("only Markdown documents and Markdown file paths can be previewed.");
+  }
+  const fileName = path2.basename(document.target).toLowerCase();
+  if (fileName === ".env" || fileName.startsWith(".env.")) {
+    throw new Error("environment files cannot be previewed as project documents.");
+  }
+  if (!MARKDOWN_EXTENSIONS.has(path2.extname(document.target).toLowerCase())) {
+    throw new Error("project document paths must reference a Markdown file.");
+  }
+  let resolvedPath;
+  try {
+    resolvedPath = await fs.realpath(document.target);
+  } catch {
+    throw new Error("project document file does not exist.");
+  }
+  await assertFlowboardWorkspaceSourceAccess({ kind: "dir", path: resolvedPath }, params.access);
+  let stat;
+  try {
+    stat = await fs.stat(resolvedPath);
+  } catch {
+    throw new Error("project document file cannot be read.");
+  }
+  if (!stat.isFile()) {
+    throw new Error("project document path must reference a regular file.");
+  }
+  if (stat.size > MAX_PROJECT_DOCUMENT_BYTES) {
+    throw new Error("project document file exceeds the 1 MiB preview limit.");
+  }
+  let bytes;
+  try {
+    bytes = await fs.readFile(resolvedPath);
+  } catch {
+    throw new Error("project document file cannot be read.");
+  }
+  let content;
+  try {
+    content = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error("project document file is not valid UTF-8 text.");
+  }
+  if (content.includes("\0")) {
+    throw new Error("project document file is not valid UTF-8 text.");
+  }
+  return {
+    document,
+    content,
+    source: "path",
+    path: resolvedPath,
+    modifiedAt: Math.trunc(stat.mtimeMs)
+  };
+}
+
 // src/backend/src/gateway-project-methods.ts
 var READ_SCOPE = "operator.read";
 var WRITE_SCOPE2 = "operator.write";
@@ -3150,6 +3295,14 @@ async function assertProjectWorkspaceAccess(request, value) {
     })
   );
   await assertFlowboardWorkspaceMutationAccess(value, access);
+}
+async function resolveProjectWorkspaceReadAccess(request) {
+  return await canonicalizeFlowboardWorkspaceAccess(
+    resolveGatewayFlowboardWorkspaceAccess({
+      context: request.context,
+      client: request.client
+    })
+  );
 }
 function registerFlowboardProjectGatewayMethods(params) {
   const { api, store, redactCard } = params;
@@ -3331,6 +3484,22 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
+    "flowboard.projects.documents.read",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        const access = await resolveProjectWorkspaceReadAccess(request);
+        const document = await store.getProjectDocument(readId(requestParams));
+        respond(true, {
+          preview: await readFlowboardProjectDocument({ document, access })
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: READ_SCOPE }
+  );
+  api.registerGatewayMethod(
     "flowboard.projects.documents.create",
     async ({ params: requestParams, respond }) => {
       try {
@@ -3406,6 +3575,58 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
+    "flowboard.cards.sources.create",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.addSourceReference(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.update",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.updateSourceReference(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.deleteSourceReference(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.reorder",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.reorderSourceReferences(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
     "flowboard.cards.moveMilestone",
     async ({ params: requestParams, respond }) => {
       try {
@@ -3437,18 +3658,18 @@ function registerFlowboardProjectGatewayMethods(params) {
 import { randomUUID as randomUUID9 } from "node:crypto";
 
 // src/backend/src/sqlite-store.ts
-import fs from "node:fs";
-import path2 from "node:path";
+import fs2 from "node:fs";
+import path3 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 4;
+var SCHEMA_VERSION = 5;
 var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var FLOWBOARD_SQLITE_DIR_MODE = 448;
 var FLOWBOARD_SQLITE_FILE_MODE = 384;
 function resolveFlowboardSqlitePath(env = process.env) {
-  return path2.join(resolveStateDir(env), ...FLOWBOARD_DB_RELATIVE_PATH);
+  return path3.join(resolveStateDir(env), ...FLOWBOARD_DB_RELATIVE_PATH);
 }
 function jsonValue(value) {
   return value === void 0 ? null : JSON.stringify(value);
@@ -3673,6 +3894,31 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS flowboard_card_delivery (
+      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      objective TEXT,
+      delivery_summary TEXT,
+      open_items TEXT,
+      implementation_state TEXT,
+      verification_state TEXT,
+      release_state TEXT,
+      updated_at INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_card_source_references (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      ordinal INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      target TEXT NOT NULL,
+      note TEXT,
+      position REAL NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_card_source_references_card_position_idx
+      ON flowboard_card_source_references(card_id, position);
+
     CREATE TABLE IF NOT EXISTS flowboard_card_diagnostics (
       card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
@@ -3820,7 +4066,7 @@ function ensureFlowboardSchema(db) {
 }
 function chmodIfExists(targetPath, mode) {
   try {
-    fs.chmodSync(targetPath, mode);
+    fs2.chmodSync(targetPath, mode);
   } catch (err) {
     if (err.code !== "ENOENT") {
       throw err;
@@ -3828,17 +4074,17 @@ function chmodIfExists(targetPath, mode) {
   }
 }
 function hardenFlowboardDatabaseFiles(dbPath) {
-  fs.chmodSync(path2.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
+  fs2.chmodSync(path3.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
   chmodIfExists(dbPath, FLOWBOARD_SQLITE_FILE_MODE);
   chmodIfExists(`${dbPath}-wal`, FLOWBOARD_SQLITE_FILE_MODE);
   chmodIfExists(`${dbPath}-shm`, FLOWBOARD_SQLITE_FILE_MODE);
   chmodIfExists(`${dbPath}-journal`, FLOWBOARD_SQLITE_FILE_MODE);
 }
 function createDatabase(dbPath) {
-  fs.mkdirSync(path2.dirname(dbPath), { recursive: true, mode: FLOWBOARD_SQLITE_DIR_MODE });
-  chmodIfExists(path2.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
-  if (!fs.existsSync(dbPath)) {
-    fs.closeSync(fs.openSync(dbPath, "a", FLOWBOARD_SQLITE_FILE_MODE));
+  fs2.mkdirSync(path3.dirname(dbPath), { recursive: true, mode: FLOWBOARD_SQLITE_DIR_MODE });
+  chmodIfExists(path3.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
+  if (!fs2.existsSync(dbPath)) {
+    fs2.closeSync(fs2.openSync(dbPath, "a", FLOWBOARD_SQLITE_FILE_MODE));
   }
   const db = new DatabaseSync(dbPath);
   let maintenance;
@@ -4139,6 +4385,57 @@ function readMetadata(db, row) {
     ...numberValue(row, "failure_count") !== void 0 ? { failureCount: numberValue(row, "failure_count") } : {}
   });
 }
+function readDelivery(db, cardId) {
+  const row = db.prepare("SELECT * FROM flowboard_card_delivery WHERE card_id = ?").get(cardId);
+  if (!row) {
+    return void 0;
+  }
+  const delivery = {
+    updatedAt: requiredNumber(row, "updated_at")
+  };
+  const objective = stringValue(row, "objective");
+  const deliverySummary = stringValue(row, "delivery_summary");
+  const openItems = stringValue(row, "open_items");
+  const implementationState = stringValue(row, "implementation_state");
+  const verificationState = stringValue(row, "verification_state");
+  const releaseState = stringValue(row, "release_state");
+  if (objective) {
+    delivery.objective = objective;
+  }
+  if (deliverySummary) {
+    delivery.deliverySummary = deliverySummary;
+  }
+  if (openItems) {
+    delivery.openItems = openItems;
+  }
+  if (implementationState) {
+    delivery.implementationState = implementationState;
+  }
+  if (verificationState) {
+    delivery.verificationState = verificationState;
+  }
+  if (releaseState) {
+    delivery.releaseState = releaseState;
+  }
+  return delivery;
+}
+function readSourceReferences(db, cardId) {
+  return childRows(db, "flowboard_card_source_references", cardId).map((child) => {
+    const reference = {
+      id: requiredString(child, "id"),
+      label: requiredString(child, "label"),
+      target: requiredString(child, "target"),
+      position: requiredNumber(child, "position"),
+      createdAt: requiredNumber(child, "created_at"),
+      updatedAt: requiredNumber(child, "updated_at")
+    };
+    const note = stringValue(child, "note");
+    if (note) {
+      reference.note = note;
+    }
+    return reference;
+  });
+}
 function readCard(db, row) {
   const card = {
     id: requiredString(row, "id"),
@@ -4151,6 +4448,8 @@ function readCard(db, row) {
     updatedAt: requiredNumber(row, "updated_at")
   };
   const metadata = readMetadata(db, row);
+  const delivery = readDelivery(db, card.id);
+  const sourceReferences = readSourceReferences(db, card.id);
   return {
     ...card,
     ...stringValue(row, "notes") ? { notes: stringValue(row, "notes") } : {},
@@ -4161,6 +4460,8 @@ function readCard(db, row) {
     ...stringValue(row, "source_url") ? { sourceUrl: stringValue(row, "source_url") } : {},
     ...stringValue(row, "milestone_id") ? { milestoneId: stringValue(row, "milestone_id") } : {},
     ...readExecution(row) ? { execution: readExecution(row) } : {},
+    ...delivery ? { delivery } : {},
+    ...sourceReferences.length ? { sourceReferences } : {},
     ...numberValue(row, "started_at") !== void 0 ? { startedAt: numberValue(row, "started_at") } : {},
     ...numberValue(row, "completed_at") !== void 0 ? { completedAt: numberValue(row, "completed_at") } : {},
     ...readEvents(db, card.id) ? { events: readEvents(db, card.id) } : {},
@@ -4384,6 +4685,51 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
+  db.prepare("DELETE FROM flowboard_card_delivery WHERE card_id = ?").run(card.id);
+  if (card.delivery) {
+    db.prepare(
+      `
+        INSERT INTO flowboard_card_delivery
+          (card_id, objective, delivery_summary, open_items, implementation_state,
+           verification_state, release_state, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    ).run(
+      card.id,
+      bindNull(card.delivery.objective),
+      bindNull(card.delivery.deliverySummary),
+      bindNull(card.delivery.openItems),
+      bindNull(card.delivery.implementationState),
+      bindNull(card.delivery.verificationState),
+      bindNull(card.delivery.releaseState),
+      card.delivery.updatedAt
+    );
+  }
+  insertChildren(
+    db,
+    "flowboard_card_source_references",
+    card.id,
+    card.sourceReferences,
+    (entry, ordinal) => {
+      db.prepare(
+        `
+          INSERT INTO flowboard_card_source_references
+            (id, card_id, ordinal, label, target, note, position, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run(
+        entry.id,
+        card.id,
+        ordinal,
+        entry.label,
+        entry.target,
+        bindNull(entry.note),
+        entry.position,
+        entry.createdAt,
+        entry.updatedAt
+      );
+    }
+  );
   insertChildren(
     db,
     "flowboard_card_attachments",
@@ -5408,6 +5754,7 @@ var FlowboardCoreStore = class {
     const taskId = normalizeOptionalString(input.taskId);
     const sourceUrl = normalizeOptionalString(input.sourceUrl);
     const normalizedExecution = normalizeExecution(input.execution);
+    const delivery = normalizeDelivery(input.delivery, void 0, now);
     const execution = normalizedExecution?.status === "running" && (heldBySchedule || heldByDependencies) ? void 0 : normalizedExecution;
     const startedAt = input.startedAt === void 0 ? status === "running" ? now : void 0 : normalizeTimestamp(input.startedAt, 0) || void 0;
     const completedAt = input.completedAt === void 0 ? status === "done" ? now : void 0 : normalizeTimestamp(input.completedAt, 0) || void 0;
@@ -5457,6 +5804,7 @@ var FlowboardCoreStore = class {
       ...taskId ? { taskId } : {},
       ...sourceUrl ? { sourceUrl } : {},
       ...execution ? { execution } : {},
+      ...delivery ? { delivery } : {},
       ...startedAt ? { startedAt } : {},
       ...completedAt ? { completedAt } : {},
       ...!metadataIsEmpty(syncedMetadata) ? { metadata: syncedMetadata } : {}
@@ -5560,6 +5908,7 @@ var FlowboardCoreStore = class {
       taskId: effectivePatch.taskId === void 0 ? existing.taskId : normalizeOptionalString(effectivePatch.taskId),
       sourceUrl: effectivePatch.sourceUrl === void 0 ? existing.sourceUrl : normalizeOptionalString(effectivePatch.sourceUrl),
       execution,
+      delivery: effectivePatch.delivery === void 0 ? existing.delivery : normalizeDelivery(effectivePatch.delivery, existing.delivery, now),
       metadata: effectivePatch.templateId === void 0 ? metadata : { ...metadata, templateId: normalizeTemplateId(effectivePatch.templateId) },
       position: effectivePatchRecord.position === void 0 ? existing.position : normalizePosition(effectivePatchRecord.position, existing.position),
       updatedAt: now,
@@ -5642,6 +5991,132 @@ var FlowboardCoreStore = class {
         ...existing.metadata,
         comments: [...existing.metadata?.comments ?? [], comment].slice(-MAX_CARD_COMMENTS)
       };
+    });
+  }
+  async addSourceReference(id, input) {
+    const now = Date.now();
+    const label = normalizeTitle(input.label);
+    const target = normalizeBoundedString(input.target, void 0, 2e3, "source reference target");
+    const note = normalizeBoundedString(input.note, void 0, 2e3, "source reference note");
+    if (!target || target.includes("\0") || target.includes("\n")) {
+      throw new Error("source reference target is required and must be a single line.");
+    }
+    return await this.mutateSourceReferences(id, (references) => [
+      ...references,
+      {
+        id: randomUUID4(),
+        label,
+        target,
+        position: Math.max(0, ...references.map((reference) => reference.position)) + POSITION_STEP,
+        createdAt: now,
+        updatedAt: now,
+        ...note ? { note } : {}
+      }
+    ]);
+  }
+  async updateSourceReference(id, input) {
+    const sourceReferenceId = normalizeBoundedString(
+      input.sourceReferenceId,
+      void 0,
+      120,
+      "source reference id"
+    );
+    if (!sourceReferenceId) {
+      throw new Error("sourceReferenceId is required.");
+    }
+    return await this.mutateSourceReferences(id, (references) => {
+      const existing = references.find((reference) => reference.id === sourceReferenceId);
+      if (!existing) {
+        throw new Error(`source reference not found: ${sourceReferenceId}`);
+      }
+      const label = input.label === void 0 ? existing.label : normalizeTitle(input.label);
+      const target = input.target === void 0 ? existing.target : normalizeBoundedString(input.target, void 0, 2e3, "source reference target");
+      const note = input.note === void 0 ? existing.note : normalizeBoundedString(input.note, void 0, 2e3, "source reference note");
+      if (!target || target.includes("\0") || target.includes("\n")) {
+        throw new Error("source reference target is required and must be a single line.");
+      }
+      return references.map((reference) => {
+        if (reference.id !== sourceReferenceId) {
+          return reference;
+        }
+        const next = {
+          ...reference,
+          label,
+          target,
+          updatedAt: Date.now(),
+          ...note ? { note } : {}
+        };
+        if (!note) {
+          delete next.note;
+        }
+        return next;
+      });
+    });
+  }
+  async deleteSourceReference(id, input) {
+    const sourceReferenceId = normalizeBoundedString(
+      input.sourceReferenceId,
+      void 0,
+      120,
+      "source reference id"
+    );
+    if (!sourceReferenceId) {
+      throw new Error("sourceReferenceId is required.");
+    }
+    return await this.mutateSourceReferences(id, (references) => {
+      if (!references.some((reference) => reference.id === sourceReferenceId)) {
+        throw new Error(`source reference not found: ${sourceReferenceId}`);
+      }
+      return references.filter((reference) => reference.id !== sourceReferenceId);
+    });
+  }
+  async reorderSourceReferences(id, input) {
+    if (!Array.isArray(input.sourceReferenceIds) || input.sourceReferenceIds.some((value) => typeof value !== "string")) {
+      throw new Error("sourceReferenceIds are required.");
+    }
+    const sourceReferenceIds = input.sourceReferenceIds;
+    return await this.mutateSourceReferences(id, (references) => {
+      if (sourceReferenceIds.length !== references.length || new Set(sourceReferenceIds).size !== sourceReferenceIds.length) {
+        throw new Error("sourceReferenceIds must contain every source reference exactly once.");
+      }
+      const byId = new Map(references.map((reference) => [reference.id, reference]));
+      const now = Date.now();
+      return sourceReferenceIds.map((sourceReferenceId, index) => {
+        const reference = byId.get(sourceReferenceId);
+        if (!reference) {
+          throw new Error(`source reference not found: ${sourceReferenceId}`);
+        }
+        return {
+          ...reference,
+          position: (index + 1) * POSITION_STEP,
+          updatedAt: now
+        };
+      });
+    });
+  }
+  async mutateSourceReferences(id, mutate) {
+    return await this.enqueueMutation(async () => {
+      const existing = await this.get(id);
+      if (!existing) {
+        throw new Error(`card not found: ${id}`);
+      }
+      const sourceReferences = mutate(
+        [...existing.sourceReferences ?? []].toSorted(
+          (left, right) => left.position - right.position || left.createdAt - right.createdAt
+        )
+      );
+      const now = Date.now();
+      const next = removeUndefinedCardFields({
+        ...existing,
+        ...sourceReferences.length ? { sourceReferences } : {},
+        updatedAt: now
+      });
+      if (!sourceReferences.length) {
+        delete next.sourceReferences;
+      }
+      next.events = appendEvent(next, { kind: "edited" }, now);
+      await this.store.register(next.id, { version: 1, card: next });
+      return next;
     });
   }
   async addLink(id, input) {
@@ -5887,6 +6362,32 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
       return {
         ...metadata,
         artifacts: [...metadata.artifacts ?? [], artifact].slice(-MAX_CARD_ARTIFACTS)
+      };
+    });
+  }
+  async deleteProof(id, proofId, scope) {
+    return await this.updateMetadata(id, (existing) => {
+      assertCanMutateClaimedCard(existing, scope);
+      const proof = existing.metadata?.proof ?? [];
+      if (!proof.some((entry) => entry.id === proofId)) {
+        throw new Error(`proof not found: ${proofId}`);
+      }
+      return {
+        ...existing.metadata,
+        proof: proof.filter((entry) => entry.id !== proofId)
+      };
+    });
+  }
+  async deleteArtifact(id, artifactId, scope) {
+    return await this.updateMetadata(id, (existing) => {
+      assertCanMutateClaimedCard(existing, scope);
+      const artifacts = existing.metadata?.artifacts ?? [];
+      if (!artifacts.some((entry) => entry.id === artifactId)) {
+        throw new Error(`artifact not found: ${artifactId}`);
+      }
+      return {
+        ...existing.metadata,
+        artifacts: artifacts.filter((entry) => entry.id !== artifactId)
       };
     });
   }
@@ -6682,13 +7183,11 @@ var FlowboardNotificationStore = class extends FlowboardWorkflowStore {
 // src/backend/src/store-projects.ts
 var STANDARD_PROJECT_DOCUMENTS = [
   { key: "project", section: "project", title: "Project Overview" },
-  { key: "config", section: "project", title: "Project Configuration" },
   { key: "requirements", section: "project", title: "Requirements" },
   { key: "roadmap", section: "project", title: "Roadmap" },
   { key: "state", section: "project", title: "Current State" },
   { key: "retrospective", section: "project", title: "Retrospective" },
   { key: "architecture", section: "codebase", title: "Architecture" },
-  { key: "stack", section: "codebase", title: "Technology Stack" },
   { key: "structure", section: "codebase", title: "Directory Structure" },
   { key: "conventions", section: "codebase", title: "Coding Conventions" },
   { key: "testing", section: "codebase", title: "Testing" },
@@ -6699,9 +7198,17 @@ var STANDARD_PROJECT_DOCUMENTS = [
   { key: "notes", section: "knowledge", title: "Notes" },
   { key: "research", section: "knowledge", title: "Research" },
   { key: "todos", section: "knowledge", title: "Todos" },
-  { key: "seeds", section: "knowledge", title: "Seeds" },
-  { key: "onboarding", section: "knowledge", title: "Onboarding" }
+  { key: "seeds", section: "knowledge", title: "Seeds" }
 ];
+var STANDARD_PROJECT_DOCUMENT_KEYS = new Set(STANDARD_PROJECT_DOCUMENTS.map((item) => item.key));
+function presentProjectDocument(document) {
+  if (!document.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(document.key)) {
+    return document;
+  }
+  const next = { ...document };
+  delete next.system;
+  return next;
+}
 function isDocumentSection(value) {
   return typeof value === "string" && FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.includes(value);
 }
@@ -6740,9 +7247,11 @@ function normalizeDocumentType(value, fallback) {
   return value;
 }
 function normalizeDocumentBody(input, type, fallback) {
+  const hasTargetInput = Object.hasOwn(input, "target");
   const target = type === "link" ? normalizeExternalUrl(input.target, fallback?.target, "document URL") : type === "path" || type === "secret_ref" ? normalizeBoundedString(input.target, fallback?.target, 2e3, "document target") : void 0;
   const content = type === "markdown" || type === "json" ? normalizeBoundedString(input.content, fallback?.content, 2e4, "document content") : void 0;
-  if ((type === "link" || type === "path" || type === "secret_ref") && !target) {
+  const allowsUnboundSystemPath = type === "path" && fallback?.system === true && !hasTargetInput && !fallback.target;
+  if ((type === "link" || type === "path" || type === "secret_ref") && !target && !allowsUnboundSystemPath) {
     throw new Error(`${type} documents require a target.`);
   }
   if (type === "path" && (target?.includes("\0") || target?.includes("\n"))) {
@@ -6790,7 +7299,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
         boardId,
         key: item.key,
         section: item.section,
-        type: "markdown",
+        type: "path",
         title: item.title,
         position: (position + 1) * POSITION_STEP,
         system: true,
@@ -7199,11 +7708,18 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       await this.ensureProjectDirect(normalizedBoardId);
       const documents = (await this.documentStore.entries()).map((entry) => entry.value).filter(
         (entry) => entry?.version === 1 && entry.document?.boardId === normalizedBoardId
-      ).map((entry) => entry.document).filter((document) => options.includeHidden === true || !document.hiddenAt).toSorted(
+      ).map((entry) => presentProjectDocument(entry.document)).filter((document) => options.includeHidden === true || !document.hiddenAt).toSorted(
         (left, right) => left.section.localeCompare(right.section) || left.position - right.position || left.createdAt - right.createdAt
       );
       return { documents };
     });
+  }
+  async getProjectDocument(id) {
+    const entry = await this.documentStore.lookup(id.trim());
+    if (!entry?.document) {
+      throw new Error(`project document not found: ${id}`);
+    }
+    return presentProjectDocument(entry.document);
   }
   async createProjectDocument(input) {
     return await this.enqueueMutation(async () => {
@@ -7300,7 +7816,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
       if (!entry?.document) {
         return { deleted: false };
       }
-      if (entry.document.system) {
+      if (entry.document.system && STANDARD_PROJECT_DOCUMENT_KEYS.has(entry.document.key)) {
         throw new Error("standard project documents can be hidden but not deleted.");
       }
       return { deleted: await this.documentStore.delete(entry.document.id) };
@@ -7772,6 +8288,40 @@ function registerFlowboardGatewayMethods(params) {
       try {
         respond(true, {
           card: redactClaimToken(await store.addArtifact(readId(requestParams), requestParams))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.proof.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const proofId = requestParams.proofId;
+        if (typeof proofId !== "string" || !proofId.trim()) {
+          throw new Error("proofId is required.");
+        }
+        respond(true, {
+          card: redactClaimToken(await store.deleteProof(readId(requestParams), proofId.trim()))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.artifact.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const artifactId = requestParams.artifactId;
+        if (typeof artifactId !== "string" || !artifactId.trim()) {
+          throw new Error("artifactId is required.");
+        }
+        respond(true, {
+          card: redactClaimToken(await store.deleteArtifact(readId(requestParams), artifactId.trim()))
         });
       } catch (error) {
         respondError(respond, error);
@@ -13949,8 +14499,8 @@ function createFlowboardTools(params) {
 }
 
 // src/ui-static.ts
-import fs2 from "node:fs";
-import path3 from "node:path";
+import fs3 from "node:fs";
+import path4 from "node:path";
 import { fileURLToPath } from "node:url";
 var UI_PREFIX = "/flowboard/";
 var MIME_TYPES = {
@@ -13974,8 +14524,8 @@ function send(req, res, status, headers, body) {
   res.end();
 }
 function isWithinRoot(root, candidate) {
-  const relative = path3.relative(root, candidate);
-  return relative === "" || !relative.startsWith(`..${path3.sep}`) && relative !== "..";
+  const relative = path4.relative(root, candidate);
+  return relative === "" || !relative.startsWith(`..${path4.sep}`) && relative !== "..";
 }
 function resolveUiFile(root, requestPath) {
   let decodedPath;
@@ -13988,20 +14538,20 @@ function resolveUiFile(root, requestPath) {
     return null;
   }
   const relativePath = decodedPath.slice(UI_PREFIX.length).replace(/^\/+/, "");
-  const candidate = path3.resolve(root, relativePath || "index.html");
+  const candidate = path4.resolve(root, relativePath || "index.html");
   if (!isWithinRoot(root, candidate)) {
     return null;
   }
-  if (fs2.existsSync(candidate) && fs2.statSync(candidate).isFile()) {
+  if (fs3.existsSync(candidate) && fs3.statSync(candidate).isFile()) {
     return { filePath: candidate, fallback: false };
   }
-  if (path3.extname(relativePath) === "") {
-    return { filePath: path3.join(root, "index.html"), fallback: true };
+  if (path4.extname(relativePath) === "") {
+    return { filePath: path4.join(root, "index.html"), fallback: true };
   }
   return null;
 }
 function createFlowboardStaticUiHandler(uiRoot) {
-  const root = path3.resolve(
+  const root = path4.resolve(
     uiRoot ?? fileURLToPath(new URL("../ui/dist/", import.meta.url))
   );
   return (req, res) => {
@@ -14020,8 +14570,8 @@ function createFlowboardStaticUiHandler(uiRoot) {
       return true;
     }
     try {
-      const content = fs2.readFileSync(resolved.filePath);
-      const extension = path3.extname(resolved.filePath).toLowerCase();
+      const content = fs3.readFileSync(resolved.filePath);
+      const extension = path4.extname(resolved.filePath).toLowerCase();
       const immutableAsset = pathname.includes("/assets/") && !resolved.fallback;
       send(
         req,

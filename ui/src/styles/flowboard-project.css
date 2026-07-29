@@ -476,6 +476,22 @@
   white-space: nowrap;
 }
 
+.flowboard-project__delivery-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  grid-column: 2;
+}
+
+.flowboard-project__delivery-badges small {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 4px;
+}
+
 .flowboard-project__card-footer {
   justify-content: space-between;
   margin-top: 9px;
@@ -541,6 +557,19 @@
   gap: 18px;
 }
 
+.flowboard-project__documents-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.flowboard-project__document-navigation {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
 .flowboard-project__document-section {
   border-top: 1px solid var(--border);
   padding-top: 12px;
@@ -578,6 +607,10 @@
   text-align: left;
 }
 
+.flowboard-project__document-main:hover > span {
+  color: var(--accent);
+}
+
 .flowboard-project__document-main > span {
   font-size: 13px;
   font-weight: 600;
@@ -594,6 +627,185 @@
   display: flex;
   flex: 0 0 auto;
   gap: 2px;
+}
+
+.flowboard-project__document-reader {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  min-height: 460px;
+  overflow: auto;
+  padding: 18px;
+}
+
+.flowboard-project__document-reader.is-empty {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+}
+
+.flowboard-project__document-reader header {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+}
+
+.flowboard-project__document-reader h2 {
+  font-size: 16px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.flowboard-project__document-reader header small {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.flowboard-project__document-reader-message {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.flowboard-project__document-reader-message.is-error {
+  color: var(--danger);
+}
+
+.flowboard-markdown {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.flowboard-markdown > :first-child {
+  margin-top: 0;
+}
+
+.flowboard-markdown h1,
+.flowboard-markdown h2,
+.flowboard-markdown h3,
+.flowboard-markdown h4 {
+  line-height: 1.3;
+}
+
+.flowboard-markdown h1 { font-size: 22px; }
+.flowboard-markdown h2 { font-size: 18px; }
+.flowboard-markdown h3 { font-size: 15px; }
+
+.flowboard-markdown code {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.92em;
+  padding: 1px 4px;
+}
+
+.flowboard-markdown pre {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  overflow: auto;
+  padding: 12px;
+}
+
+.flowboard-markdown pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.flowboard-markdown table {
+  border-collapse: collapse;
+  display: block;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.flowboard-markdown td,
+.flowboard-markdown th {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.flowboard-project__detail-section {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.flowboard-project__detail-section h3 {
+  font-size: 13px;
+  margin: 0;
+}
+
+.flowboard-project__delivery-form,
+.flowboard-project__source-reference,
+.flowboard-project__evidence-form,
+.flowboard-project__detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.flowboard-project__detail-empty {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.flowboard-project__source-reference {
+  background: color-mix(in srgb, var(--panel-strong) 50%, transparent);
+  border: 1px solid var(--border);
+  padding: 8px;
+}
+
+.flowboard-project__evidence-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.flowboard-project__evidence-form .btn {
+  justify-self: start;
+}
+
+.flowboard-project__evidence-item {
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  display: grid;
+  gap: 3px 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 6px 0;
+}
+
+.flowboard-project__evidence-item span {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.flowboard-project__evidence-item small {
+  color: var(--muted);
+  font-size: 11px;
+  grid-column: 1;
+  overflow-wrap: anywhere;
+}
+
+.flowboard-project__evidence-item .flowboard-project__icon-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.flowboard-project__inline-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .flowboard-project__move-card-title {
@@ -740,6 +952,14 @@
   .flowboard-project__kanban {
     min-height: calc(100vh - 270px);
   }
+
+  .flowboard-project__documents-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .flowboard-project__document-reader {
+    min-height: 340px;
+  }
 }
 
 @media (max-width: 560px) {
@@ -755,7 +975,8 @@
   }
 
   .flowboard-project__settings-form,
-  .flowboard-project__modal-grid {
+  .flowboard-project__modal-grid,
+  .flowboard-project__evidence-form {
     grid-template-columns: 1fr;
   }
 

@@ -2,6 +2,7 @@ import { LitElement, html } from "lit";
 import type {
   FlowboardBoardSummary,
   FlowboardProjectDocument,
+  FlowboardProjectDocumentRead,
   FlowboardProjectView,
   FlowboardStatus,
 } from "../../src/contract/index.ts";
@@ -36,6 +37,10 @@ type ProjectResponse = {
 
 type ProjectDocumentsResponse = {
   documents: FlowboardProjectDocument[];
+};
+
+type ProjectDocumentReadResponse = {
+  preview: FlowboardProjectDocumentRead;
 };
 
 function validChange(value: unknown): value is ChangeCursor {
@@ -174,6 +179,9 @@ class FlowboardProjectHost extends LitElement {
         this.state.selectedProjectId = null;
         this.state.project = null;
         this.state.documents = [];
+        this.state.selectedDocumentId = null;
+        this.state.documentPreview = null;
+        this.state.documentPreviewError = null;
         this.state.screen = "overview";
       } else if (selectedId) {
         const project = await this.gateway.request<ProjectResponse>("flowboard.projects.get", {
@@ -195,6 +203,14 @@ class FlowboardProjectHost extends LitElement {
             return;
           }
           this.state.documents = documents.documents;
+          if (
+            this.state.selectedDocumentId &&
+            !documents.documents.some((document) => document.id === this.state.selectedDocumentId)
+          ) {
+            this.state.selectedDocumentId = null;
+            this.state.documentPreview = null;
+            this.state.documentPreviewError = null;
+          }
         }
       }
       this.state.loaded = true;
@@ -214,6 +230,9 @@ class FlowboardProjectHost extends LitElement {
     this.state.selectedProjectId = id;
     this.state.screen = "board";
     this.state.documents = [];
+    this.state.selectedDocumentId = null;
+    this.state.documentPreview = null;
+    this.state.documentPreviewError = null;
     void this.refresh();
   }
 
@@ -437,6 +456,45 @@ class FlowboardProjectHost extends LitElement {
     }, { closeModal: false });
   }
 
+  private openDocument(id: string) {
+    void this.readDocument(id);
+  }
+
+  private refreshDocument() {
+    if (this.state.selectedDocumentId) {
+      void this.readDocument(this.state.selectedDocumentId);
+    }
+  }
+
+  private async readDocument(id: string) {
+    if (this.state.documentPreviewLoading) {
+      return;
+    }
+    this.state.selectedDocumentId = id;
+    this.state.documentPreview = null;
+    this.state.documentPreviewError = null;
+    this.state.documentPreviewLoading = true;
+    this.requestUpdate();
+    try {
+      const response = await this.gateway.request<ProjectDocumentReadResponse>(
+        "flowboard.projects.documents.read",
+        { id },
+      );
+      if (this.state.selectedDocumentId === id) {
+        this.state.documentPreview = response.preview;
+      }
+    } catch (error) {
+      if (this.state.selectedDocumentId === id) {
+        this.state.documentPreviewError = errorMessage(error);
+      }
+    } finally {
+      if (this.state.selectedDocumentId === id) {
+        this.state.documentPreviewLoading = false;
+        this.requestUpdate();
+      }
+    }
+  }
+
   private saveMilestone(data: Record<string, string>) {
     const project = this.state.project;
     if (!project) {
@@ -520,6 +578,70 @@ class FlowboardProjectHost extends LitElement {
     }, { closeModal: false });
   }
 
+  private updateCardDelivery(id: string, data: Record<string, string>) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.update", {
+        id,
+        delivery: {
+          objective: data.objective,
+          deliverySummary: data.deliverySummary,
+          openItems: data.openItems,
+          implementationState: data.implementationState,
+          verificationState: data.verificationState,
+          releaseState: data.releaseState,
+        },
+      });
+    }, { closeModal: false });
+  }
+
+  private createSourceReference(id: string, data: Record<string, string>) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.sources.create", { id, ...data });
+    }, { closeModal: false });
+  }
+
+  private updateSourceReference(id: string, data: Record<string, string>) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.sources.update", { id, ...data });
+    }, { closeModal: false });
+  }
+
+  private deleteSourceReference(id: string, sourceReferenceId: string) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.sources.delete", { id, sourceReferenceId });
+    }, { closeModal: false });
+  }
+
+  private reorderSourceReferences(id: string, sourceReferenceIds: string[]) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.sources.reorder", { id, sourceReferenceIds });
+    }, { closeModal: false });
+  }
+
+  private addProof(id: string, data: Record<string, string>) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.proof", { id, ...data });
+    }, { closeModal: false });
+  }
+
+  private deleteProof(id: string, proofId: string) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.proof.delete", { id, proofId });
+    }, { closeModal: false });
+  }
+
+  private addArtifact(id: string, data: Record<string, string>) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.artifact", { id, ...data });
+    }, { closeModal: false });
+  }
+
+  private deleteArtifact(id: string, artifactId: string) {
+    void this.mutate(async () => {
+      await this.gateway.request("flowboard.cards.artifact.delete", { id, artifactId });
+    }, { closeModal: false });
+  }
+
   render() {
     return html`${renderFlowboardProjects({
       state: this.state,
@@ -545,12 +667,25 @@ class FlowboardProjectHost extends LitElement {
       reorderProjects: (ids) => this.reorderProjects(ids),
       reorderMilestones: (ids) => this.reorderMilestones(ids),
       reorderDocuments: (ids) => this.reorderDocuments(ids),
+      openDocument: (id) => this.openDocument(id),
+      refreshDocument: () => this.refreshDocument(),
       saveMilestone: (data) => this.saveMilestone(data),
       completeMilestone: (id) => this.completeMilestone(id),
       archiveMilestone: (id, archived) => this.archiveMilestone(id, archived),
       saveDocument: (data) => this.saveDocument(data),
       hideDocument: (id, hidden) => this.hideDocument(id, hidden),
       deleteDocument: (id) => this.deleteDocument(id),
+      updateCardDelivery: (id, data) => this.updateCardDelivery(id, data),
+      createSourceReference: (id, data) => this.createSourceReference(id, data),
+      updateSourceReference: (id, data) => this.updateSourceReference(id, data),
+      deleteSourceReference: (id, sourceReferenceId) =>
+        this.deleteSourceReference(id, sourceReferenceId),
+      reorderSourceReferences: (id, sourceReferenceIds) =>
+        this.reorderSourceReferences(id, sourceReferenceIds),
+      addProof: (id, data) => this.addProof(id, data),
+      deleteProof: (id, proofId) => this.deleteProof(id, proofId),
+      addArtifact: (id, data) => this.addArtifact(id, data),
+      deleteArtifact: (id, artifactId) => this.deleteArtifact(id, artifactId),
     })}`;
   }
 }

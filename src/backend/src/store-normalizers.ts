@@ -4,6 +4,9 @@ import {
   FLOWBOARD_ATTEMPT_STATUSES,
   FLOWBOARD_DIAGNOSTIC_KINDS,
   FLOWBOARD_DIAGNOSTIC_SEVERITIES,
+  FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES,
+  FLOWBOARD_DELIVERY_RELEASE_STATES,
+  FLOWBOARD_DELIVERY_VERIFICATION_STATES,
   FLOWBOARD_EVENT_KINDS,
   FLOWBOARD_EXECUTION_MODES,
   FLOWBOARD_EXECUTION_STATUSES,
@@ -24,6 +27,10 @@ import {
   type FlowboardDiagnosticAction,
   type FlowboardDiagnosticKind,
   type FlowboardDiagnosticSeverity,
+  type FlowboardDelivery,
+  type FlowboardDeliveryImplementationState,
+  type FlowboardDeliveryReleaseState,
+  type FlowboardDeliveryVerificationState,
   type FlowboardEvent,
   type FlowboardEventKind,
   type FlowboardExecution,
@@ -287,6 +294,97 @@ export function normalizeNotes(value: unknown): string | undefined {
     throw new Error("notes must be 4000 characters or fewer.");
   }
   return notes;
+}
+
+function normalizeOptionalBoundedString(
+  value: unknown,
+  maxLength: number,
+  fieldName: string,
+): string | undefined {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized.length > maxLength) {
+    throw new Error(`${fieldName} must be ${maxLength} characters or fewer.`);
+  }
+  return normalized;
+}
+
+function normalizeDeliveryState<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fieldName: string,
+): T | undefined {
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+  if (!allowed.includes(value as T)) {
+    throw new Error(`${fieldName} must be one of: ${allowed.join(", ")}.`);
+  }
+  return value as T;
+}
+
+export function normalizeDelivery(
+  value: unknown,
+  fallback?: FlowboardDelivery,
+  now = Date.now(),
+): FlowboardDelivery | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return fallback;
+  }
+  const record = value as Record<string, unknown>;
+  const readText = (
+    key: "objective" | "deliverySummary" | "openItems",
+    maxLength: number,
+    fieldName: string,
+  ) =>
+    Object.hasOwn(record, key)
+      ? normalizeOptionalBoundedString(record[key], maxLength, fieldName)
+      : fallback?.[key];
+  const implementationState = Object.hasOwn(record, "implementationState")
+    ? normalizeDeliveryState(
+        record.implementationState,
+        FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES,
+        "implementation state",
+      )
+    : fallback?.implementationState;
+  const verificationState = Object.hasOwn(record, "verificationState")
+    ? normalizeDeliveryState(
+        record.verificationState,
+        FLOWBOARD_DELIVERY_VERIFICATION_STATES,
+        "verification state",
+      )
+    : fallback?.verificationState;
+  const releaseState = Object.hasOwn(record, "releaseState")
+    ? normalizeDeliveryState(
+        record.releaseState,
+        FLOWBOARD_DELIVERY_RELEASE_STATES,
+        "release state",
+      )
+    : fallback?.releaseState;
+  const delivery: Omit<FlowboardDelivery, "updatedAt"> = {
+    ...(readText("objective", 2000, "delivery objective")
+      ? { objective: readText("objective", 2000, "delivery objective") }
+      : {}),
+    ...(readText("deliverySummary", 4000, "delivery summary")
+      ? { deliverySummary: readText("deliverySummary", 4000, "delivery summary") }
+      : {}),
+    ...(readText("openItems", 4000, "delivery open items")
+      ? { openItems: readText("openItems", 4000, "delivery open items") }
+      : {}),
+    ...(implementationState
+      ? { implementationState: implementationState as FlowboardDeliveryImplementationState }
+      : {}),
+    ...(verificationState
+      ? { verificationState: verificationState as FlowboardDeliveryVerificationState }
+      : {}),
+    ...(releaseState ? { releaseState: releaseState as FlowboardDeliveryReleaseState } : {}),
+  };
+  return Object.keys(delivery).length ? { ...delivery, updatedAt: now } : undefined;
 }
 
 export function normalizeBoundedString(

@@ -7,6 +7,7 @@ import type {
   FlowboardCard,
   FlowboardComment,
   FlowboardDiagnostic,
+  FlowboardDelivery,
   FlowboardEvent,
   FlowboardExecution,
   FlowboardLink,
@@ -16,6 +17,7 @@ import type {
   FlowboardProof,
   FlowboardProjectDocument,
   FlowboardRunAttempt,
+  FlowboardSourceReference,
   FlowboardWorkerLog,
 } from "../../contract/index.js";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
@@ -30,7 +32,7 @@ import type {
   FlowboardKeyedStore,
 } from "./persistence-types.js";
 const FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"] as const;
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const FLOWBOARD_SQLITE_DIR_MODE = 0o700;
 const FLOWBOARD_SQLITE_FILE_MODE = 0o600;
@@ -284,6 +286,31 @@ const FLOWBOARD_SCHEMA_SQL = `
       mime_type TEXT,
       created_at INTEGER NOT NULL
     ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_card_delivery (
+      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      objective TEXT,
+      delivery_summary TEXT,
+      open_items TEXT,
+      implementation_state TEXT,
+      verification_state TEXT,
+      release_state TEXT,
+      updated_at INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_card_source_references (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      ordinal INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      target TEXT NOT NULL,
+      note TEXT,
+      position REAL NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_card_source_references_card_position_idx
+      ON flowboard_card_source_references(card_id, position);
 
     CREATE TABLE IF NOT EXISTS flowboard_card_diagnostics (
       card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
@@ -786,6 +813,62 @@ function readMetadata(db: DatabaseSync, row: Row): FlowboardMetadata | undefined
   });
 }
 
+function readDelivery(db: DatabaseSync, cardId: string): FlowboardDelivery | undefined {
+  const row = db
+    .prepare("SELECT * FROM flowboard_card_delivery WHERE card_id = ?")
+    .get(cardId) as Row | undefined;
+  if (!row) {
+    return undefined;
+  }
+  const delivery: FlowboardDelivery = {
+    updatedAt: requiredNumber(row, "updated_at"),
+  };
+  const objective = stringValue(row, "objective");
+  const deliverySummary = stringValue(row, "delivery_summary");
+  const openItems = stringValue(row, "open_items");
+  const implementationState = stringValue(row, "implementation_state");
+  const verificationState = stringValue(row, "verification_state");
+  const releaseState = stringValue(row, "release_state");
+  if (objective) {
+    delivery.objective = objective;
+  }
+  if (deliverySummary) {
+    delivery.deliverySummary = deliverySummary;
+  }
+  if (openItems) {
+    delivery.openItems = openItems;
+  }
+  if (implementationState) {
+    delivery.implementationState =
+      implementationState as FlowboardDelivery["implementationState"];
+  }
+  if (verificationState) {
+    delivery.verificationState = verificationState as FlowboardDelivery["verificationState"];
+  }
+  if (releaseState) {
+    delivery.releaseState = releaseState as FlowboardDelivery["releaseState"];
+  }
+  return delivery;
+}
+
+function readSourceReferences(db: DatabaseSync, cardId: string): FlowboardSourceReference[] {
+  return childRows(db, "flowboard_card_source_references", cardId).map((child) => {
+    const reference: FlowboardSourceReference = {
+      id: requiredString(child, "id"),
+      label: requiredString(child, "label"),
+      target: requiredString(child, "target"),
+      position: requiredNumber(child, "position"),
+      createdAt: requiredNumber(child, "created_at"),
+      updatedAt: requiredNumber(child, "updated_at"),
+    };
+    const note = stringValue(child, "note");
+    if (note) {
+      reference.note = note;
+    }
+    return reference;
+  });
+}
+
 function readCard(db: DatabaseSync, row: Row): FlowboardCard {
   const card: FlowboardCard = {
     id: requiredString(row, "id"),
@@ -798,6 +881,8 @@ function readCard(db: DatabaseSync, row: Row): FlowboardCard {
     updatedAt: requiredNumber(row, "updated_at"),
   };
   const metadata = readMetadata(db, row);
+  const delivery = readDelivery(db, card.id);
+  const sourceReferences = readSourceReferences(db, card.id);
   return {
     ...card,
     ...(stringValue(row, "notes") ? { notes: stringValue(row, "notes") } : {}),
@@ -808,6 +893,8 @@ function readCard(db: DatabaseSync, row: Row): FlowboardCard {
     ...(stringValue(row, "source_url") ? { sourceUrl: stringValue(row, "source_url") } : {}),
     ...(stringValue(row, "milestone_id") ? { milestoneId: stringValue(row, "milestone_id") } : {}),
     ...(readExecution(row) ? { execution: readExecution(row) } : {}),
+    ...(delivery ? { delivery } : {}),
+    ...(sourceReferences.length ? { sourceReferences } : {}),
     ...(numberValue(row, "started_at") !== undefined
       ? { startedAt: numberValue(row, "started_at") }
       : {}),
@@ -1053,6 +1140,51 @@ function insertCard(db: DatabaseSync, card: FlowboardCard): void {
       entry.createdAt,
     );
   });
+  db.prepare("DELETE FROM flowboard_card_delivery WHERE card_id = ?").run(card.id);
+  if (card.delivery) {
+    db.prepare(
+      `
+        INSERT INTO flowboard_card_delivery
+          (card_id, objective, delivery_summary, open_items, implementation_state,
+           verification_state, release_state, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    ).run(
+      card.id,
+      bindNull(card.delivery.objective),
+      bindNull(card.delivery.deliverySummary),
+      bindNull(card.delivery.openItems),
+      bindNull(card.delivery.implementationState),
+      bindNull(card.delivery.verificationState),
+      bindNull(card.delivery.releaseState),
+      card.delivery.updatedAt,
+    );
+  }
+  insertChildren(
+    db,
+    "flowboard_card_source_references",
+    card.id,
+    card.sourceReferences,
+    (entry, ordinal) => {
+      db.prepare(
+        `
+          INSERT INTO flowboard_card_source_references
+            (id, card_id, ordinal, label, target, note, position, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        entry.id,
+        card.id,
+        ordinal,
+        entry.label,
+        entry.target,
+        bindNull(entry.note),
+        entry.position,
+        entry.createdAt,
+        entry.updatedAt,
+      );
+    },
+  );
   insertChildren(
     db,
     "flowboard_card_attachments",

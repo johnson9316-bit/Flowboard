@@ -215,6 +215,42 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
+    "flowboard.cards.proof.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const proofId = requestParams.proofId;
+        if (typeof proofId !== "string" || !proofId.trim()) {
+          throw new Error("proofId is required.");
+        }
+        respond(true, {
+          card: redactClaimToken(await store.deleteProof(readId(requestParams), proofId.trim())),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.artifact.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const artifactId = requestParams.artifactId;
+        if (typeof artifactId !== "string" || !artifactId.trim()) {
+          throw new Error("artifactId is required.");
+        }
+        respond(true, {
+          card: redactClaimToken(await store.deleteArtifact(readId(requestParams), artifactId.trim())),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
     "flowboard.cards.claim",
     async ({ params: requestParams, respond }) => {
       try {

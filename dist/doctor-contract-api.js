@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 4;
+var SCHEMA_VERSION = 5;
 var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var FLOWBOARD_SQLITE_DIR_MODE = 448;
 var FLOWBOARD_SQLITE_FILE_MODE = 384;
@@ -234,6 +234,31 @@ var FLOWBOARD_SCHEMA_SQL = `
       mime_type TEXT,
       created_at INTEGER NOT NULL
     ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_card_delivery (
+      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      objective TEXT,
+      delivery_summary TEXT,
+      open_items TEXT,
+      implementation_state TEXT,
+      verification_state TEXT,
+      release_state TEXT,
+      updated_at INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS flowboard_card_source_references (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      ordinal INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      target TEXT NOT NULL,
+      note TEXT,
+      position REAL NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS flowboard_card_source_references_card_position_idx
+      ON flowboard_card_source_references(card_id, position);
 
     CREATE TABLE IF NOT EXISTS flowboard_card_diagnostics (
       card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
@@ -701,6 +726,57 @@ function readMetadata(db, row) {
     ...numberValue(row, "failure_count") !== void 0 ? { failureCount: numberValue(row, "failure_count") } : {}
   });
 }
+function readDelivery(db, cardId) {
+  const row = db.prepare("SELECT * FROM flowboard_card_delivery WHERE card_id = ?").get(cardId);
+  if (!row) {
+    return void 0;
+  }
+  const delivery = {
+    updatedAt: requiredNumber(row, "updated_at")
+  };
+  const objective = stringValue(row, "objective");
+  const deliverySummary = stringValue(row, "delivery_summary");
+  const openItems = stringValue(row, "open_items");
+  const implementationState = stringValue(row, "implementation_state");
+  const verificationState = stringValue(row, "verification_state");
+  const releaseState = stringValue(row, "release_state");
+  if (objective) {
+    delivery.objective = objective;
+  }
+  if (deliverySummary) {
+    delivery.deliverySummary = deliverySummary;
+  }
+  if (openItems) {
+    delivery.openItems = openItems;
+  }
+  if (implementationState) {
+    delivery.implementationState = implementationState;
+  }
+  if (verificationState) {
+    delivery.verificationState = verificationState;
+  }
+  if (releaseState) {
+    delivery.releaseState = releaseState;
+  }
+  return delivery;
+}
+function readSourceReferences(db, cardId) {
+  return childRows(db, "flowboard_card_source_references", cardId).map((child) => {
+    const reference = {
+      id: requiredString(child, "id"),
+      label: requiredString(child, "label"),
+      target: requiredString(child, "target"),
+      position: requiredNumber(child, "position"),
+      createdAt: requiredNumber(child, "created_at"),
+      updatedAt: requiredNumber(child, "updated_at")
+    };
+    const note = stringValue(child, "note");
+    if (note) {
+      reference.note = note;
+    }
+    return reference;
+  });
+}
 function readCard(db, row) {
   const card = {
     id: requiredString(row, "id"),
@@ -713,6 +789,8 @@ function readCard(db, row) {
     updatedAt: requiredNumber(row, "updated_at")
   };
   const metadata = readMetadata(db, row);
+  const delivery = readDelivery(db, card.id);
+  const sourceReferences = readSourceReferences(db, card.id);
   return {
     ...card,
     ...stringValue(row, "notes") ? { notes: stringValue(row, "notes") } : {},
@@ -723,6 +801,8 @@ function readCard(db, row) {
     ...stringValue(row, "source_url") ? { sourceUrl: stringValue(row, "source_url") } : {},
     ...stringValue(row, "milestone_id") ? { milestoneId: stringValue(row, "milestone_id") } : {},
     ...readExecution(row) ? { execution: readExecution(row) } : {},
+    ...delivery ? { delivery } : {},
+    ...sourceReferences.length ? { sourceReferences } : {},
     ...numberValue(row, "started_at") !== void 0 ? { startedAt: numberValue(row, "started_at") } : {},
     ...numberValue(row, "completed_at") !== void 0 ? { completedAt: numberValue(row, "completed_at") } : {},
     ...readEvents(db, card.id) ? { events: readEvents(db, card.id) } : {},
@@ -946,6 +1026,51 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
+  db.prepare("DELETE FROM flowboard_card_delivery WHERE card_id = ?").run(card.id);
+  if (card.delivery) {
+    db.prepare(
+      `
+        INSERT INTO flowboard_card_delivery
+          (card_id, objective, delivery_summary, open_items, implementation_state,
+           verification_state, release_state, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    ).run(
+      card.id,
+      bindNull(card.delivery.objective),
+      bindNull(card.delivery.deliverySummary),
+      bindNull(card.delivery.openItems),
+      bindNull(card.delivery.implementationState),
+      bindNull(card.delivery.verificationState),
+      bindNull(card.delivery.releaseState),
+      card.delivery.updatedAt
+    );
+  }
+  insertChildren(
+    db,
+    "flowboard_card_source_references",
+    card.id,
+    card.sourceReferences,
+    (entry, ordinal) => {
+      db.prepare(
+        `
+          INSERT INTO flowboard_card_source_references
+            (id, card_id, ordinal, label, target, note, position, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run(
+        entry.id,
+        card.id,
+        ordinal,
+        entry.label,
+        entry.target,
+        bindNull(entry.note),
+        entry.position,
+        entry.createdAt,
+        entry.updatedAt
+      );
+    }
+  );
   insertChildren(
     db,
     "flowboard_card_attachments",

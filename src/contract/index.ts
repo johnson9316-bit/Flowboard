@@ -89,6 +89,29 @@ export const FLOWBOARD_PROJECT_DOCUMENT_TYPES = [
   "path",
   "secret_ref",
 ] as const;
+export const FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES = [
+  "not_started",
+  "in_progress",
+  "code_complete",
+  "not_applicable",
+  "unknown",
+] as const;
+export const FLOWBOARD_DELIVERY_VERIFICATION_STATES = [
+  "not_started",
+  "partial",
+  "passed",
+  "failed",
+  "human_required",
+  "not_required",
+  "unknown",
+] as const;
+export const FLOWBOARD_DELIVERY_RELEASE_STATES = [
+  "not_started",
+  "pending",
+  "released",
+  "not_required",
+  "unknown",
+] as const;
 export const FLOWBOARD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 
 export function isValidFlowboardBoardId(value: unknown): value is string {
@@ -112,6 +135,11 @@ export type FlowboardMilestoneState = (typeof FLOWBOARD_MILESTONE_STATES)[number
 export type FlowboardProjectDocumentSection =
   (typeof FLOWBOARD_PROJECT_DOCUMENT_SECTIONS)[number];
 export type FlowboardProjectDocumentType = (typeof FLOWBOARD_PROJECT_DOCUMENT_TYPES)[number];
+export type FlowboardDeliveryImplementationState =
+  (typeof FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES)[number];
+export type FlowboardDeliveryVerificationState =
+  (typeof FLOWBOARD_DELIVERY_VERIFICATION_STATES)[number];
+export type FlowboardDeliveryReleaseState = (typeof FLOWBOARD_DELIVERY_RELEASE_STATES)[number];
 
 export type FlowboardExecution = {
   id: string;
@@ -184,6 +212,26 @@ export type FlowboardArtifact = {
   url?: string;
   path?: string;
   mimeType?: string;
+};
+
+export type FlowboardDelivery = {
+  objective?: string;
+  deliverySummary?: string;
+  openItems?: string;
+  implementationState?: FlowboardDeliveryImplementationState;
+  verificationState?: FlowboardDeliveryVerificationState;
+  releaseState?: FlowboardDeliveryReleaseState;
+  updatedAt: number;
+};
+
+export type FlowboardSourceReference = {
+  id: string;
+  label: string;
+  target: string;
+  position: number;
+  createdAt: number;
+  updatedAt: number;
+  note?: string;
 };
 
 export type FlowboardAttachment = {
@@ -370,6 +418,14 @@ export type FlowboardProjectDocument = {
   updatedAt: number;
 };
 
+export type FlowboardProjectDocumentRead = {
+  document: FlowboardProjectDocument;
+  content: string;
+  source: "stored" | "path";
+  path?: string;
+  modifiedAt?: number;
+};
+
 export type FlowboardNotificationSubscription = {
   id: string;
   boardId: string;
@@ -419,6 +475,8 @@ export type FlowboardCard = {
   taskId?: string;
   sourceUrl?: string;
   execution?: FlowboardExecution;
+  delivery?: FlowboardDelivery;
+  sourceReferences?: FlowboardSourceReference[];
   milestoneId?: string;
   position: number;
   createdAt: number;

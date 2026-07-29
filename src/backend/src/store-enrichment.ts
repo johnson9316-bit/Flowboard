@@ -105,6 +105,42 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
     });
   }
 
+  async deleteProof(
+    id: string,
+    proofId: string,
+    scope?: FlowboardMutationScope,
+  ): Promise<FlowboardCard> {
+    return await this.updateMetadata(id, (existing) => {
+      assertCanMutateClaimedCard(existing, scope);
+      const proof = existing.metadata?.proof ?? [];
+      if (!proof.some((entry) => entry.id === proofId)) {
+        throw new Error(`proof not found: ${proofId}`);
+      }
+      return {
+        ...existing.metadata,
+        proof: proof.filter((entry) => entry.id !== proofId),
+      };
+    });
+  }
+
+  async deleteArtifact(
+    id: string,
+    artifactId: string,
+    scope?: FlowboardMutationScope,
+  ): Promise<FlowboardCard> {
+    return await this.updateMetadata(id, (existing) => {
+      assertCanMutateClaimedCard(existing, scope);
+      const artifacts = existing.metadata?.artifacts ?? [];
+      if (!artifacts.some((entry) => entry.id === artifactId)) {
+        throw new Error(`artifact not found: ${artifactId}`);
+      }
+      return {
+        ...existing.metadata,
+        artifacts: artifacts.filter((entry) => entry.id !== artifactId),
+      };
+    });
+  }
+
   async addAttachment(
     id: string,
     input: FlowboardAttachmentInput,

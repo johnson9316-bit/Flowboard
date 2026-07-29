@@ -321,6 +321,8 @@ export function removeUndefinedCardFields(card: FlowboardCard): FlowboardCard {
     "taskId",
     "sourceUrl",
     "execution",
+    "delivery",
+    "sourceReferences",
     "startedAt",
     "completedAt",
     "metadata",

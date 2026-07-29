@@ -54,13 +54,11 @@ type StandardDocument = {
 
 const STANDARD_PROJECT_DOCUMENTS: readonly StandardDocument[] = [
   { key: "project", section: "project", title: "Project Overview" },
-  { key: "config", section: "project", title: "Project Configuration" },
   { key: "requirements", section: "project", title: "Requirements" },
   { key: "roadmap", section: "project", title: "Roadmap" },
   { key: "state", section: "project", title: "Current State" },
   { key: "retrospective", section: "project", title: "Retrospective" },
   { key: "architecture", section: "codebase", title: "Architecture" },
-  { key: "stack", section: "codebase", title: "Technology Stack" },
   { key: "structure", section: "codebase", title: "Directory Structure" },
   { key: "conventions", section: "codebase", title: "Coding Conventions" },
   { key: "testing", section: "codebase", title: "Testing" },
@@ -72,8 +70,17 @@ const STANDARD_PROJECT_DOCUMENTS: readonly StandardDocument[] = [
   { key: "research", section: "knowledge", title: "Research" },
   { key: "todos", section: "knowledge", title: "Todos" },
   { key: "seeds", section: "knowledge", title: "Seeds" },
-  { key: "onboarding", section: "knowledge", title: "Onboarding" },
 ];
+const STANDARD_PROJECT_DOCUMENT_KEYS = new Set(STANDARD_PROJECT_DOCUMENTS.map((item) => item.key));
+
+function presentProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
+  if (!document.system || STANDARD_PROJECT_DOCUMENT_KEYS.has(document.key)) {
+    return document;
+  }
+  const next = { ...document };
+  delete next.system;
+  return next;
+}
 
 function isDocumentSection(value: unknown): value is FlowboardProjectDocumentSection {
   return (
@@ -134,6 +141,7 @@ function normalizeDocumentBody(
   type: FlowboardProjectDocumentType,
   fallback?: FlowboardProjectDocument,
 ): Pick<FlowboardProjectDocument, "target" | "content"> {
+  const hasTargetInput = Object.hasOwn(input, "target");
   const target =
     type === "link"
       ? normalizeExternalUrl(input.target, fallback?.target, "document URL")
@@ -144,7 +152,13 @@ function normalizeDocumentBody(
     type === "markdown" || type === "json"
       ? normalizeBoundedString(input.content, fallback?.content, 20_000, "document content")
       : undefined;
-  if ((type === "link" || type === "path" || type === "secret_ref") && !target) {
+  const allowsUnboundSystemPath =
+    type === "path" && fallback?.system === true && !hasTargetInput && !fallback.target;
+  if (
+    (type === "link" || type === "path" || type === "secret_ref") &&
+    !target &&
+    !allowsUnboundSystemPath
+  ) {
     throw new Error(`${type} documents require a target.`);
   }
   if (type === "path" && (target?.includes("\0") || target?.includes("\n"))) {
@@ -201,7 +215,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         boardId,
         key: item.key,
         section: item.section,
-        type: "markdown",
+        type: "path",
         title: item.title,
         position: (position + 1) * POSITION_STEP,
         system: true,
@@ -692,7 +706,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
           (entry): entry is { version: 1; document: FlowboardProjectDocument } =>
             entry?.version === 1 && entry.document?.boardId === normalizedBoardId,
         )
-        .map((entry) => entry.document)
+        .map((entry) => presentProjectDocument(entry.document))
         .filter((document) => options.includeHidden === true || !document.hiddenAt)
         .toSorted(
           (left, right) =>
@@ -702,6 +716,14 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         );
       return { documents };
     });
+  }
+
+  async getProjectDocument(id: string): Promise<FlowboardProjectDocument> {
+    const entry = await this.documentStore.lookup(id.trim());
+    if (!entry?.document) {
+      throw new Error(`project document not found: ${id}`);
+    }
+    return presentProjectDocument(entry.document);
   }
 
   async createProjectDocument(
@@ -823,7 +845,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       if (!entry?.document) {
         return { deleted: false };
       }
-      if (entry.document.system) {
+      if (entry.document.system && STANDARD_PROJECT_DOCUMENT_KEYS.has(entry.document.key)) {
         throw new Error("standard project documents can be hidden but not deleted.");
       }
       return { deleted: await this.documentStore.delete(entry.document.id) };

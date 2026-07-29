@@ -30,12 +30,14 @@ function keyedStore<T>(): FlowboardKeyedStore<T> {
 
 function createStore() {
   const cards = keyedStore<PersistedFlowboardCard>();
+  const documents = keyedStore<PersistedFlowboardProjectDocument>();
   return {
     cards,
+    documents,
     store: new FlowboardStore(cards, {
       boards: keyedStore<PersistedFlowboardBoard>(),
       milestones: keyedStore<PersistedFlowboardMilestone>(),
-      documents: keyedStore<PersistedFlowboardProjectDocument>(),
+      documents,
       subscriptions: keyedStore<PersistedFlowboardNotificationSubscription>(),
       attachments: keyedStore<PersistedFlowboardAttachment>(),
     }),
@@ -56,8 +58,18 @@ describe("Flowboard M2 project store", () => {
     expect(project.board).toMatchObject({ id: "alpha", name: "Alpha" });
     expect(project.milestones).toHaveLength(1);
     expect(project.milestones[0]).toMatchObject({ boardId: "alpha", state: "active" });
-    expect(documents.documents.map((document) => document.key)).toEqual(
-      expect.arrayContaining(["project", "requirements", "architecture", "dev_environment", "notes"]),
+    expect(documents.documents).toHaveLength(17);
+    expect(documents.documents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "project", type: "path", system: true }),
+        expect.objectContaining({ key: "requirements", type: "path", system: true }),
+        expect.objectContaining({ key: "architecture", type: "path", system: true }),
+        expect.objectContaining({ key: "dev_environment", type: "path", system: true }),
+        expect.objectContaining({ key: "notes", type: "path", system: true }),
+      ]),
+    );
+    expect(documents.documents.map((document) => document.key)).not.toEqual(
+      expect.arrayContaining(["config", "stack", "onboarding"]),
     );
 
     await expect(
@@ -218,5 +230,107 @@ describe("Flowboard M2 project store", () => {
     await expect(
       store.claim(card.id, { ownerId: "operator" }),
     ).rejects.toThrow("project is archived");
+  });
+
+  it("keeps removed fixed-directory records as deletable historical documents", async () => {
+    const { documents, store } = createStore();
+    await store.createProject({
+      id: "alpha",
+      name: "Alpha",
+      initialMilestoneTitle: "Build",
+    });
+    await documents.register("legacy-stack", {
+      version: 1,
+      document: {
+        id: "legacy-stack",
+        boardId: "alpha",
+        key: "stack",
+        section: "codebase",
+        type: "path",
+        title: "Technology Stack",
+        target: "/workspace/STACK.md",
+        position: 99999,
+        system: true,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+
+    const listed = await store.listProjectDocuments("alpha", { includeHidden: true });
+
+    const legacy = listed.documents.find((document) => document.id === "legacy-stack");
+    expect(legacy).toMatchObject({ id: "legacy-stack", key: "stack" });
+    expect(legacy?.system).toBeUndefined();
+    await expect(store.deleteProjectDocument("legacy-stack")).resolves.toEqual({ deleted: true });
+  });
+
+  it("keeps delivery facts and source references independent from execution state", async () => {
+    const { store } = createStore();
+    const project = await store.createProject({
+      id: "alpha",
+      name: "Alpha",
+      initialMilestoneTitle: "Build",
+    });
+    const card = await store.create({
+      title: "Validate production",
+      boardId: "alpha",
+      milestoneId: project.milestones[0]?.id,
+      status: "running",
+      execution: {
+        id: "run-1",
+        kind: "agent-session",
+        mode: "autonomous",
+        status: "running",
+        startedAt: 10,
+        updatedAt: 20,
+      },
+    });
+    const claimed = await store.claim(card.id, { ownerId: "operator" });
+
+    const delivered = await store.update(card.id, {
+      delivery: {
+        objective: "Run the real environment check.",
+        deliverySummary: "Code is complete.",
+        openItems: "Human verification remains.",
+        implementationState: "code_complete",
+        verificationState: "human_required",
+        releaseState: "pending",
+      },
+    });
+    const referenced = await store.addSourceReference(card.id, {
+      label: "Verification checklist",
+      target: "/workspace/docs/verification.md",
+      note: "Use during acceptance.",
+    });
+
+    expect(delivered).toMatchObject({
+      status: "running",
+      execution: card.execution,
+      milestoneId: project.milestones[0]?.id,
+      metadata: { claim: claimed.card.metadata?.claim },
+      delivery: {
+        implementationState: "code_complete",
+        verificationState: "human_required",
+        releaseState: "pending",
+      },
+    });
+    expect(referenced).toMatchObject({
+      status: "running",
+      execution: card.execution,
+      milestoneId: project.milestones[0]?.id,
+      metadata: { claim: claimed.card.metadata?.claim },
+      sourceReferences: [
+        expect.objectContaining({
+          label: "Verification checklist",
+          target: "/workspace/docs/verification.md",
+        }),
+      ],
+    });
+    await expect(
+      store.addSourceReference(card.id, {
+        label: "Invalid",
+        target: "/workspace/docs/one\nsecond.md",
+      }),
+    ).rejects.toThrow("single line");
   });
 });

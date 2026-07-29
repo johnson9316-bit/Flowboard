@@ -66,6 +66,10 @@ describe("Flowboard M2 Gateway methods", () => {
       "flowboard.projects.documents.create",
       "flowboard.projects.documents.reorder",
       "flowboard.projects.documents.delete",
+      "flowboard.cards.sources.create",
+      "flowboard.cards.sources.update",
+      "flowboard.cards.sources.delete",
+      "flowboard.cards.sources.reorder",
       "flowboard.cards.moveMilestone",
       "flowboard.cards.moveProject",
     ];
@@ -74,6 +78,9 @@ describe("Flowboard M2 Gateway methods", () => {
     }
     expect(registrations.get("flowboard.projects.get")?.options.scope).toBe("operator.read");
     expect(registrations.get("flowboard.projects.documents.list")?.options.scope).toBe("operator.read");
+    expect(registrations.get("flowboard.projects.documents.read")?.options.scope).toBe(
+      "operator.read",
+    );
 
     const responses: Array<{ ok: boolean; payload?: unknown }> = [];
     const create = registrations.get("flowboard.projects.create");

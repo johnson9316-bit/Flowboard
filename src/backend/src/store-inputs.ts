@@ -20,6 +20,7 @@ type FlowboardCardInput = {
   taskId?: unknown;
   sourceUrl?: unknown;
   execution?: unknown;
+  delivery?: unknown;
   metadata?: unknown;
   templateId?: unknown;
   position?: unknown;
@@ -65,6 +66,20 @@ export type FlowboardArtifactInput = {
   url?: unknown;
   path?: unknown;
   mimeType?: unknown;
+};
+export type FlowboardSourceReferenceCreateInput = {
+  label?: unknown;
+  target?: unknown;
+  note?: unknown;
+};
+export type FlowboardSourceReferenceUpdateInput = FlowboardSourceReferenceCreateInput & {
+  sourceReferenceId?: unknown;
+};
+export type FlowboardSourceReferenceDeleteInput = {
+  sourceReferenceId?: unknown;
+};
+export type FlowboardSourceReferenceReorderInput = {
+  sourceReferenceIds?: unknown;
 };
 export type FlowboardAttachmentInput = {
   fileName?: unknown;

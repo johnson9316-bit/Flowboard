@@ -11,6 +11,7 @@ import {
   assertFlowboardWorkspaceMutationAccess,
   canonicalizeFlowboardWorkspaceAccess,
 } from "./workspace-access.js";
+import { readFlowboardProjectDocument } from "./project-document-reader.js";
 
 const READ_SCOPE = "operator.read" as const;
 const WRITE_SCOPE = "operator.write" as const;
@@ -26,6 +27,17 @@ async function assertProjectWorkspaceAccess(
     }),
   );
   await assertFlowboardWorkspaceMutationAccess(value, access);
+}
+
+async function resolveProjectWorkspaceReadAccess(
+  request: GatewayMethodContext,
+) {
+  return await canonicalizeFlowboardWorkspaceAccess(
+    resolveGatewayFlowboardWorkspaceAccess({
+      context: request.context,
+      client: request.client,
+    }),
+  );
 }
 
 export function registerFlowboardProjectGatewayMethods(params: {
@@ -214,6 +226,22 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
   api.registerGatewayMethod(
+    "flowboard.projects.documents.read",
+    async (request) => {
+      const { params: requestParams, respond } = request;
+      try {
+        const access = await resolveProjectWorkspaceReadAccess(request);
+        const document = await store.getProjectDocument(readId(requestParams));
+        respond(true, {
+          preview: await readFlowboardProjectDocument({ document, access }),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: READ_SCOPE },
+  );
+  api.registerGatewayMethod(
     "flowboard.projects.documents.create",
     async ({ params: requestParams, respond }) => {
       try {
@@ -282,6 +310,59 @@ export function registerFlowboardProjectGatewayMethods(params: {
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteProjectDocument(readId(requestParams)));
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.create",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.addSourceReference(readId(requestParams), requestParams)),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.update",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.updateSourceReference(readId(requestParams), requestParams)),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.delete",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.deleteSourceReference(readId(requestParams), requestParams)),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+  api.registerGatewayMethod(
+    "flowboard.cards.sources.reorder",
+    async ({ params: requestParams, respond }) => {
+      try {
+        respond(true, {
+          card: redactCard(await store.reorderSourceReferences(readId(requestParams), requestParams)),
+        });
       } catch (error) {
         respondError(respond, error);
       }

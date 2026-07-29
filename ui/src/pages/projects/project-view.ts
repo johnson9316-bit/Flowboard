@@ -3,9 +3,13 @@ import type {
   FlowboardBoardMetadata,
   FlowboardBoardSummary,
   FlowboardCard,
+  FlowboardDeliveryImplementationState,
+  FlowboardDeliveryReleaseState,
+  FlowboardDeliveryVerificationState,
   FlowboardMilestone,
   FlowboardPriority,
   FlowboardProjectDocument,
+  FlowboardProjectDocumentRead,
   FlowboardProjectDocumentSection,
   FlowboardProjectDocumentType,
   FlowboardProjectView,
@@ -13,6 +17,7 @@ import type {
 } from "../../../../src/contract/index.ts";
 import "../../components/modal-dialog.ts";
 import { t } from "../../i18n/index.ts";
+import { renderFlowboardMarkdown } from "../../lib/markdown.ts";
 import "../../styles/flowboard-project.css";
 
 const STATUSES: readonly FlowboardStatus[] = [
@@ -40,6 +45,29 @@ const DOCUMENT_TYPES: readonly FlowboardProjectDocumentType[] = [
   "path",
   "secret_ref",
 ];
+const IMPLEMENTATION_STATES: readonly FlowboardDeliveryImplementationState[] = [
+  "not_started",
+  "in_progress",
+  "code_complete",
+  "not_applicable",
+  "unknown",
+];
+const VERIFICATION_STATES: readonly FlowboardDeliveryVerificationState[] = [
+  "not_started",
+  "partial",
+  "passed",
+  "failed",
+  "human_required",
+  "not_required",
+  "unknown",
+];
+const RELEASE_STATES: readonly FlowboardDeliveryReleaseState[] = [
+  "not_started",
+  "pending",
+  "released",
+  "not_required",
+  "unknown",
+];
 
 export type FlowboardProjectModal =
   | { kind: "project" }
@@ -63,6 +91,10 @@ export type FlowboardProjectUiState = {
   projects: FlowboardBoardSummary[];
   project: FlowboardProjectView | null;
   documents: FlowboardProjectDocument[];
+  selectedDocumentId: string | null;
+  documentPreview: FlowboardProjectDocumentRead | null;
+  documentPreviewLoading: boolean;
+  documentPreviewError: string | null;
   selectedProjectId: string | null;
   screen: "overview" | "board" | "settings" | "documents";
   modal: FlowboardProjectModal | null;
@@ -93,12 +125,23 @@ export type FlowboardProjectViewController = {
   reorderProjects: (ids: string[]) => void;
   reorderMilestones: (ids: string[]) => void;
   reorderDocuments: (ids: string[]) => void;
+  openDocument: (id: string) => void;
+  refreshDocument: () => void;
   saveMilestone: (data: Record<string, string>) => void;
   completeMilestone: (id: string) => void;
   archiveMilestone: (id: string, archived: boolean) => void;
   saveDocument: (data: Record<string, string>) => void;
   hideDocument: (id: string, hidden: boolean) => void;
   deleteDocument: (id: string) => void;
+  updateCardDelivery: (id: string, data: Record<string, string>) => void;
+  createSourceReference: (id: string, data: Record<string, string>) => void;
+  updateSourceReference: (id: string, data: Record<string, string>) => void;
+  deleteSourceReference: (id: string, sourceReferenceId: string) => void;
+  reorderSourceReferences: (id: string, sourceReferenceIds: string[]) => void;
+  addProof: (id: string, data: Record<string, string>) => void;
+  deleteProof: (id: string, proofId: string) => void;
+  addArtifact: (id: string, data: Record<string, string>) => void;
+  deleteArtifact: (id: string, artifactId: string) => void;
 };
 
 export function createFlowboardProjectUiState(): FlowboardProjectUiState {
@@ -110,6 +153,10 @@ export function createFlowboardProjectUiState(): FlowboardProjectUiState {
     projects: [],
     project: null,
     documents: [],
+    selectedDocumentId: null,
+    documentPreview: null,
+    documentPreviewLoading: false,
+    documentPreviewError: null,
     selectedProjectId: null,
     screen: "overview",
     modal: null,
@@ -200,6 +247,40 @@ function renderPriorityOptions(selected: FlowboardPriority) {
     (priority) =>
       html`<option value=${priority} ?selected=${priority === selected}>${priority}</option>`,
   );
+}
+
+function deliveryStateKey(
+  prefix: "implementation" | "verification" | "release",
+  state: string,
+): string {
+  const suffix = state
+    .split("_")
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join("");
+  return `flowboardProject.delivery${prefix[0]?.toUpperCase() ?? ""}${prefix.slice(1)}${suffix}`;
+}
+
+function renderDeliveryOptions(
+  states: readonly string[],
+  selected: string | undefined,
+  prefix: "implementation" | "verification" | "release",
+) {
+  return [
+    html`<option value="">${t("flowboardProject.deliveryNotRecorded")}</option>`,
+    ...states.map(
+      (state) =>
+        html`<option value=${state} ?selected=${state === selected}>${t(
+          deliveryStateKey(prefix, state),
+        )}</option>`,
+    ),
+  ];
+}
+
+function deliveryStateLabel(
+  prefix: "implementation" | "verification" | "release",
+  state: string | undefined,
+): string {
+  return state ? t(deliveryStateKey(prefix, state)) : t("flowboardProject.deliveryNotRecorded");
 }
 
 function renderOrderControls(params: {
@@ -412,6 +493,27 @@ function renderCard(
         <span class="flowboard-project__priority priority-${card.priority}"></span>
         <span class="flowboard-project__card-title">${card.title}</span>
         ${card.notes ? html`<span class="flowboard-project__card-notes">${card.notes}</span>` : nothing}
+        ${card.delivery
+          ? html`
+              <span class="flowboard-project__delivery-badges">
+                ${card.delivery.implementationState
+                  ? html`<small>${deliveryStateLabel(
+                      "implementation",
+                      card.delivery.implementationState,
+                    )}</small>`
+                  : nothing}
+                ${card.delivery.verificationState
+                  ? html`<small>${deliveryStateLabel(
+                      "verification",
+                      card.delivery.verificationState,
+                    )}</small>`
+                  : nothing}
+                ${card.delivery.releaseState
+                  ? html`<small>${deliveryStateLabel("release", card.delivery.releaseState)}</small>`
+                  : nothing}
+              </span>
+            `
+          : nothing}
       </button>
       <div class="flowboard-project__card-footer">
         <select
@@ -731,13 +833,19 @@ function renderDocumentSection(
                     <button
                       class="flowboard-project__document-main"
                       type="button"
-                      @click=${() => controller.openModal({ kind: "document", document })}
+                      @click=${() => controller.openDocument(document.id)}
                     >
                       <span>${document.title}</span>
                       <small>${document.key} · ${documentTypeLabel(document.type)}</small>
                       ${document.summary ? html`<p>${document.summary}</p>` : nothing}
                     </button>
                     <div class="flowboard-project__document-actions">
+                      <button
+                        class="flowboard-project__icon-button"
+                        type="button"
+                        title=${t("flowboardProject.editDocument")}
+                        @click=${() => controller.openModal({ kind: "document", document })}
+                      >...</button>
                       ${renderOrderControls({
                         canMoveUp: Boolean(moveUp),
                         canMoveDown: Boolean(moveDown),
@@ -801,7 +909,56 @@ function renderDocuments(controller: FlowboardProjectViewController) {
           </button>
         </div>
       </div>
-      ${DOCUMENT_SECTIONS.map((section) => renderDocumentSection(controller, section))}
+      <div class="flowboard-project__documents-layout">
+        <aside class="flowboard-project__document-navigation">
+          ${DOCUMENT_SECTIONS.map((section) => renderDocumentSection(controller, section))}
+        </aside>
+        ${renderDocumentPreview(controller)}
+      </div>
+    </section>
+  `;
+}
+
+function renderDocumentPreview(controller: FlowboardProjectViewController) {
+  const { state } = controller;
+  const document =
+    state.documents.find((candidate) => candidate.id === state.selectedDocumentId) ?? null;
+  if (!document) {
+    return html`
+      <section class="flowboard-project__document-reader is-empty">
+        <p>${t("flowboardProject.selectDocument")}</p>
+      </section>
+    `;
+  }
+  return html`
+    <section class="flowboard-project__document-reader">
+      <header>
+        <div>
+          <h2>${document.title}</h2>
+          <small>${state.documentPreview?.path ?? document.target ?? documentTypeLabel(document.type)}</small>
+        </div>
+        <button
+          class="flowboard-project__icon-button"
+          type="button"
+          title=${t("flowboardProject.refreshDocument")}
+          aria-label=${t("flowboardProject.refreshDocument")}
+          ?disabled=${state.documentPreviewLoading}
+          @click=${controller.refreshDocument}
+        >&#8635;</button>
+      </header>
+      ${state.documentPreviewLoading
+        ? html`<p class="flowboard-project__document-reader-message">${t(
+            "flowboardProject.readingDocument",
+          )}</p>`
+        : state.documentPreviewError
+          ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
+          : state.documentPreview
+            ? html`<article class="flowboard-markdown">${renderFlowboardMarkdown(
+                state.documentPreview.content,
+              )}</article>`
+            : html`<p class="flowboard-project__document-reader-message">${t(
+                "flowboardProject.noDocumentContent",
+              )}</p>`}
     </section>
   `;
 }
@@ -865,6 +1022,9 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
               )}
           </select>
         </label>
+        ${renderDeliverySection(controller, card)}
+        ${renderSourceReferenceSection(controller, card)}
+        ${renderEvidenceSection(controller, card)}
         ${otherProjects.length
           ? html`
               <button
@@ -901,6 +1061,238 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
         </button>
       </footer>
     </div>
+  `;
+}
+
+function renderDeliverySection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+  const delivery = card.delivery;
+  return html`
+    <section class="flowboard-project__detail-section">
+      <h3>${t("flowboardProject.deliveryFacts")}</h3>
+      <form
+        class="flowboard-project__delivery-form"
+        @submit=${(event: SubmitEvent) => {
+          event.preventDefault();
+          controller.updateCardDelivery(card.id, readForm(event));
+        }}
+      >
+        <label>
+          ${t("flowboardProject.deliveryObjective")}
+          <textarea name="objective" .value=${delivery?.objective ?? ""}></textarea>
+        </label>
+        <label>
+          ${t("flowboardProject.deliverySummary")}
+          <textarea name="deliverySummary" .value=${delivery?.deliverySummary ?? ""}></textarea>
+        </label>
+        <label>
+          ${t("flowboardProject.deliveryOpenItems")}
+          <textarea name="openItems" .value=${delivery?.openItems ?? ""}></textarea>
+        </label>
+        <div class="flowboard-project__modal-grid">
+          <label>
+            ${t("flowboardProject.deliveryImplementation")}
+            <select name="implementationState">
+              ${renderDeliveryOptions(
+                IMPLEMENTATION_STATES,
+                delivery?.implementationState,
+                "implementation",
+              )}
+            </select>
+          </label>
+          <label>
+            ${t("flowboardProject.deliveryVerification")}
+            <select name="verificationState">
+              ${renderDeliveryOptions(
+                VERIFICATION_STATES,
+                delivery?.verificationState,
+                "verification",
+              )}
+            </select>
+          </label>
+          <label>
+            ${t("flowboardProject.deliveryRelease")}
+            <select name="releaseState">
+              ${renderDeliveryOptions(RELEASE_STATES, delivery?.releaseState, "release")}
+            </select>
+          </label>
+        </div>
+        <button class="btn" type="submit" ?disabled=${controller.state.busy}>
+          ${t("flowboardProject.saveDelivery")}
+        </button>
+      </form>
+    </section>
+  `;
+}
+
+function renderSourceReferenceSection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+  const references = [...(card.sourceReferences ?? [])].toSorted(
+    (left, right) => left.position - right.position || left.createdAt - right.createdAt,
+  );
+  return html`
+    <section class="flowboard-project__detail-section">
+      <h3>${t("flowboardProject.sourceReferences")}</h3>
+      <div class="flowboard-project__detail-list">
+        ${references.length
+          ? references.map((reference, index) => {
+              const ids = references.map((item) => item.id);
+              const moveUp =
+                index > 0
+                  ? [
+                      ...ids.slice(0, index - 1),
+                      reference.id,
+                      ids[index - 1]!,
+                      ...ids.slice(index + 1),
+                    ]
+                  : undefined;
+              const moveDown =
+                index < ids.length - 1
+                  ? [
+                      ...ids.slice(0, index),
+                      ids[index + 1]!,
+                      reference.id,
+                      ...ids.slice(index + 2),
+                    ]
+                  : undefined;
+              return html`
+                <form
+                  class="flowboard-project__source-reference"
+                  @submit=${(event: SubmitEvent) => {
+                    event.preventDefault();
+                    controller.updateSourceReference(card.id, readForm(event));
+                  }}
+                >
+                  <input type="hidden" name="sourceReferenceId" value=${reference.id} />
+                  <input name="label" aria-label=${t("flowboardProject.sourceReferenceLabel")} .value=${reference.label} required />
+                  <input name="target" aria-label=${t("flowboardProject.sourceReferenceTarget")} .value=${reference.target} required />
+                  <input name="note" aria-label=${t("flowboardProject.sourceReferenceNote")} .value=${reference.note ?? ""} />
+                  <div class="flowboard-project__inline-actions">
+                    <button class="btn" type="submit" ?disabled=${controller.state.busy}>
+                      ${t("flowboardProject.save")}
+                    </button>
+                    ${renderOrderControls({
+                      canMoveUp: Boolean(moveUp),
+                      canMoveDown: Boolean(moveDown),
+                      onMoveUp: () =>
+                        moveUp && controller.reorderSourceReferences(card.id, moveUp),
+                      onMoveDown: () =>
+                        moveDown && controller.reorderSourceReferences(card.id, moveDown),
+                    })}
+                    <button
+                      class="flowboard-project__icon-button"
+                      type="button"
+                      title=${t("common.delete")}
+                      @click=${() => controller.deleteSourceReference(card.id, reference.id)}
+                    >&times;</button>
+                  </div>
+                </form>
+              `;
+            })
+          : html`<p class="flowboard-project__detail-empty">${t(
+              "flowboardProject.noSourceReferences",
+            )}</p>`}
+      </div>
+      <form
+        class="flowboard-project__source-reference"
+        @submit=${(event: SubmitEvent) => {
+          event.preventDefault();
+          controller.createSourceReference(card.id, readForm(event));
+        }}
+      >
+        <input name="label" placeholder=${t("flowboardProject.sourceReferenceLabel")} required />
+        <input name="target" placeholder=${t("flowboardProject.sourceReferenceTarget")} required />
+        <input name="note" placeholder=${t("flowboardProject.sourceReferenceNote")} />
+        <button class="btn" type="submit" ?disabled=${controller.state.busy}>
+          ${t("flowboardProject.addSourceReference")}
+        </button>
+      </form>
+    </section>
+  `;
+}
+
+function renderEvidenceSection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+  const proof = card.metadata?.proof ?? [];
+  const artifacts = card.metadata?.artifacts ?? [];
+  return html`
+    <section class="flowboard-project__detail-section">
+      <h3>${t("flowboardProject.proof")}</h3>
+      <div class="flowboard-project__detail-list">
+        ${proof.length
+          ? proof.map(
+              (entry) => html`
+                <div class="flowboard-project__evidence-item">
+                  <span>${entry.label || entry.command || entry.url || entry.status}</span>
+                  <small>${entry.status}${entry.note ? ` · ${entry.note}` : ""}</small>
+                  <button
+                    class="flowboard-project__icon-button"
+                    type="button"
+                    title=${t("common.delete")}
+                    @click=${() => controller.deleteProof(card.id, entry.id)}
+                  >&times;</button>
+                </div>
+              `,
+            )
+          : html`<p class="flowboard-project__detail-empty">${t("flowboardProject.noProof")}</p>`}
+      </div>
+      <form
+        class="flowboard-project__evidence-form"
+        @submit=${(event: SubmitEvent) => {
+          event.preventDefault();
+          controller.addProof(card.id, readForm(event));
+        }}
+      >
+        <select name="status">
+          <option value="unknown">${t("flowboardProject.proofUnknown")}</option>
+          <option value="passed">${t("flowboardProject.proofPassed")}</option>
+          <option value="failed">${t("flowboardProject.proofFailed")}</option>
+          <option value="skipped">${t("flowboardProject.proofSkipped")}</option>
+        </select>
+        <input name="label" placeholder=${t("flowboardProject.evidenceLabel")} />
+        <input name="command" placeholder=${t("flowboardProject.proofCommand")} />
+        <input name="url" placeholder=${t("flowboardProject.evidenceUrl")} />
+        <input name="note" placeholder=${t("flowboardProject.evidenceNote")} />
+        <button class="btn" type="submit" ?disabled=${controller.state.busy}>
+          ${t("flowboardProject.addProof")}
+        </button>
+      </form>
+    </section>
+    <section class="flowboard-project__detail-section">
+      <h3>${t("flowboardProject.artifacts")}</h3>
+      <div class="flowboard-project__detail-list">
+        ${artifacts.length
+          ? artifacts.map(
+              (entry) => html`
+                <div class="flowboard-project__evidence-item">
+                  <span>${entry.label || entry.path || entry.url || t("flowboardProject.artifact")}</span>
+                  <small>${entry.path || entry.url || ""}</small>
+                  <button
+                    class="flowboard-project__icon-button"
+                    type="button"
+                    title=${t("common.delete")}
+                    @click=${() => controller.deleteArtifact(card.id, entry.id)}
+                  >&times;</button>
+                </div>
+              `,
+            )
+          : html`<p class="flowboard-project__detail-empty">${t(
+              "flowboardProject.noArtifacts",
+            )}</p>`}
+      </div>
+      <form
+        class="flowboard-project__evidence-form"
+        @submit=${(event: SubmitEvent) => {
+          event.preventDefault();
+          controller.addArtifact(card.id, readForm(event));
+        }}
+      >
+        <input name="label" placeholder=${t("flowboardProject.evidenceLabel")} />
+        <input name="path" placeholder=${t("flowboardProject.artifactPath")} />
+        <input name="url" placeholder=${t("flowboardProject.evidenceUrl")} />
+        <input name="mimeType" placeholder=${t("flowboardProject.artifactMimeType")} />
+        <button class="btn" type="submit" ?disabled=${controller.state.busy}>
+          ${t("flowboardProject.addArtifact")}
+        </button>
+      </form>
+    </section>
   `;
 }
 
@@ -1113,7 +1505,7 @@ function renderModal(controller: FlowboardProjectViewController) {
             <select name="type">
               ${DOCUMENT_TYPES.map(
                 (type) =>
-                  html`<option value=${type} ?selected=${type === (document?.type ?? "markdown")}>${documentTypeLabel(type)}</option>`,
+                  html`<option value=${type} ?selected=${type === (document?.type ?? "path")}>${documentTypeLabel(type)}</option>`,
               )}
             </select>
           </label>

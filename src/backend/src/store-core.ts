@@ -3,6 +3,7 @@ import type {
   FlowboardBoardMetadata,
   FlowboardChange,
   FlowboardCard,
+  FlowboardSourceReference,
   FlowboardLink,
   FlowboardMetadata,
   FlowboardStatus,
@@ -42,6 +43,10 @@ import type {
   FlowboardLinkedCreateInput,
   FlowboardListOptions,
   FlowboardMutationScope,
+  FlowboardSourceReferenceCreateInput,
+  FlowboardSourceReferenceDeleteInput,
+  FlowboardSourceReferenceReorderInput,
+  FlowboardSourceReferenceUpdateInput,
   FlowboardStatsResult,
 } from "./store-inputs.js";
 import {
@@ -53,6 +58,7 @@ import {
   normalizeBoardMetadata,
   normalizeBoundedString,
   normalizeExecution,
+  normalizeDelivery,
   normalizeLabels,
   normalizeLinkType,
   normalizeMetadata,
@@ -424,6 +430,7 @@ export class FlowboardCoreStore {
     const taskId = normalizeOptionalString(input.taskId);
     const sourceUrl = normalizeOptionalString(input.sourceUrl);
     const normalizedExecution = normalizeExecution(input.execution);
+    const delivery = normalizeDelivery(input.delivery, undefined, now);
     const execution =
       normalizedExecution?.status === "running" && (heldBySchedule || heldByDependencies)
         ? undefined
@@ -490,6 +497,7 @@ export class FlowboardCoreStore {
       ...(taskId ? { taskId } : {}),
       ...(sourceUrl ? { sourceUrl } : {}),
       ...(execution ? { execution } : {}),
+      ...(delivery ? { delivery } : {}),
       ...(startedAt ? { startedAt } : {}),
       ...(completedAt ? { completedAt } : {}),
       ...(!metadataIsEmpty(syncedMetadata) ? { metadata: syncedMetadata } : {}),
@@ -652,6 +660,10 @@ export class FlowboardCoreStore {
           ? existing.sourceUrl
           : normalizeOptionalString(effectivePatch.sourceUrl),
       execution,
+      delivery:
+        effectivePatch.delivery === undefined
+          ? existing.delivery
+          : normalizeDelivery(effectivePatch.delivery, existing.delivery, now),
       metadata:
         effectivePatch.templateId === undefined
           ? metadata
@@ -761,6 +773,165 @@ export class FlowboardCoreStore {
         ...existing.metadata,
         comments: [...(existing.metadata?.comments ?? []), comment].slice(-MAX_CARD_COMMENTS),
       };
+    });
+  }
+
+  async addSourceReference(
+    id: string,
+    input: FlowboardSourceReferenceCreateInput,
+  ): Promise<FlowboardCard> {
+    const now = Date.now();
+    const label = normalizeTitle(input.label);
+    const target = normalizeBoundedString(input.target, undefined, 2000, "source reference target");
+    const note = normalizeBoundedString(input.note, undefined, 2000, "source reference note");
+    if (!target || target.includes("\0") || target.includes("\n")) {
+      throw new Error("source reference target is required and must be a single line.");
+    }
+    return await this.mutateSourceReferences(id, (references) => [
+      ...references,
+      {
+        id: randomUUID(),
+        label,
+        target,
+        position: Math.max(0, ...references.map((reference) => reference.position)) + POSITION_STEP,
+        createdAt: now,
+        updatedAt: now,
+        ...(note ? { note } : {}),
+      },
+    ]);
+  }
+
+  async updateSourceReference(
+    id: string,
+    input: FlowboardSourceReferenceUpdateInput,
+  ): Promise<FlowboardCard> {
+    const sourceReferenceId = normalizeBoundedString(
+      input.sourceReferenceId,
+      undefined,
+      120,
+      "source reference id",
+    );
+    if (!sourceReferenceId) {
+      throw new Error("sourceReferenceId is required.");
+    }
+    return await this.mutateSourceReferences(id, (references) => {
+      const existing = references.find((reference) => reference.id === sourceReferenceId);
+      if (!existing) {
+        throw new Error(`source reference not found: ${sourceReferenceId}`);
+      }
+      const label =
+        input.label === undefined ? existing.label : normalizeTitle(input.label);
+      const target =
+        input.target === undefined
+          ? existing.target
+          : normalizeBoundedString(input.target, undefined, 2000, "source reference target");
+      const note =
+        input.note === undefined
+          ? existing.note
+          : normalizeBoundedString(input.note, undefined, 2000, "source reference note");
+      if (!target || target.includes("\0") || target.includes("\n")) {
+        throw new Error("source reference target is required and must be a single line.");
+      }
+      return references.map((reference) => {
+        if (reference.id !== sourceReferenceId) {
+          return reference;
+        }
+        const next: FlowboardSourceReference = {
+          ...reference,
+          label,
+          target,
+          updatedAt: Date.now(),
+          ...(note ? { note } : {}),
+        };
+        if (!note) {
+          delete next.note;
+        }
+        return next;
+      });
+    });
+  }
+
+  async deleteSourceReference(
+    id: string,
+    input: FlowboardSourceReferenceDeleteInput,
+  ): Promise<FlowboardCard> {
+    const sourceReferenceId = normalizeBoundedString(
+      input.sourceReferenceId,
+      undefined,
+      120,
+      "source reference id",
+    );
+    if (!sourceReferenceId) {
+      throw new Error("sourceReferenceId is required.");
+    }
+    return await this.mutateSourceReferences(id, (references) => {
+      if (!references.some((reference) => reference.id === sourceReferenceId)) {
+        throw new Error(`source reference not found: ${sourceReferenceId}`);
+      }
+      return references.filter((reference) => reference.id !== sourceReferenceId);
+    });
+  }
+
+  async reorderSourceReferences(
+    id: string,
+    input: FlowboardSourceReferenceReorderInput,
+  ): Promise<FlowboardCard> {
+    if (
+      !Array.isArray(input.sourceReferenceIds) ||
+      input.sourceReferenceIds.some((value) => typeof value !== "string")
+    ) {
+      throw new Error("sourceReferenceIds are required.");
+    }
+    const sourceReferenceIds = input.sourceReferenceIds as string[];
+    return await this.mutateSourceReferences(id, (references) => {
+      if (
+        sourceReferenceIds.length !== references.length ||
+        new Set(sourceReferenceIds).size !== sourceReferenceIds.length
+      ) {
+        throw new Error("sourceReferenceIds must contain every source reference exactly once.");
+      }
+      const byId = new Map(references.map((reference) => [reference.id, reference]));
+      const now = Date.now();
+      return sourceReferenceIds.map((sourceReferenceId, index) => {
+        const reference = byId.get(sourceReferenceId);
+        if (!reference) {
+          throw new Error(`source reference not found: ${sourceReferenceId}`);
+        }
+        return {
+          ...reference,
+          position: (index + 1) * POSITION_STEP,
+          updatedAt: now,
+        };
+      });
+    });
+  }
+
+  private async mutateSourceReferences(
+    id: string,
+    mutate: (references: FlowboardSourceReference[]) => FlowboardSourceReference[],
+  ): Promise<FlowboardCard> {
+    return await this.enqueueMutation(async () => {
+      const existing = await this.get(id);
+      if (!existing) {
+        throw new Error(`card not found: ${id}`);
+      }
+      const sourceReferences = mutate(
+        [...(existing.sourceReferences ?? [])].toSorted(
+          (left, right) => left.position - right.position || left.createdAt - right.createdAt,
+        ),
+      );
+      const now = Date.now();
+      const next = removeUndefinedCardFields({
+        ...existing,
+        ...(sourceReferences.length ? { sourceReferences } : {}),
+        updatedAt: now,
+      });
+      if (!sourceReferences.length) {
+        delete next.sourceReferences;
+      }
+      next.events = appendEvent(next, { kind: "edited" }, now);
+      await this.store.register(next.id, { version: 1, card: next });
+      return next;
     });
   }
 
