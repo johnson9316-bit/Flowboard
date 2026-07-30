@@ -2303,7 +2303,11 @@ function mergeDiagnostics(previous, next) {
   });
 }
 function flowboardLastActivityAt(card) {
-  return card.metadata?.claim?.lastHeartbeatAt ?? card.execution?.updatedAt ?? card.updatedAt;
+  return Math.max(
+    card.metadata?.claim?.lastHeartbeatAt ?? 0,
+    card.execution?.updatedAt ?? 0,
+    card.updatedAt
+  );
 }
 function computeCardDiagnostics(card, now) {
   if (card.metadata?.archivedAt) {
@@ -3171,14 +3175,6 @@ function boundExecutionPreview(value, depth = 0) {
   }
   return value;
 }
-function taskIdFromRuntime(runtime, sessionKey, runId) {
-  try {
-    const task = runtime.tasks.runs.bindSession({ sessionKey }).findLatest();
-    return task?.runId === runId ? readOptionalString(task.taskId, 200) : void 0;
-  } catch {
-    return void 0;
-  }
-}
 async function resolveCard(store, id) {
   const cardId = readOptionalString(id, 200);
   if (!cardId) {
@@ -3298,11 +3294,9 @@ async function startFlowboardCardExecution(params) {
       });
       runStarted = true;
       const now = Date.now();
-      const taskId = taskIdFromRuntime(params.options.runtime, sessionKey, run.runId);
       const updated = await params.store.update(current.id, {
         sessionKey,
         runId: run.runId,
-        ...taskId ? { taskId } : {},
         execution: buildExecution({
           card: current,
           sessionKey,
@@ -3326,7 +3320,6 @@ async function startFlowboardCardExecution(params) {
         card: updated,
         sessionKey,
         runId: run.runId,
-        ...taskId ? { taskId } : {},
         worktreePath,
         branch: worktree.branch
       };
@@ -3352,16 +3345,13 @@ async function inspectFlowboardCardExecution(params) {
   }
   const token = card.metadata?.claim?.token;
   const preview = await params.runtime.subagent.getSessionMessages({ sessionKey, limit: PREVIEW_LIMIT }).then(({ messages }) => ({ messages })).catch((error) => ({ error: formatErrorMessage2(error) }));
-  const task = card.taskId ? params.runtime.tasks.runs.bindSession({ sessionKey }).get(card.taskId) : void 0;
   return {
     card,
     active: true,
     execution: card.execution,
     sessionKey,
     runId,
-    ...card.taskId ? { taskId: card.taskId } : {},
-    preview: boundExecutionPreview(redactExecutionPayload(preview, token)),
-    ...task ? { task: boundExecutionPreview(redactExecutionPayload(task, token)) } : {}
+    preview: boundExecutionPreview(redactExecutionPayload(preview, token))
   };
 }
 async function steerFlowboardCardExecution(params) {
@@ -3376,10 +3366,8 @@ async function steerFlowboardCardExecution(params) {
   const nextRunId = readOptionalString(params.nextRunId, 200);
   let updated = card;
   if (nextRunId) {
-    const taskId = taskIdFromRuntime(params.runtime, sessionKey, nextRunId);
     updated = await params.store.update(card.id, {
       runId: nextRunId,
-      ...taskId ? { taskId } : {},
       execution: { ...card.execution, runId: nextRunId, updatedAt: Date.now() }
     });
   }
@@ -9358,8 +9346,7 @@ function registerFlowboardGatewayMethods(params) {
         const result = await steerFlowboardCardExecution({
           store,
           id: request.params.id,
-          nextRunId: request.params.nextRunId,
-          runtime: api.runtime
+          nextRunId: request.params.nextRunId
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
       } catch (error) {

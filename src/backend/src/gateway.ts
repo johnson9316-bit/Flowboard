@@ -199,7 +199,6 @@ export function registerFlowboardGatewayMethods(params: {
           store,
           id: request.params.id,
           nextRunId: request.params.nextRunId,
-          runtime: api.runtime,
         });
         request.respond(true, { ...result, card: redactClaimToken(result.card) });
       } catch (error) {

@@ -41,7 +41,11 @@ function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
 
 /** A running card whose last sign of life was `minutesAgo` minutes back. */
 function quietFor(minutesAgo: number, overrides: Partial<FlowboardCard> = {}): FlowboardCard {
-  return card({ metadata: { claim: claim(NOW - minutesAgo * MINUTE) }, ...overrides });
+  return card({
+    updatedAt: NOW - minutesAgo * MINUTE,
+    metadata: { claim: claim(NOW - minutesAgo * MINUTE) },
+    ...overrides,
+  });
 }
 
 describe("Flowboard lifecycle", () => {
@@ -115,6 +119,7 @@ describe("Flowboard lifecycle", () => {
     it("falls back to execution and card timestamps when there is no claim", () => {
       const viaExecution = card({
         metadata: {},
+        updatedAt: NOW - 90 * MINUTE,
         execution: {
           id: "exec-1",
           kind: "agent-session",

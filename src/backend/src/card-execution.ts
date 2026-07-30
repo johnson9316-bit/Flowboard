@@ -29,10 +29,7 @@ const PREVIEW_LIMIT = 6;
 const PREVIEW_MAX_CHARS = 600;
 const CLAIM_TOKEN_PLACEHOLDER = "[generated after confirmation]";
 
-type FlowboardExecutionRuntime = Pick<
-  PluginRuntime,
-  "agent" | "subagent" | "tasks" | "worktrees"
->;
+type FlowboardExecutionRuntime = Pick<PluginRuntime, "agent" | "subagent" | "worktrees">;
 
 export type FlowboardCardExecutionOptions = {
   runtime: FlowboardExecutionRuntime;
@@ -230,22 +227,6 @@ function boundExecutionPreview(value: unknown, depth = 0): unknown {
   return value;
 }
 
-function taskIdFromRuntime(
-  runtime: Pick<PluginRuntime, "tasks">,
-  sessionKey: string,
-  runId: string,
-): string | undefined {
-  try {
-    const task = runtime.tasks.runs.bindSession({ sessionKey }).findLatest() as unknown as Record<
-      string,
-      unknown
-    > | undefined;
-    return task?.runId === runId ? readOptionalString(task.taskId, 200) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 async function resolveCard(store: FlowboardStore, id: unknown): Promise<FlowboardCard> {
   const cardId = readOptionalString(id, 200);
   if (!cardId) {
@@ -382,11 +363,9 @@ export async function startFlowboardCardExecution(params: {
       });
       runStarted = true;
       const now = Date.now();
-      const taskId = taskIdFromRuntime(params.options.runtime, sessionKey, run.runId);
       const updated = await params.store.update(current.id, {
         sessionKey,
         runId: run.runId,
-        ...(taskId ? { taskId } : {}),
         execution: buildExecution({
           card: current,
           sessionKey,
@@ -412,7 +391,6 @@ export async function startFlowboardCardExecution(params: {
         card: updated,
         sessionKey,
         runId: run.runId,
-        ...(taskId ? { taskId } : {}),
         worktreePath,
         branch: worktree.branch,
       };
@@ -438,7 +416,7 @@ export async function startFlowboardCardExecution(params: {
 export async function inspectFlowboardCardExecution(params: {
   store: FlowboardStore;
   id: unknown;
-  runtime: Pick<PluginRuntime, "subagent" | "tasks">;
+  runtime: Pick<PluginRuntime, "subagent">;
 }) {
   const card = await resolveCard(params.store, params.id);
   const sessionKey = card.execution?.sessionKey ?? card.sessionKey;
@@ -452,18 +430,13 @@ export async function inspectFlowboardCardExecution(params: {
     .getSessionMessages({ sessionKey, limit: PREVIEW_LIMIT })
     .then(({ messages }) => ({ messages }))
     .catch((error) => ({ error: formatErrorMessage(error) }));
-  const task = card.taskId
-    ? params.runtime.tasks.runs.bindSession({ sessionKey }).get(card.taskId)
-    : undefined;
   return {
     card,
     active: true,
     execution: card.execution,
     sessionKey,
     runId,
-    ...(card.taskId ? { taskId: card.taskId } : {}),
     preview: boundExecutionPreview(redactExecutionPayload(preview, token)),
-    ...(task ? { task: boundExecutionPreview(redactExecutionPayload(task, token)) } : {}),
   };
 }
 
@@ -471,7 +444,6 @@ export async function steerFlowboardCardExecution(params: {
   store: FlowboardStore;
   id: unknown;
   nextRunId?: unknown;
-  runtime: Pick<PluginRuntime, "tasks">;
 }) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
@@ -484,10 +456,8 @@ export async function steerFlowboardCardExecution(params: {
   const nextRunId = readOptionalString(params.nextRunId, 200);
   let updated = card;
   if (nextRunId) {
-    const taskId = taskIdFromRuntime(params.runtime, sessionKey, nextRunId);
     updated = await params.store.update(card.id, {
       runId: nextRunId,
-      ...(taskId ? { taskId } : {}),
       execution: { ...card.execution, runId: nextRunId, updatedAt: Date.now() },
     });
   }

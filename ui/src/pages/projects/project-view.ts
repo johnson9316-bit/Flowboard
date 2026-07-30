@@ -111,10 +111,8 @@ export type FlowboardCardExecutionInspection = {
   execution: FlowboardExecution | null;
   sessionKey?: string;
   runId?: string;
-  taskId?: string;
   session?: unknown;
   preview?: unknown;
-  task?: unknown;
 };
 
 export type FlowboardProjectUiState = {
@@ -1462,7 +1460,6 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
   const unresolvedActive = !active && hasActiveCardExecution(card);
   const sessionKey = inspection?.sessionKey ?? card.execution?.sessionKey ?? card.sessionKey;
   const runId = inspection?.runId ?? card.execution?.runId ?? card.runId;
-  const taskId = inspection?.taskId ?? card.taskId;
   const workspace = card.metadata?.automation?.workspace;
   const inspectionError =
     state.executionInspectionCardId === card.id ? state.executionInspectionError : null;
@@ -1498,9 +1495,6 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
               ${runId
                 ? html`<div><dt>${t("flowboardProject.executionRun")}</dt><dd>${runId}</dd></div>`
                 : nothing}
-              ${taskId
-                ? html`<div><dt>${t("flowboardProject.executionTask")}</dt><dd>${taskId}</dd></div>`
-                : nothing}
               ${workspace?.kind === "worktree" && workspace.path
                 ? html`<div><dt>${t("flowboardProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
                 : nothing}
@@ -1518,14 +1512,6 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
                   <details class="flowboard-project__execution-preview">
                     <summary>${t("flowboardProject.executionSessionPreview")}</summary>
                     <pre>${executionValue(inspection.preview)}</pre>
-                  </details>
-                `
-              : nothing}
-            ${inspection?.task
-              ? html`
-                  <details class="flowboard-project__execution-preview">
-                    <summary>${t("flowboardProject.executionTaskState")}</summary>
-                    <pre>${executionValue(inspection.task)}</pre>
                   </details>
                 `
               : nothing}
@@ -1593,14 +1579,11 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
                   ? t("flowboardProject.executionStopped")
                   : t("flowboardProject.executionIdle")}
             </p>
-            ${runId || taskId || (workspace?.kind === "worktree" && workspace.path)
+            ${runId || (workspace?.kind === "worktree" && workspace.path)
               ? html`
                   <dl class="flowboard-project__execution-facts">
                     ${runId
                       ? html`<div><dt>${t("flowboardProject.executionRun")}</dt><dd>${runId}</dd></div>`
-                      : nothing}
-                    ${taskId
-                      ? html`<div><dt>${t("flowboardProject.executionTask")}</dt><dd>${taskId}</dd></div>`
                       : nothing}
                     ${workspace?.kind === "worktree" && workspace.path
                       ? html`<div><dt>${t("flowboardProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`

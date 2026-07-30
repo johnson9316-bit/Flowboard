@@ -405,14 +405,22 @@ export function mergeDiagnostics(
 }
 
 /**
- * The freshest evidence that whoever owns this card is still working. A claim
- * heartbeat is the strongest signal; an execution timestamp and then the card's own
- * `updatedAt` stand in when there is no claim. Exported so the reconciler judges
+ * The freshest evidence that whoever owns this card is still working. Only
+ * `store.heartbeat()` refreshes `claim.lastHeartbeatAt`, so a claimed run that is
+ * genuinely still active but whose worker never calls `flowboard_heartbeat` (the
+ * prompt asks for it, but nothing enforces it) must not be judged solely on that
+ * one timestamp — any card write (a log, a proof, a comment) is also evidence of
+ * activity. Taking the max of all three keeps the liveness check from mistaking
+ * silence on one channel for silence everywhere. Exported so the reconciler judges
  * liveness by exactly the rule the `running_without_heartbeat` diagnostic uses,
  * rather than a second definition that could drift from it.
  */
 export function flowboardLastActivityAt(card: FlowboardCard): number {
-  return card.metadata?.claim?.lastHeartbeatAt ?? card.execution?.updatedAt ?? card.updatedAt;
+  return Math.max(
+    card.metadata?.claim?.lastHeartbeatAt ?? 0,
+    card.execution?.updatedAt ?? 0,
+    card.updatedAt,
+  );
 }
 
 export function computeCardDiagnostics(card: FlowboardCard, now: number): FlowboardDiagnostic[] {

@@ -96,20 +96,6 @@ function executionOptions(params: {
           messages: params.sessionMessages?.() ?? [],
         })),
       },
-      tasks: {
-        runs: {
-          bindSession: () => ({
-            get: (taskId: string) =>
-              taskId === `task-${params.taskRunId()}`
-                ? { taskId, status: "running", runId: params.taskRunId() }
-                : undefined,
-            findLatest: () => ({
-              runId: params.taskRunId(),
-              taskId: `task-${params.taskRunId()}`,
-            }),
-          }),
-        },
-      },
       worktrees: {
         create: createWorktree,
         removeIfLossless: vi.fn(async () => true),
@@ -199,7 +185,6 @@ describe("Flowboard native card execution", () => {
       id: card.id,
       status: "done",
       execution: { status: "running", sessionKey: started.sessionKey, runId: "run-1" },
-      taskId: "task-run-1",
       metadata: {
         automation: {
           workspace: {
@@ -243,9 +228,7 @@ describe("Flowboard native card execution", () => {
       active: true,
       sessionKey: started.sessionKey,
       runId: "run-1",
-      taskId: "task-run-1",
       preview: { messages: [{ role: "assistant", text: "Claim token: [redacted]" }] },
-      task: { taskId: "task-run-1", status: "running" },
     });
     expect(options.runtime.subagent.getSessionMessages).toHaveBeenCalledWith({
       sessionKey: started.sessionKey,
@@ -257,10 +240,8 @@ describe("Flowboard native card execution", () => {
       store,
       id: card.id,
       nextRunId: currentRunId,
-      runtime: options.runtime,
     });
     expect(steered.card.execution).toMatchObject({ status: "running", runId: "run-2" });
-    expect(steered.card.taskId).toBe("task-run-2");
 
     const stopped = await abortFlowboardCardExecution({
       store,

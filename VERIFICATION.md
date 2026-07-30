@@ -197,10 +197,110 @@ WebSocket:
   is exposed is the static bundle and nothing else. Acceptable under the default
   loopback bind; worth revisiting before binding to a LAN or tailnet.
 
-Not verified: dispatching a real worker run end to end. `openclaw flowboard dispatch`
-refused with `target agent is not sandboxed for this restricted Flowboard card`,
-which is the workspace gate behaving correctly; clearing it needs `--admin`
-full-host access, which was not granted to an unattended probe.
+Not verified in this pass: dispatching a real worker run end to end. `openclaw
+flowboard dispatch` refused with `target agent is not sandboxed for this
+restricted Flowboard card`, which is the workspace gate behaving correctly;
+clearing it needs `--admin` full-host access, which was not granted to an
+unattended probe. Attempted and found broken below, once granted.
+
+### Real worker dispatch with `--admin` — found a defect, not a pass
+
+`--admin` was granted for one throwaway card in the archived `fb-probe`
+project (restored, tested, re-archived; card deleted after). Dispatch itself
+worked mechanically — claim, subagent spawn, `subagent_ended` convergence to
+`review` — but the worker could not do the one thing it was dispatched to do.
+
+Two runs, same result for two different reasons:
+
+- **Run 1**: the worker called `workboard_heartbeat`, `workboard_comment`,
+  `workboard_proof`, `workboard_complete` — the bundled Workboard plugin's
+  tools, not Flowboard's — despite the prompt naming `flowboard_*` explicitly
+  twice. All four calls returned `card not found` (wrong plugin's card store).
+  The card still converged to `status: review`, `execution.status: done`,
+  `attempt.status: succeeded`, with zero comments, zero proof, no summary.
+- **Run 2**: told explicitly and only to call `flowboard_complete`, the model's
+  own reasoning (captured in the session transcript) states it has no
+  `flowboard_*` tool in its available tool list at all — only `workboard_*`.
+  It then called the generic `exec` tool to `echo` a string that looks like a
+  tool call (`flowboard_complete({...})`), which "succeeded" because `echo`
+  always does, and its final message reports the card as blocked on a missing
+  tool. The card still converged to `review` the same way.
+
+Root cause, traced through `src/backend/src/dispatcher.ts` and
+`src/backend/src/workspace-access.ts`: the only place Flowboard ever asks the
+host to attach the Flowboard tool set (and require
+`flowboard_heartbeat`/`flowboard_complete`/`flowboard_block`) to a dispatched
+subagent is `assertRestrictedFlowboardTarget` →
+`resolveAgentFlowboardWorkspaceRuntime`, which passes
+`confinedToolNames: FLOWBOARD_TOOL_NAMES` and
+`requiredToolNames: FLOWBOARD_REQUIRED_WORKER_TOOLS` to the host's
+`prepareSandboxWorkspaceAuthority`. All three call sites of
+`assertRestrictedFlowboardTarget` in `dispatcher.ts` (lines ~367, ~399, ~445)
+are gated by `if (!workspaceAccess.unrestricted)`. `params.subagent.run(...)`
+(`dispatcher.ts:459`), the call that actually spawns the worker, passes no
+tool list of its own — it relies entirely on that gated call having already
+happened. `--admin` makes `workspaceAccess.unrestricted` true, so none of the
+three call sites fire, so the host never hears about Flowboard's tools for
+that run, so the subagent gets whatever its underlying agent profile's static
+default tools are (here: the bundled Workboard plugin plus generic tools like
+`exec`, but not Flowboard).
+
+Meanwhile `finishExecutionForRun` (`store-workflow.ts:205-206`,
+`succeeded = outcome === "ok"`) treats the host's `subagent_ended` event as a
+pass/fail signal on its own — `outcome: "ok"` means only "the agent turn ended
+without a host-level error," not "the worker called `flowboard_complete`" or
+did anything Flowboard-shaped at all. Combined, a `--admin` dispatch converges
+every run to `review` — indistinguishable on the card from a genuine
+completion — with no comment, proof, or summary recorded, regardless of
+whether the worker did anything.
+
+### The real root cause is one level deeper — a host SDK gap, not an `if`
+
+Attempting the fix implied above (route `--admin` through
+`assertRestrictedFlowboardTarget` too, unconditionally) revealed it would not
+have worked. `prepareSandboxWorkspaceAuthority` is supplied in `gateway.ts:93-99`
+via `(api.runtime as unknown as { sandbox?: { prepareWorkspaceAuthority?: ... } }).sandbox`
+— an `as unknown as` cast reaching for a property that does not exist on this
+host. `grep -rn "prepareWorkspaceAuthority" node_modules/openclaw/` returns zero
+matches in the installed OpenClaw 2026.7.1-2 package, and the public `PluginRuntime`
+type (`node_modules/openclaw/dist/types-DaHgOqFX.d.ts:8424`) has no `sandbox`
+field at all. So `sandbox` is always `undefined`, `prepareSandboxWorkspaceAuthority`
+is always `undefined`, and `resolveAgentFlowboardWorkspaceRuntime` always takes its
+`if (!sandboxRuntime)` early return — `{ sandboxed: false, workspaceAccess: { unrestricted: true } }`
+— regardless of `--admin`. This means:
+
+- A normal (non-admin) dispatch of a card with restricted workspace access is
+  **also** broken on this host version: `assertRestrictedFlowboardTarget` always
+  resolves `sandboxed: false` and throws `target agent is not sandboxed for this
+  restricted Flowboard card` — not because no agent on this host happens to be
+  sandboxed, but because the hook this code depends on to find out doesn't exist.
+- The public SDK does export a real sandbox-status function —
+  `resolveSandboxRuntimeStatus` from `openclaw/plugin-sdk/sandbox`
+  (`node_modules/openclaw/dist/sandbox-BMYGaWSS.d.ts`) — but its signature is
+  `{ cfg, sessionKey } → { sandboxed, mode, ... }` with no way to request that
+  specific tools be attached to a run.
+- The call that actually spawns the worker, `runtime.subagent.run(params)`, has
+  a `SubagentRunParams` type (`types-DaHgOqFX.d.ts:8356`) with no tool-related
+  field and no `agentId` — a subagent's toolset is entirely the static
+  configuration of whatever agent its session key resolves to (here: `main`),
+  and the plugin SDK gives a plugin no lever to attach its own optional tools to
+  one dispatched run. `~/.openclaw/openclaw.json`'s `agents` config has no
+  per-agent tool allowlist either.
+
+Conclusion: `workspace-access.ts`'s whole `confinedToolNames`/`requiredToolNames`/
+`prepareSandboxWorkspaceAuthority` mechanism was written against a host interface
+that has never existed in a shipped OpenClaw version. This is not fixable inside
+this repository — it needs either an upstream SDK capability or a different,
+currently-unknown static configuration lever. Not scoped to `--admin`: every
+dispatch path hits the same gap. The one historical successful run (card
+`252615eb`, referenced in earlier planning) could not be reconstructed or
+explained by this investigation.
+
+Not verified as a result: a worker actually calling `flowboard_heartbeat`,
+`flowboard_comment`, `flowboard_proof`, or `flowboard_complete` for real, and
+any of the 43 tools being exercised at all — both attempts had zero working
+Flowboard tool calls between them. Recorded in [[需求/8.6-问题修复.md]] as a
+host capability gap, not something this round fixed.
 
 ## Architecture rework — July 29, 2026
 
