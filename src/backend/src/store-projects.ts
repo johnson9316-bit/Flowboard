@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { stat } from "node:fs/promises";
 import type {
   TaskfoldBoardMetadata,
   TaskfoldCard,
@@ -52,6 +53,33 @@ import {
 } from "./project-document-discovery.js";
 
 const RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES = ["file.", "ai."] as const;
+
+function normalizeProjectCreateMode(value: unknown): "new" | "existing" {
+  if (value === undefined || value === "new") {
+    return "new";
+  }
+  if (value === "existing") {
+    return "existing";
+  }
+  throw new Error("project mode must be new or existing.");
+}
+
+async function assertExistingProjectDirectory(
+  workspace: TaskfoldBoardMetadata["defaultWorkspace"],
+): Promise<void> {
+  if (workspace?.kind !== "dir" || !workspace.path) {
+    throw new Error("existing project requires an absolute local directory.");
+  }
+  let details: Awaited<ReturnType<typeof stat>>;
+  try {
+    details = await stat(workspace.path);
+  } catch {
+    throw new Error(`existing project directory is unavailable: ${workspace.path}`);
+  }
+  if (!details.isDirectory()) {
+    throw new Error(`existing project path is not a directory: ${workspace.path}`);
+  }
+}
 
 function presentProjectDocument(document: TaskfoldProjectDocument): TaskfoldProjectDocument {
   const next: TaskfoldProjectDocument = {
@@ -331,7 +359,8 @@ export class TaskfoldProjectStore extends TaskfoldNotificationStore {
         throw new Error(`project already exists through existing cards: ${boardId}`);
       }
       const name = normalizeTitle(input.name);
-      const initialMilestoneTitle = normalizeTitle(input.initialMilestoneTitle);
+      const projectMode = normalizeProjectCreateMode(input.projectMode);
+      const initialMilestoneTitle = normalizeOptionalString(input.initialMilestoneTitle);
       const existingBoards = await this.listBoards();
       const maxPosition = Math.max(
         0,
@@ -346,32 +375,36 @@ export class TaskfoldProjectStore extends TaskfoldNotificationStore {
         },
         undefined,
       );
-      const milestone = this.createMilestoneRecord(
-        boardId,
-        {
-          title: initialMilestoneTitle,
-          description: undefined,
-          color: undefined,
-          position: POSITION_STEP,
-        },
-        Date.now(),
-      );
+      if (projectMode === "existing") {
+        await assertExistingProjectDirectory(board.defaultWorkspace);
+      }
+      const milestone = initialMilestoneTitle
+        ? this.createMilestoneRecord(
+            boardId,
+            {
+              title: normalizeTitle(initialMilestoneTitle),
+              description: undefined,
+              color: undefined,
+              position: POSITION_STEP,
+            },
+            Date.now(),
+          )
+        : undefined;
       await this.boardStore.register(board.id, { version: 1, board });
       try {
-        await this.milestoneStore.register(milestone.id, { version: 1, milestone });
-      } catch (error) {
-        for (const entry of await this.documentStore.entries()) {
-          if (entry.value?.version === 1 && entry.value.document.boardId === boardId) {
-            await this.documentStore.delete(entry.key);
-          }
+        if (milestone) {
+          await this.milestoneStore.register(milestone.id, { version: 1, milestone });
         }
-        await this.milestoneStore.delete(milestone.id);
+      } catch (error) {
+        if (milestone) {
+          await this.milestoneStore.delete(milestone.id);
+        }
         await this.boardStore.delete(board.id);
         throw error;
       }
       return {
         board,
-        milestones: [milestone],
+        milestones: milestone ? [milestone] : [],
         cards: [],
       };
     });

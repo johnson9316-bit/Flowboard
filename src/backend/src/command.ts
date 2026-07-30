@@ -138,7 +138,7 @@ async function handleTaskfoldCommand(params: {
         "/taskfold create <title>",
         "/taskfold move <card-id> --status <status>",
         "/taskfold project list",
-        "/taskfold project create <id> <name> --milestone <title>",
+        "/taskfold project create <id> <name> [--workspace <path>] [--milestone <title>]",
         "/taskfold project milestone move-card <card-id> --milestone <id|unassigned>",
         "/taskfold dispatch",
       ].join("\n"),
@@ -194,17 +194,26 @@ async function handleTaskfoldCommand(params: {
     if (projectAction === "create") {
       const id = projectArgs[0];
       const milestoneTitle = optionValue(projectArgs, "--milestone");
-      const name = normalizeTitle(withoutOption(projectArgs.slice(1), "--milestone"));
-      if (!id || !name || !milestoneTitle) {
+      const workspacePath = optionValue(projectArgs, "--workspace");
+      const name = normalizeTitle(
+        withoutOption(withoutOption(projectArgs.slice(1), "--milestone"), "--workspace"),
+      );
+      if (!id || !name) {
         return {
-          text: "Usage: /taskfold project create <id> <name> --milestone <title>",
+          text: "Usage: /taskfold project create <id> <name> [--workspace <path>] [--milestone <title>]",
           isError: true,
         };
       }
       const project = await params.store.createProject({
         id,
         name,
-        initialMilestoneTitle: milestoneTitle,
+        ...(milestoneTitle ? { initialMilestoneTitle: milestoneTitle } : {}),
+        ...(workspacePath
+          ? {
+              projectMode: "existing",
+              defaultWorkspace: { kind: "dir", path: workspacePath },
+            }
+          : {}),
       });
       return { text: `Created project ${project.board.id}.` };
     }

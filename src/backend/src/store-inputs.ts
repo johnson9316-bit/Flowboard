@@ -189,6 +189,7 @@ export type TaskfoldBoardInput = {
   archived?: unknown;
 };
 export type TaskfoldProjectCreateInput = TaskfoldBoardInput & {
+  projectMode?: unknown;
   initialMilestoneTitle?: unknown;
 };
 export type TaskfoldMilestoneCreateInput = {

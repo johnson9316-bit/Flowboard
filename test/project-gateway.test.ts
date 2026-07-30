@@ -99,7 +99,7 @@ describe("Taskfold M2 Gateway methods", () => {
       throw new Error("project create method was not registered");
     }
     await create.handler({
-      params: { id: "gateway-project", name: "Gateway project", initialMilestoneTitle: "Start" },
+      params: { id: "gateway-project", name: "Gateway project" },
       context: { getRuntimeConfig: () => ({}) },
       respond: (ok: boolean, payload?: unknown) => responses.push({ ok, payload }),
     });

@@ -53,6 +53,8 @@ function createController(setLocale = vi.fn()) {
     requestUpdate: vi.fn(),
     refresh: vi.fn(),
     setLocale,
+    closeModal: vi.fn(),
+    createProject: vi.fn(),
   };
 }
 
@@ -79,5 +81,18 @@ describe("Taskfold project language selector", () => {
     expect(view).toContain("?disabled=");
     expect(controller.state.languageSwitching).toBe(true);
     expect(setLocale).not.toHaveBeenCalled();
+  });
+
+  it("offers blank and existing-project creation without collecting a milestone", async () => {
+    await i18n.setLocale("en", { persist: false });
+    const controller = createController();
+    controller.state.modal = { kind: "project" };
+    const view = templateText(renderTaskfoldProjects(controller as never));
+
+    expect(view).toContain('name="projectMode"');
+    expect(view).toContain('value="new"');
+    expect(view).toContain('value="existing"');
+    expect(view).toContain('name="workspacePath"');
+    expect(view).not.toContain("initialMilestoneTitle");
   });
 });

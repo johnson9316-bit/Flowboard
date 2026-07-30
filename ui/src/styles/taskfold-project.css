@@ -1116,6 +1116,39 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.taskfold-project__project-mode {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.taskfold-project__project-mode legend {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 2px;
+  padding: 0;
+}
+
+.taskfold-project__modal-panel .taskfold-project__project-mode label {
+  align-items: center;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.taskfold-project__project-mode input {
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+  height: 14px;
+  min-height: 0;
+  padding: 0;
+  width: 14px;
+}
+
 .taskfold-project__detail-panel {
   --openclaw-modal-width: min(520px, calc(100vw - 40px));
   background: var(--panel);

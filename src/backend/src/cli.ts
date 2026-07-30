@@ -256,18 +256,29 @@ export function registerTaskfoldCli(params: { program: Command; store: TaskfoldS
     .command("create")
     .argument("<id>", "Project id")
     .argument("<name...>", "Project name")
-    .requiredOption("--milestone <title>", "Initial milestone title")
+    .option("--milestone <title>", "Optional initial milestone title")
+    .option("--workspace <path>", "Existing local project directory")
     .option("--json", "Print JSON", false)
-    .action(async (id: string, name: string[], options: JsonOptions & { milestone: string }) => {
+    .action(async (
+      id: string,
+      name: string[],
+      options: JsonOptions & { milestone?: string; workspace?: string },
+    ) => {
       const projectView = await params.store.createProject({
         id,
         name: name.join(" "),
-        initialMilestoneTitle: options.milestone,
+        ...(options.milestone ? { initialMilestoneTitle: options.milestone } : {}),
+        ...(options.workspace
+          ? {
+              projectMode: "existing",
+              defaultWorkspace: { kind: "dir", path: options.workspace },
+            }
+          : {}),
       });
       if (options.json) {
         writeJson({ project: projectView });
       } else {
-        writeLine(`Created project ${projectView.board.id} with ${projectView.milestones[0]?.title}`);
+        writeLine(`Created project ${projectView.board.id}`);
       }
     });
   project

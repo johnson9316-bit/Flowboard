@@ -4,7 +4,7 @@
 
 AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报）与**AI 执行开发调度**（v0.8 新增，模块⑥）。前者是辅助功能；后者将 GSD 的 Execute 阶段变成可排队、可观察、可接管的流程，是 taskfold 的核心差异化。
 
-> **2026-07-28 架构修正：taskfold 是 OpenClaw 插件。** M1 只复制 Workboard；M2 起才在插件中增加 `AgentRunner`、工作项、run 账本、GSD 映射和人机交接状态。分工见 [[14-OpenClaw技能策略]]。
+> **2026-07-30 架构修正：taskfold 是 OpenClaw 插件。** M1-M3 不开发执行调度；M4 起在插件中增加 ACP Runner、工作项、run 账本、GSD 映射和人机交接状态。执行契约见 [[8.7-待开发一波]] 与 [[14-OpenClaw技能策略]]。
 
 ### Agent Tools（**以 MCP 为主契约**）
 
@@ -72,7 +72,7 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 
 **一句话定位：**
 
-> **taskfold 是独立调度层，不是开发执行者。真实执行者是 OpenClaw `coding-agent`、Claude CLI / codex / opencode 等专业开发 agent。**
+> **taskfold 是独立调度层，不是开发执行者。真实执行者是经官方 OpenClaw ACP Runtime 启动的 Claude Code、Codex、OpenCode 等专业开发 harness。**
 > 目标不是让 AI 自主完成所有开发，而是把开发执行变成**可排队、可观察、可验证、可接管**的异步流程。
 
 #### 职责红线
@@ -104,9 +104,27 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 
 ⇒ **只有 Execute 是可以放手的**。其余四个阶段 taskfold 只做「把材料准备好、把人叫来」。
 
-#### ⚠️ 关键发现：OpenClaw 已内建 CLI backend，执行层大半可复用
+#### 已定方案：官方 OpenClaw ACP Runtime
 
-**（2026-07 查官方文档，本机未装 OpenClaw，未实测）**
+**2026-07-30 已定。** Taskfold 直接使用公开的
+`openclaw/plugin-sdk/acp-runtime` 与官方 `@openclaw/acpx`：
+
+```text
+Taskfold Card / run ledger
+  -> Taskfold ACP Runner
+    -> OpenClaw 公共 ACP Runtime SDK
+      -> @openclaw/acpx
+        -> Claude Code / Codex / OpenCode
+```
+
+ACP Runtime 提供会话创建/恢复、结构化 turn event、状态查询、取消和关闭；Taskfold 持有
+Card、run、审批、审计、worktree lease、Git 安全和并发约束。CLI backend 不再是开发执行的
+主路径，只能作为 ACP 不可用时另行评估的文本型 fallback。完整 API、状态机、持久化和验收见
+[[8.7-待开发一波]]。
+
+#### 历史调研：OpenClaw CLI backend（不作为主执行路径）
+
+**（2026-07 旧调研，保留作 fallback 参考，不得据此实现 M4 主路径）**
 
 这是 v0.8 调研中最有价值的一条，直接回应「充分利用 OpenClaw 生态，不要啥都自己开发」：
 
@@ -125,7 +143,9 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 | 会话历史存储 | `~/.openclaw/agents/<agentId>/agent/openclaw-agent.sqlite` + 归档 transcripts 于 `sessions/` | `concepts/session` |
 | 多 agent 编排 | `sessions_spawn`（非阻塞，返回 `runId` + `childSessionKey`）/ `sessions_yield` / subagents 树视图 | `concepts/session-tool` |
 
-**⇒ 结论：taskfold 不该自己写会话管理器。** PTY、流式解析、session resume、MCP 注入、skills 挂载、历史落库——这些全是已解决问题。taskfold 该做的是**上面那一层：账本 + 排队 + GSD 状态机 + 人机交接点**。
+**历史结论仍成立的一部分**：Taskfold 不该自己写 CLI 会话管理器；PT​​Y、流式解析、session
+resume、MCP 注入、skills 挂载、历史落库应尽量复用 OpenClaw。当前正式实现改由 ACP Runtime
+完成，Taskfold 只做账本、排队、GSD 状态机和人机交接点。
 
 **你的两条指示在这里冲突了，必须拍板**（→ [[11-交接与待决]] 决策 B）：
 
@@ -146,7 +166,7 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 
 **所以准确的说法是**：`-p` 是**传输模式**，不是会话模式。加上 `--session-id` + resume 之后上下文是连续的，你担心的「每次从零开始」不会发生。真正丢掉的是**实时打断**和**权限请求上抛**这两项——而这两项恰好命中「可接管」。
 
-**建议方案（分层，同时满足两条指示）**：
+**已作废的 CLI backend 主路径建议（保留原取证）**：
 
 ```
 默认路径：OpenClaw claude-cli 后端（-p + session-id + resume）
@@ -173,7 +193,7 @@ run（一次会话）  status: queued → running → awaiting_human → done / 
     │
     ├─ 组装上下文包：workspace 路径 + GSD phase + 要读的 .planning/ 产物
     │                + 该项目的 skills + 该项目的 MCP（[[4-执行调度与AI]]）
-    ├─ 提交给 OpenClaw claude-cli 后端，拿回 session_id
+    ├─ 交给 Taskfold ACP Runner：创建/恢复 ACP session，启动 turn 并持久化 handle
     ├─ 流式事件 → 写 run_events → WebSocket 推到看板卡片上
     │
     ├─ 命中「需要人」→ awaiting_human，卡片进「待我处理」列 + 推送通知

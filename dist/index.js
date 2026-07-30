@@ -331,16 +331,20 @@ function registerTaskfoldCli(params) {
       writeLine(`${entry.id}  ${entry.name ?? entry.id}${entry.archivedAt ? "  archived" : ""}`);
     }
   });
-  project.command("create").argument("<id>", "Project id").argument("<name...>", "Project name").requiredOption("--milestone <title>", "Initial milestone title").option("--json", "Print JSON", false).action(async (id, name, options) => {
+  project.command("create").argument("<id>", "Project id").argument("<name...>", "Project name").option("--milestone <title>", "Optional initial milestone title").option("--workspace <path>", "Existing local project directory").option("--json", "Print JSON", false).action(async (id, name, options) => {
     const projectView = await params.store.createProject({
       id,
       name: name.join(" "),
-      initialMilestoneTitle: options.milestone
+      ...options.milestone ? { initialMilestoneTitle: options.milestone } : {},
+      ...options.workspace ? {
+        projectMode: "existing",
+        defaultWorkspace: { kind: "dir", path: options.workspace }
+      } : {}
     });
     if (options.json) {
       writeJson({ project: projectView });
     } else {
-      writeLine(`Created project ${projectView.board.id} with ${projectView.milestones[0]?.title}`);
+      writeLine(`Created project ${projectView.board.id}`);
     }
   });
   project.command("show").argument("<id>", "Project id").option("--json", "Print JSON", false).action(async (id, options) => {
@@ -3718,16 +3722,16 @@ async function resolveProjectDocumentFile(params) {
     throw new Error("project document file does not exist.");
   }
   await assertTaskfoldWorkspaceSourceAccess({ kind: "dir", path: resolvedPath }, params.access);
-  let stat;
+  let stat2;
   try {
-    stat = await fs.stat(resolvedPath);
+    stat2 = await fs.stat(resolvedPath);
   } catch {
     throw new Error("project document file cannot be read.");
   }
-  if (!stat.isFile()) {
+  if (!stat2.isFile()) {
     throw new Error("project document path must reference a regular file.");
   }
-  if (stat.size > MAX_PROJECT_DOCUMENT_BYTES) {
+  if (stat2.size > MAX_PROJECT_DOCUMENT_BYTES) {
     throw new Error("project document file exceeds the 1 MiB preview limit.");
   }
   let bytes;
@@ -3736,7 +3740,7 @@ async function resolveProjectDocumentFile(params) {
   } catch {
     throw new Error("project document file cannot be read.");
   }
-  return { content: decodeUtf8(bytes), bytes, path: resolvedPath, stat };
+  return { content: decodeUtf8(bytes), bytes, path: resolvedPath, stat: stat2 };
 }
 async function readTaskfoldProjectDocument(params) {
   const { document } = params;
@@ -6028,6 +6032,7 @@ function createTaskfoldSqliteStores(options = {}) {
 // src/backend/src/store-projects.ts
 init_contract();
 import { randomUUID as randomUUID10 } from "node:crypto";
+import { stat } from "node:fs/promises";
 
 // src/backend/src/store-workflow.ts
 import { randomUUID as randomUUID9 } from "node:crypto";
@@ -8200,13 +8205,13 @@ async function addCandidate(params) {
   if (!isPathInside2(params.root, target) || params.targets.has(target)) {
     return;
   }
-  let stat;
+  let stat2;
   try {
-    stat = await fs3.stat(target);
+    stat2 = await fs3.stat(target);
   } catch {
     return;
   }
-  if (!stat.isFile()) {
+  if (!stat2.isFile()) {
     return;
   }
   const relativePath = normalizedRelativePath(params.root, target);
@@ -8316,6 +8321,29 @@ async function discoverTaskfoldProjectDocuments(workspacePath) {
 
 // src/backend/src/store-projects.ts
 var RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES = ["file.", "ai."];
+function normalizeProjectCreateMode(value) {
+  if (value === void 0 || value === "new") {
+    return "new";
+  }
+  if (value === "existing") {
+    return "existing";
+  }
+  throw new Error("project mode must be new or existing.");
+}
+async function assertExistingProjectDirectory(workspace) {
+  if (workspace?.kind !== "dir" || !workspace.path) {
+    throw new Error("existing project requires an absolute local directory.");
+  }
+  let details;
+  try {
+    details = await stat(workspace.path);
+  } catch {
+    throw new Error(`existing project directory is unavailable: ${workspace.path}`);
+  }
+  if (!details.isDirectory()) {
+    throw new Error(`existing project path is not a directory: ${workspace.path}`);
+  }
+}
 function presentProjectDocument(document) {
   const next = {
     ...document,
@@ -8511,7 +8539,8 @@ var TaskfoldProjectStore = class extends TaskfoldNotificationStore {
         throw new Error(`project already exists through existing cards: ${boardId}`);
       }
       const name = normalizeTitle(input.name);
-      const initialMilestoneTitle = normalizeTitle(input.initialMilestoneTitle);
+      const projectMode = normalizeProjectCreateMode(input.projectMode);
+      const initialMilestoneTitle = normalizeOptionalString(input.initialMilestoneTitle);
       const existingBoards = await this.listBoards();
       const maxPosition = Math.max(
         0,
@@ -8526,32 +8555,34 @@ var TaskfoldProjectStore = class extends TaskfoldNotificationStore {
         },
         void 0
       );
-      const milestone = this.createMilestoneRecord(
+      if (projectMode === "existing") {
+        await assertExistingProjectDirectory(board.defaultWorkspace);
+      }
+      const milestone = initialMilestoneTitle ? this.createMilestoneRecord(
         boardId,
         {
-          title: initialMilestoneTitle,
+          title: normalizeTitle(initialMilestoneTitle),
           description: void 0,
           color: void 0,
           position: POSITION_STEP
         },
         Date.now()
-      );
+      ) : void 0;
       await this.boardStore.register(board.id, { version: 1, board });
       try {
-        await this.milestoneStore.register(milestone.id, { version: 1, milestone });
-      } catch (error) {
-        for (const entry of await this.documentStore.entries()) {
-          if (entry.value?.version === 1 && entry.value.document.boardId === boardId) {
-            await this.documentStore.delete(entry.key);
-          }
+        if (milestone) {
+          await this.milestoneStore.register(milestone.id, { version: 1, milestone });
         }
-        await this.milestoneStore.delete(milestone.id);
+      } catch (error) {
+        if (milestone) {
+          await this.milestoneStore.delete(milestone.id);
+        }
         await this.boardStore.delete(board.id);
         throw error;
       }
       return {
         board,
-        milestones: [milestone],
+        milestones: milestone ? [milestone] : [],
         cards: []
       };
     });
@@ -10108,7 +10139,7 @@ async function handleTaskfoldCommand(params) {
         "/taskfold create <title>",
         "/taskfold move <card-id> --status <status>",
         "/taskfold project list",
-        "/taskfold project create <id> <name> --milestone <title>",
+        "/taskfold project create <id> <name> [--workspace <path>] [--milestone <title>]",
         "/taskfold project milestone move-card <card-id> --milestone <id|unassigned>",
         "/taskfold dispatch"
       ].join("\n")
@@ -10160,17 +10191,24 @@ async function handleTaskfoldCommand(params) {
     if (projectAction === "create") {
       const id = projectArgs[0];
       const milestoneTitle = optionValue(projectArgs, "--milestone");
-      const name = normalizeTitle2(withoutOption(projectArgs.slice(1), "--milestone"));
-      if (!id || !name || !milestoneTitle) {
+      const workspacePath = optionValue(projectArgs, "--workspace");
+      const name = normalizeTitle2(
+        withoutOption(withoutOption(projectArgs.slice(1), "--milestone"), "--workspace")
+      );
+      if (!id || !name) {
         return {
-          text: "Usage: /taskfold project create <id> <name> --milestone <title>",
+          text: "Usage: /taskfold project create <id> <name> [--workspace <path>] [--milestone <title>]",
           isError: true
         };
       }
       const project = await params.store.createProject({
         id,
         name,
-        initialMilestoneTitle: milestoneTitle
+        ...milestoneTitle ? { initialMilestoneTitle: milestoneTitle } : {},
+        ...workspacePath ? {
+          projectMode: "existing",
+          defaultWorkspace: { kind: "dir", path: workspacePath }
+        } : {}
       });
       return { text: `Created project ${project.board.id}.` };
     }
@@ -15492,16 +15530,30 @@ function createTaskfoldTools(params) {
     {
       name: "taskfold_project_create",
       label: "Taskfold Project Create",
-      description: "Create a Taskfold project with its first milestone and standard documents.",
+      description: "Create a blank Taskfold project, or initialize one for an existing local project directory.",
       parameters: typebox_exports.Object(
         {
           id: typebox_exports.String({ description: "Stable project id." }),
           name: typebox_exports.String({ description: "Project name." }),
-          initialMilestoneTitle: typebox_exports.String({ description: "First milestone title." }),
+          projectMode: typebox_exports.Optional(
+            typebox_exports.Union([typebox_exports.Literal("new"), typebox_exports.Literal("existing")])
+          ),
+          initialMilestoneTitle: typebox_exports.Optional(
+            typebox_exports.String({ description: "Optional initial milestone title." })
+          ),
           description: typebox_exports.Optional(typebox_exports.String()),
           color: typebox_exports.Optional(typebox_exports.String()),
           repositoryUrl: typebox_exports.Optional(typebox_exports.String()),
-          planningPath: typebox_exports.Optional(typebox_exports.String())
+          planningPath: typebox_exports.Optional(typebox_exports.String()),
+          defaultWorkspace: typebox_exports.Optional(
+            typebox_exports.Object(
+              {
+                kind: typebox_exports.Literal("dir"),
+                path: typebox_exports.String({ description: "Absolute existing local project directory." })
+              },
+              { additionalProperties: false }
+            )
+          )
         },
         { additionalProperties: false }
       ),

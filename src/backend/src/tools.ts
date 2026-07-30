@@ -636,16 +636,31 @@ export function createTaskfoldTools(params: {
     {
       name: "taskfold_project_create",
       label: "Taskfold Project Create",
-      description: "Create a Taskfold project with its first milestone and standard documents.",
+      description:
+        "Create a blank Taskfold project, or initialize one for an existing local project directory.",
       parameters: Type.Object(
         {
           id: Type.String({ description: "Stable project id." }),
           name: Type.String({ description: "Project name." }),
-          initialMilestoneTitle: Type.String({ description: "First milestone title." }),
+          projectMode: Type.Optional(
+            Type.Union([Type.Literal("new"), Type.Literal("existing")]),
+          ),
+          initialMilestoneTitle: Type.Optional(
+            Type.String({ description: "Optional initial milestone title." }),
+          ),
           description: Type.Optional(Type.String()),
           color: Type.Optional(Type.String()),
           repositoryUrl: Type.Optional(Type.String()),
           planningPath: Type.Optional(Type.String()),
+          defaultWorkspace: Type.Optional(
+            Type.Object(
+              {
+                kind: Type.Literal("dir"),
+                path: Type.String({ description: "Absolute existing local project directory." }),
+              },
+              { additionalProperties: false },
+            ),
+          ),
         },
         { additionalProperties: false },
       ),

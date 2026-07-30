@@ -407,10 +407,18 @@ class TaskfoldProjectHost extends LitElement {
 
   private createProject(data: Record<string, string>) {
     void this.mutate(async () => {
+      const projectMode = data.projectMode === "existing" ? "existing" : "new";
+      const workspacePath = data.workspacePath?.trim();
+      if (projectMode === "existing" && !workspacePath) {
+        throw new Error(i18n.t("taskfoldProject.existingWorkspaceRequired"));
+      }
       const response = await this.gateway.request<ProjectResponse>("taskfold.projects.create", {
         id: data.id,
         name: data.name,
-        initialMilestoneTitle: data.initialMilestoneTitle,
+        projectMode,
+        ...(projectMode === "existing"
+          ? { defaultWorkspace: { kind: "dir", path: workspacePath } }
+          : {}),
       });
       this.state.selectedProjectId = response.project.board.id;
       this.state.screen = "board";

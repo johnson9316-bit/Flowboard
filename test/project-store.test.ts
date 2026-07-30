@@ -8,6 +8,9 @@ import type {
   PersistedTaskfoldProjectDocument,
   TaskfoldKeyedStore,
 } from "../src/backend/src/persistence-types.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { TaskfoldStore } from "../src/backend/src/store.js";
 
 function keyedStore<T>(): TaskfoldKeyedStore<T> {
@@ -45,7 +48,19 @@ function createStore() {
 }
 
 describe("Taskfold M2 project store", () => {
-  it("creates a project atomically with its first milestone", async () => {
+  it("creates a blank project without a milestone", async () => {
+    const { store } = createStore();
+
+    const project = await store.createProject({
+      id: "blank",
+      name: "Blank",
+    });
+
+    expect(project.board).toMatchObject({ id: "blank", name: "Blank" });
+    expect(project.milestones).toEqual([]);
+  });
+
+  it("keeps an optional initial milestone compatible for automated callers", async () => {
     const { store } = createStore();
 
     const project = await store.createProject({
@@ -66,6 +81,31 @@ describe("Taskfold M2 project store", () => {
         initialMilestoneTitle: "First",
       }),
     ).rejects.toThrow("title is required");
+  });
+
+  it("initializes an existing project only from a real local directory", async () => {
+    const { store } = createStore();
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "taskfold-project-"));
+    try {
+      const project = await store.createProject({
+        id: "existing",
+        name: "Existing",
+        projectMode: "existing",
+        defaultWorkspace: { kind: "dir", path: workspace },
+      });
+
+      expect(project.board.defaultWorkspace).toEqual({ kind: "dir", path: workspace });
+      await expect(
+        store.createProject({
+          id: "missing-directory",
+          name: "Missing directory",
+          projectMode: "existing",
+          defaultWorkspace: { kind: "dir", path: path.join(workspace, "missing") },
+        }),
+      ).rejects.toThrow("existing project directory is unavailable");
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 
   it("will not claim a legacy card namespace as a newly-created project", async () => {

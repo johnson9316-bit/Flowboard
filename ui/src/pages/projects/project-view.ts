@@ -355,6 +355,20 @@ function readForm(event: SubmitEvent): Record<string, string> {
   );
 }
 
+function setProjectCreateMode(event: Event): void {
+  const input = event.currentTarget as HTMLInputElement;
+  const form = input.form;
+  if (!form) {
+    return;
+  }
+  const existing = input.value === "existing";
+  const workspaceField = form.elements.namedItem("workspacePath");
+  const workspaceInput =
+    workspaceField instanceof HTMLInputElement ? workspaceField : undefined;
+  workspaceInput?.toggleAttribute("required", existing);
+  form.querySelector<HTMLElement>("[data-project-workspace]")?.toggleAttribute("hidden", !existing);
+}
+
 export function reorderVisibleItemIds<T extends { id: string }>(
   allItems: readonly T[],
   visibleItems: readonly T[],
@@ -2027,9 +2041,34 @@ function renderModal(controller: TaskfoldProjectViewController) {
           }}
         >
           <header><h2>${t("taskfoldProject.newProject")}</h2></header>
+          <fieldset class="taskfold-project__project-mode">
+            <legend>${t("taskfoldProject.projectMode")}</legend>
+            <label>
+              <input
+                type="radio"
+                name="projectMode"
+                value="new"
+                checked
+                @change=${setProjectCreateMode}
+              />
+              <span>${t("taskfoldProject.newBlankProject")}</span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="projectMode"
+                value="existing"
+                @change=${setProjectCreateMode}
+              />
+              <span>${t("taskfoldProject.initializeExistingProject")}</span>
+            </label>
+          </fieldset>
           <label>${t("taskfoldProject.projectId")}<input name="id" required pattern="[a-z0-9][a-z0-9._-]{0,79}" /></label>
           <label>${t("taskfoldProject.projectName")}<input name="name" required /></label>
-          <label>${t("taskfoldProject.firstMilestone")}<input name="initialMilestoneTitle" required /></label>
+          <label data-project-workspace hidden>
+            ${t("taskfoldProject.existingWorkspace")}
+            <input name="workspacePath" />
+          </label>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
             <button

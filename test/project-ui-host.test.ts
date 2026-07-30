@@ -25,6 +25,9 @@ describe("Taskfold M2 project UI host", () => {
     expect(page).toContain("taskfold-project__kanban");
     expect(page).toContain("taskfold-project__project-toolbar");
     expect(page).toContain("taskfold-project__language-select");
+    expect(page).toContain('name="projectMode"');
+    expect(page).toContain('name="workspacePath"');
+    expect(page).not.toContain('name="initialMilestoneTitle"');
     expect(page).not.toContain("taskfold-project__sidebar");
     expect(page).toContain("?disabled=${controller.state.busy || !controller.connected}");
   });
