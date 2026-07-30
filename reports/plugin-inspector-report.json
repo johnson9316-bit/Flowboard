@@ -1,0 +1,2749 @@
+{
+  "generatedAt": "deterministic",
+  "targetOpenClaw": {
+    "configuredPath": null,
+    "status": "disabled",
+    "compatRecords": [],
+    "compatRecordStatuses": {},
+    "hookNames": [],
+    "apiRegistrars": [],
+    "capturedRegistrars": [],
+    "sdkExports": [],
+    "reservedSdkExports": [],
+    "supportedFacadeSdkExports": [],
+    "publicPluginOwnedSdkExports": [],
+    "manifestFields": [],
+    "manifestContractFields": []
+  },
+  "status": "pass",
+  "summary": {
+    "breakageCount": 0,
+    "warningCount": 0,
+    "deprecationWarningCount": 0,
+    "issueCount": 0
+  },
+  "fixtures": [
+    {
+      "id": "taskfold",
+      "name": "Taskfold",
+      "priority": "high",
+      "seams": [
+        "dynamic-tool"
+      ],
+      "why": "local OpenClaw plugin root",
+      "status": "ok",
+      "hooks": [
+        "subagent_ended"
+      ],
+      "hookDetails": [
+        {
+          "name": "subagent_ended",
+          "file": "dist/index.js",
+          "line": 16158,
+          "ref": "dist/index.js:16158"
+        },
+        {
+          "name": "subagent_ended",
+          "file": "src/backend/index.ts",
+          "line": 61,
+          "ref": "src/backend/index.ts:61"
+        }
+      ],
+      "registrations": [
+        "definePluginEntry",
+        "registerCli",
+        "registerCommand",
+        "registerGatewayMethod",
+        "registerHttpRoute",
+        "registerService",
+        "registerTool"
+      ],
+      "registrationDetails": [
+        {
+          "name": "definePluginEntry",
+          "file": "dist/index.js",
+          "line": 16127,
+          "ref": "dist/index.js:16127"
+        },
+        {
+          "name": "definePluginEntry",
+          "file": "src/backend/index.ts",
+          "line": 26,
+          "ref": "src/backend/index.ts:26"
+        },
+        {
+          "name": "registerCli",
+          "file": "dist/index.js",
+          "line": 16133,
+          "ref": "dist/index.js:16133"
+        },
+        {
+          "name": "registerCli",
+          "file": "dist/index.js",
+          "line": 16172,
+          "ref": "dist/index.js:16172"
+        },
+        {
+          "name": "registerCli",
+          "file": "src/backend/index.ts",
+          "line": 32,
+          "ref": "src/backend/index.ts:32"
+        },
+        {
+          "name": "registerCli",
+          "file": "src/backend/index.ts",
+          "line": 75,
+          "ref": "src/backend/index.ts:75"
+        },
+        {
+          "name": "registerCommand",
+          "file": "dist/index.js",
+          "line": 10268,
+          "ref": "dist/index.js:10268"
+        },
+        {
+          "name": "registerCommand",
+          "file": "src/backend/src/command.ts",
+          "line": 306,
+          "ref": "src/backend/src/command.ts:306"
+        },
+        {
+          "name": "registerCommand",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/command.ts",
+          "line": 217,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/command.ts:217"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3542,
+          "ref": "dist/index.js:3542"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3562,
+          "ref": "dist/index.js:3562"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3586,
+          "ref": "dist/index.js:3586"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3608,
+          "ref": "dist/index.js:3608"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3624,
+          "ref": "dist/index.js:3624"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3641,
+          "ref": "dist/index.js:3641"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3829,
+          "ref": "dist/index.js:3829"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3840,
+          "ref": "dist/index.js:3840"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3851,
+          "ref": "dist/index.js:3851"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3864,
+          "ref": "dist/index.js:3864"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3877,
+          "ref": "dist/index.js:3877"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3888,
+          "ref": "dist/index.js:3888"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3902,
+          "ref": "dist/index.js:3902"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3913,
+          "ref": "dist/index.js:3913"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3924,
+          "ref": "dist/index.js:3924"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3935,
+          "ref": "dist/index.js:3935"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3946,
+          "ref": "dist/index.js:3946"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3957,
+          "ref": "dist/index.js:3957"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3968,
+          "ref": "dist/index.js:3968"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3979,
+          "ref": "dist/index.js:3979"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 3990,
+          "ref": "dist/index.js:3990"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4012,
+          "ref": "dist/index.js:4012"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4028,
+          "ref": "dist/index.js:4028"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4062,
+          "ref": "dist/index.js:4062"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4073,
+          "ref": "dist/index.js:4073"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4087,
+          "ref": "dist/index.js:4087"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4098,
+          "ref": "dist/index.js:4098"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4112,
+          "ref": "dist/index.js:4112"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4126,
+          "ref": "dist/index.js:4126"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4137,
+          "ref": "dist/index.js:4137"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4150,
+          "ref": "dist/index.js:4150"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4163,
+          "ref": "dist/index.js:4163"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4176,
+          "ref": "dist/index.js:4176"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4189,
+          "ref": "dist/index.js:4189"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 4202,
+          "ref": "dist/index.js:4202"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9361,
+          "ref": "dist/index.js:9361"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9372,
+          "ref": "dist/index.js:9372"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9390,
+          "ref": "dist/index.js:9390"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9406,
+          "ref": "dist/index.js:9406"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9423,
+          "ref": "dist/index.js:9423"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9439,
+          "ref": "dist/index.js:9439"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9456,
+          "ref": "dist/index.js:9456"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9475,
+          "ref": "dist/index.js:9475"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9494,
+          "ref": "dist/index.js:9494"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9509,
+          "ref": "dist/index.js:9509"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9520,
+          "ref": "dist/index.js:9520"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9533,
+          "ref": "dist/index.js:9533"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9546,
+          "ref": "dist/index.js:9546"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9564,
+          "ref": "dist/index.js:9564"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9577,
+          "ref": "dist/index.js:9577"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9590,
+          "ref": "dist/index.js:9590"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9607,
+          "ref": "dist/index.js:9607"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9624,
+          "ref": "dist/index.js:9624"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9636,
+          "ref": "dist/index.js:9636"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9649,
+          "ref": "dist/index.js:9649"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9662,
+          "ref": "dist/index.js:9662"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9675,
+          "ref": "dist/index.js:9675"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9688,
+          "ref": "dist/index.js:9688"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9701,
+          "ref": "dist/index.js:9701"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9714,
+          "ref": "dist/index.js:9714"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9727,
+          "ref": "dist/index.js:9727"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9741,
+          "ref": "dist/index.js:9741"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9752,
+          "ref": "dist/index.js:9752"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9763,
+          "ref": "dist/index.js:9763"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9768,
+          "ref": "dist/index.js:9768"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9773,
+          "ref": "dist/index.js:9773"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9785,
+          "ref": "dist/index.js:9785"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9798,
+          "ref": "dist/index.js:9798"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9809,
+          "ref": "dist/index.js:9809"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9820,
+          "ref": "dist/index.js:9820"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9833,
+          "ref": "dist/index.js:9833"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9844,
+          "ref": "dist/index.js:9844"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9855,
+          "ref": "dist/index.js:9855"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9866,
+          "ref": "dist/index.js:9866"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9878,
+          "ref": "dist/index.js:9878"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9889,
+          "ref": "dist/index.js:9889"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9901,
+          "ref": "dist/index.js:9901"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9916,
+          "ref": "dist/index.js:9916"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9929,
+          "ref": "dist/index.js:9929"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9948,
+          "ref": "dist/index.js:9948"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9961,
+          "ref": "dist/index.js:9961"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9976,
+          "ref": "dist/index.js:9976"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "dist/index.js",
+          "line": 9991,
+          "ref": "dist/index.js:9991"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 109,
+          "ref": "src/backend/src/gateway-project-methods.ts:109"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 120,
+          "ref": "src/backend/src/gateway-project-methods.ts:120"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 134,
+          "ref": "src/backend/src/gateway-project-methods.ts:134"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 146,
+          "ref": "src/backend/src/gateway-project-methods.ts:146"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 157,
+          "ref": "src/backend/src/gateway-project-methods.ts:157"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 168,
+          "ref": "src/backend/src/gateway-project-methods.ts:168"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 179,
+          "ref": "src/backend/src/gateway-project-methods.ts:179"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 190,
+          "ref": "src/backend/src/gateway-project-methods.ts:190"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 201,
+          "ref": "src/backend/src/gateway-project-methods.ts:201"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 212,
+          "ref": "src/backend/src/gateway-project-methods.ts:212"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 224,
+          "ref": "src/backend/src/gateway-project-methods.ts:224"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 246,
+          "ref": "src/backend/src/gateway-project-methods.ts:246"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 262,
+          "ref": "src/backend/src/gateway-project-methods.ts:262"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 299,
+          "ref": "src/backend/src/gateway-project-methods.ts:299"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 310,
+          "ref": "src/backend/src/gateway-project-methods.ts:310"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 324,
+          "ref": "src/backend/src/gateway-project-methods.ts:324"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 335,
+          "ref": "src/backend/src/gateway-project-methods.ts:335"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 349,
+          "ref": "src/backend/src/gateway-project-methods.ts:349"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 363,
+          "ref": "src/backend/src/gateway-project-methods.ts:363"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 375,
+          "ref": "src/backend/src/gateway-project-methods.ts:375"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 388,
+          "ref": "src/backend/src/gateway-project-methods.ts:388"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 401,
+          "ref": "src/backend/src/gateway-project-methods.ts:401"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 414,
+          "ref": "src/backend/src/gateway-project-methods.ts:414"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 428,
+          "ref": "src/backend/src/gateway-project-methods.ts:428"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 441,
+          "ref": "src/backend/src/gateway-project-methods.ts:441"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 61,
+          "ref": "src/backend/src/gateway-project-methods.ts:61"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 72,
+          "ref": "src/backend/src/gateway-project-methods.ts:72"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 83,
+          "ref": "src/backend/src/gateway-project-methods.ts:83"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-project-methods.ts",
+          "line": 96,
+          "ref": "src/backend/src/gateway-project-methods.ts:96"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-workspace-methods.ts",
+          "line": 122,
+          "ref": "src/backend/src/gateway-workspace-methods.ts:122"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-workspace-methods.ts",
+          "line": 141,
+          "ref": "src/backend/src/gateway-workspace-methods.ts:141"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-workspace-methods.ts",
+          "line": 161,
+          "ref": "src/backend/src/gateway-workspace-methods.ts:161"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-workspace-methods.ts",
+          "line": 46,
+          "ref": "src/backend/src/gateway-workspace-methods.ts:46"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-workspace-methods.ts",
+          "line": 70,
+          "ref": "src/backend/src/gateway-workspace-methods.ts:70"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway-workspace-methods.ts",
+          "line": 97,
+          "ref": "src/backend/src/gateway-workspace-methods.ts:97"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 128,
+          "ref": "src/backend/src/gateway.ts:128"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 140,
+          "ref": "src/backend/src/gateway.ts:140"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 159,
+          "ref": "src/backend/src/gateway.ts:159"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 176,
+          "ref": "src/backend/src/gateway.ts:176"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 194,
+          "ref": "src/backend/src/gateway.ts:194"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 211,
+          "ref": "src/backend/src/gateway.ts:211"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 229,
+          "ref": "src/backend/src/gateway.ts:229"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 249,
+          "ref": "src/backend/src/gateway.ts:249"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 270,
+          "ref": "src/backend/src/gateway.ts:270"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 286,
+          "ref": "src/backend/src/gateway.ts:286"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 298,
+          "ref": "src/backend/src/gateway.ts:298"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 312,
+          "ref": "src/backend/src/gateway.ts:312"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 326,
+          "ref": "src/backend/src/gateway.ts:326"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 345,
+          "ref": "src/backend/src/gateway.ts:345"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 359,
+          "ref": "src/backend/src/gateway.ts:359"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 373,
+          "ref": "src/backend/src/gateway.ts:373"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 391,
+          "ref": "src/backend/src/gateway.ts:391"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 409,
+          "ref": "src/backend/src/gateway.ts:409"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 422,
+          "ref": "src/backend/src/gateway.ts:422"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 436,
+          "ref": "src/backend/src/gateway.ts:436"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 450,
+          "ref": "src/backend/src/gateway.ts:450"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 464,
+          "ref": "src/backend/src/gateway.ts:464"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 478,
+          "ref": "src/backend/src/gateway.ts:478"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 492,
+          "ref": "src/backend/src/gateway.ts:492"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 506,
+          "ref": "src/backend/src/gateway.ts:506"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 520,
+          "ref": "src/backend/src/gateway.ts:520"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 536,
+          "ref": "src/backend/src/gateway.ts:536"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 548,
+          "ref": "src/backend/src/gateway.ts:548"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 560,
+          "ref": "src/backend/src/gateway.ts:560"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 566,
+          "ref": "src/backend/src/gateway.ts:566"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 572,
+          "ref": "src/backend/src/gateway.ts:572"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 586,
+          "ref": "src/backend/src/gateway.ts:586"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 600,
+          "ref": "src/backend/src/gateway.ts:600"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 612,
+          "ref": "src/backend/src/gateway.ts:612"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 624,
+          "ref": "src/backend/src/gateway.ts:624"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 639,
+          "ref": "src/backend/src/gateway.ts:639"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 651,
+          "ref": "src/backend/src/gateway.ts:651"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 663,
+          "ref": "src/backend/src/gateway.ts:663"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 675,
+          "ref": "src/backend/src/gateway.ts:675"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 688,
+          "ref": "src/backend/src/gateway.ts:688"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 700,
+          "ref": "src/backend/src/gateway.ts:700"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 713,
+          "ref": "src/backend/src/gateway.ts:713"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 729,
+          "ref": "src/backend/src/gateway.ts:729"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 743,
+          "ref": "src/backend/src/gateway.ts:743"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 763,
+          "ref": "src/backend/src/gateway.ts:763"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 777,
+          "ref": "src/backend/src/gateway.ts:777"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 793,
+          "ref": "src/backend/src/gateway.ts:793"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "src/backend/src/gateway.ts",
+          "line": 809,
+          "ref": "src/backend/src/gateway.ts:809"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+          "line": 115,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts:115"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+          "line": 134,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts:134"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+          "line": 154,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts:154"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+          "line": 46,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts:46"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+          "line": 63,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts:63"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+          "line": 90,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts:90"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 100,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:100"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 114,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:114"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 133,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:133"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 147,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:147"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 161,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:161"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 174,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:174"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 188,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:188"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 202,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:202"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 216,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:216"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 230,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:230"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 244,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:244"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 258,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:258"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 272,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:272"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 288,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:288"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 300,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:300"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 312,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:312"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 318,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:318"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 324,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:324"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 338,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:338"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 352,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:352"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 364,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:364"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 376,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:376"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 391,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:391"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 403,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:403"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 415,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:415"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 427,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:427"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 44,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:44"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 440,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:440"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 452,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:452"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 465,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:465"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 481,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:481"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 495,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:495"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 515,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:515"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 529,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:529"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 545,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:545"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 561,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:561"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 58,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:58"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 74,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:74"
+        },
+        {
+          "name": "registerGatewayMethod",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+          "line": 86,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts:86"
+        },
+        {
+          "name": "registerHttpRoute",
+          "file": "dist/index.js",
+          "line": 16148,
+          "ref": "dist/index.js:16148"
+        },
+        {
+          "name": "registerHttpRoute",
+          "file": "src/backend/index.ts",
+          "line": 47,
+          "ref": "src/backend/index.ts:47"
+        },
+        {
+          "name": "registerService",
+          "file": "dist/index.js",
+          "line": 16156,
+          "ref": "dist/index.js:16156"
+        },
+        {
+          "name": "registerService",
+          "file": "dist/index.js",
+          "line": 16157,
+          "ref": "dist/index.js:16157"
+        },
+        {
+          "name": "registerService",
+          "file": "src/backend/index.ts",
+          "line": 55,
+          "ref": "src/backend/index.ts:55"
+        },
+        {
+          "name": "registerService",
+          "file": "src/backend/index.ts",
+          "line": 60,
+          "ref": "src/backend/index.ts:60"
+        },
+        {
+          "name": "registerTool",
+          "file": "dist/index.js",
+          "line": 16179,
+          "ref": "dist/index.js:16179"
+        },
+        {
+          "name": "registerTool",
+          "file": "src/backend/index.ts",
+          "line": 82,
+          "ref": "src/backend/index.ts:82"
+        }
+      ],
+      "manifestContracts": [
+        "tools"
+      ],
+      "manifestFiles": [
+        "openclaw.plugin.json"
+      ],
+      "sourceFiles": [
+        "dist/doctor-contract-api.js",
+        "dist/index.js",
+        "scripts/backfill-procloud-m3.mjs",
+        "scripts/check-public-names.mjs",
+        "src/backend/api.ts",
+        "src/backend/doctor-contract-api.ts",
+        "src/backend/index.ts",
+        "src/backend/runtime-api.ts",
+        "src/backend/src/card-execution.ts",
+        "src/backend/src/card-lookup.ts",
+        "src/backend/src/card-redaction.ts",
+        "src/backend/src/change-events.ts",
+        "src/backend/src/cli.ts",
+        "src/backend/src/command.ts",
+        "src/backend/src/dispatcher-workspace.ts",
+        "src/backend/src/dispatcher.ts",
+        "src/backend/src/gateway-helpers.ts",
+        "src/backend/src/gateway-project-methods.ts",
+        "src/backend/src/gateway-workspace-methods.ts",
+        "src/backend/src/gateway.ts",
+        "src/backend/src/lifecycle.ts",
+        "src/backend/src/persistence-types.ts",
+        "src/backend/src/project-document-discovery.ts",
+        "src/backend/src/project-document-reader.ts",
+        "src/backend/src/reconciler.ts",
+        "src/backend/src/sqlite-store.ts",
+        "src/backend/src/store-automation.ts",
+        "src/backend/src/store-card-helpers.ts",
+        "src/backend/src/store-change-tracker.ts",
+        "src/backend/src/store-constants.ts",
+        "src/backend/src/store-core.ts",
+        "src/backend/src/store-enrichment.ts",
+        "src/backend/src/store-inputs.ts",
+        "src/backend/src/store-normalizers.ts",
+        "src/backend/src/store-notifications.ts",
+        "src/backend/src/store-projects.ts",
+        "src/backend/src/store-promote.ts",
+        "src/backend/src/store-workflow.ts",
+        "src/backend/src/store.ts",
+        "src/backend/src/tools-card-mutations.ts",
+        "src/backend/src/tools.ts",
+        "src/backend/src/worker-prompt.ts",
+        "src/backend/src/workspace-access.ts",
+        "src/backend/src/workspace-path.ts",
+        "src/contract/index.ts",
+        "src/ui-static.ts",
+        "tpm/gsd-core/.kilo/plugins/gsd-core.js",
+        "tpm/gsd-core/.opencode/plugins/gsd-core.js",
+        "tpm/gsd-core/bin/gsd-mcp-server.js",
+        "tpm/gsd-core/bin/install.js",
+        "tpm/gsd-core/bin/lib/ui-safety-gate.cjs",
+        "tpm/gsd-core/eslint-rules/lib/platform-guard.cjs",
+        "tpm/gsd-core/eslint-rules/lib/portability-vocab.cjs",
+        "tpm/gsd-core/eslint-rules/no-adhoc-markdown-parsing.cjs",
+        "tpm/gsd-core/eslint-rules/no-bare-npm-exec.cjs",
+        "tpm/gsd-core/eslint-rules/no-crlf-fragile-split.cjs",
+        "tpm/gsd-core/eslint-rules/no-elapsed-assertion.cjs",
+        "tpm/gsd-core/eslint-rules/no-hardcoded-tmp.cjs",
+        "tpm/gsd-core/eslint-rules/no-magic-sleep-in-tests.cjs",
+        "tpm/gsd-core/eslint-rules/no-path-literal-in-assert.cjs",
+        "tpm/gsd-core/eslint-rules/no-posix-mode-bit-assert.cjs",
+        "tpm/gsd-core/eslint-rules/no-raw-rmsync-in-tests.cjs",
+        "tpm/gsd-core/eslint-rules/no-source-grep.cjs",
+        "tpm/gsd-core/eslint-rules/no-tautological-assert.cjs",
+        "tpm/gsd-core/eslint-rules/no-unguarded-nonportable-exec.cjs",
+        "tpm/gsd-core/eslint-rules/normalize-path-in-content.cjs",
+        "tpm/gsd-core/eslint-rules/require-fs-op-fallback.cjs",
+        "tpm/gsd-core/eslint-rules/require-userprofile-with-home.cjs",
+        "tpm/gsd-core/eslint.config.mjs",
+        "tpm/gsd-core/examples/dynamic-context-management/context-predicates.cjs",
+        "tpm/gsd-core/examples/dynamic-context-management/demo.cjs",
+        "tpm/gsd-core/examples/dynamic-context-management/gen-context-index.cjs",
+        "tpm/gsd-core/gsd-core/bin/check-latest-version.cjs",
+        "tpm/gsd-core/gsd-core/bin/ensure-runtime-build.cjs",
+        "tpm/gsd-core/gsd-core/bin/gsd-tools.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/active-workstream-store.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/adapter-declarative.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/adapter-imperative.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/adr-parser.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/agent-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/agent-install-check.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/api-coverage.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/artifacts.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/assumption-delta.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/audit-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/audit.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/broken-windows.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-activation.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-consent.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-ledger.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-lifecycle.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-loader.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-lock.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-registry.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-source.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-state.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-trust.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-validator.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/capability-writer.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/check-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/cjs-command-router-adapter.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/claude-orchestration-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/claude-orchestration.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/cli-exit.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/cli-skew-check.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/clock.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/clusters.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/code-review-flags.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/command-aliases.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/command-arg-projection.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/command-roster.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/command-routing-hub.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/commands.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/config-loader.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/config-schema.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/config-types.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/config.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/configuration.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/context-utilization.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/core-utils.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/coverage.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/decisions.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/docs.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/drift.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/edge-probe.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/embedding-adapter.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/estimate-cli.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/eval-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/eval.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/external-descriptor-trust.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/external-job.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/fallow-runner.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/federated-config.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/frontmatter.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/gap-checker.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/gate-predicate-evaluator.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/git-base-branch.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/graphify-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/graphify.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/gsd2-import.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/handshake-serialized.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/hook-bus.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/host-integration-adapters/cline-sdk-binding.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/host-integration-adapters/imperative-hook-bus.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/host-integration-sdk.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/host-integration.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/init-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/init.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/install-effort-resolver.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/install-engine.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/install-profiles.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migration-authoring.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migration-report.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/000-first-time-baseline.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/001-legacy-orphan-files.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/002-codex-legacy-hooks-json.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/003-rename-get-shit-done-to-gsd-core.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/004-prune-stale-pristine-snapshots.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/005-opencode-baseline-commands-dir.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/installer-migrations/006-pi-extension-cjs-to-js.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/intel-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/intel.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/io.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/learnings.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/legacy-cleanup.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/loop-host-contract.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/loop-resolver.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/markdown-sectionizer.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/markdown-table.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/mcp-server.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/milestone.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/model-adapter.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/model-catalog.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/model-profiles.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/model-resolver.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/normalize-test-command.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/observability/event.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/observability/logger.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/observability/redaction.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/onboard-projection.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/package-identity.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/package-legitimacy.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phase-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phase-estimation.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phase-id.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phase-lifecycle.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phase-locator.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phase.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/phases-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/plan-drift-guard.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/plan-scan.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/planning-workspace.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/probe-core.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/profile-output.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/profile-pipeline-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/profile-pipeline.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/prohibition-enforcement.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/project-root.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/prompt-budget.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/research-provider.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/research-store.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/resolution.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/review-reviewer-selection.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/roadmap-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/roadmap-parser.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/roadmap-upgrade.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/roadmap.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-artifact-conversion.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-artifact-install-plan.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-artifact-layout.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-config-adapter-registry.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-homes.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-hooks-surface.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-name-policy.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/runtime-slash.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/schema-detect.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/secrets.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/security.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/semver-compare.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/shell-command-projection.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/smart-entry.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/spec-section.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/stale-bake-guard.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/state-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/state-document.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/state-io.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/state-transition.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/state.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/surface.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/task-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/teams-status.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/template.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/uat-predicate.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/uat.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/ui-consideration-probe.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/ui-safety-gate.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/unusable-input.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/update-context.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/validate-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/validate.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/verification-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/verification.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/verify-command-router.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/verify.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/workstream-inventory-builder.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/workstream-inventory.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/workstream-name-policy.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/workstream.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/worktree-base-ref.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/worktree-safety.cjs",
+        "tpm/gsd-core/gsd-core/bin/lib/write-set.cjs",
+        "tpm/gsd-core/gsd-core/bin/verify-reapply-patches.cjs",
+        "tpm/gsd-core/hooks/dist/gsd-check-update-worker.js",
+        "tpm/gsd-core/hooks/dist/gsd-check-update.js",
+        "tpm/gsd-core/hooks/dist/gsd-config-reload.js",
+        "tpm/gsd-core/hooks/dist/gsd-context-monitor.js",
+        "tpm/gsd-core/hooks/dist/gsd-cursor-post-tool.js",
+        "tpm/gsd-core/hooks/dist/gsd-cursor-pre-tool.js",
+        "tpm/gsd-core/hooks/dist/gsd-cursor-session-start.js",
+        "tpm/gsd-core/hooks/dist/gsd-cursor-stop.js",
+        "tpm/gsd-core/hooks/dist/gsd-cursor-subagent-start.js",
+        "tpm/gsd-core/hooks/dist/gsd-cursor-subagent-stop.js",
+        "tpm/gsd-core/hooks/dist/gsd-ensure-canonical-path.js",
+        "tpm/gsd-core/hooks/dist/gsd-prompt-guard.js",
+        "tpm/gsd-core/hooks/dist/gsd-read-guard.js",
+        "tpm/gsd-core/hooks/dist/gsd-read-injection-scanner.js",
+        "tpm/gsd-core/hooks/dist/gsd-statusline.js",
+        "tpm/gsd-core/hooks/dist/gsd-update-banner.js",
+        "tpm/gsd-core/hooks/dist/gsd-windsurf-pre-command.js",
+        "tpm/gsd-core/hooks/dist/gsd-windsurf-pre-write.js",
+        "tpm/gsd-core/hooks/dist/gsd-workflow-guard.js",
+        "tpm/gsd-core/hooks/dist/gsd-worktree-path-guard.js",
+        "tpm/gsd-core/hooks/dist/lib/cursor-workspace.js",
+        "tpm/gsd-core/hooks/dist/lib/git-cmd.js",
+        "tpm/gsd-core/hooks/dist/managed-hooks-registry.cjs",
+        "tpm/gsd-core/hooks/gsd-check-update-worker.js",
+        "tpm/gsd-core/hooks/gsd-check-update.js",
+        "tpm/gsd-core/hooks/gsd-config-reload.js",
+        "tpm/gsd-core/hooks/gsd-context-monitor.js",
+        "tpm/gsd-core/hooks/gsd-cursor-post-tool.js",
+        "tpm/gsd-core/hooks/gsd-cursor-pre-tool.js",
+        "tpm/gsd-core/hooks/gsd-cursor-session-start.js",
+        "tpm/gsd-core/hooks/gsd-cursor-stop.js",
+        "tpm/gsd-core/hooks/gsd-cursor-subagent-start.js",
+        "tpm/gsd-core/hooks/gsd-cursor-subagent-stop.js",
+        "tpm/gsd-core/hooks/gsd-ensure-canonical-path.js",
+        "tpm/gsd-core/hooks/gsd-prompt-guard.js",
+        "tpm/gsd-core/hooks/gsd-read-guard.js",
+        "tpm/gsd-core/hooks/gsd-read-injection-scanner.js",
+        "tpm/gsd-core/hooks/gsd-statusline.js",
+        "tpm/gsd-core/hooks/gsd-update-banner.js",
+        "tpm/gsd-core/hooks/gsd-windsurf-pre-command.js",
+        "tpm/gsd-core/hooks/gsd-windsurf-pre-write.js",
+        "tpm/gsd-core/hooks/gsd-workflow-guard.js",
+        "tpm/gsd-core/hooks/gsd-worktree-path-guard.js",
+        "tpm/gsd-core/hooks/lib/cursor-workspace.js",
+        "tpm/gsd-core/hooks/lib/git-cmd.js",
+        "tpm/gsd-core/hooks/managed-hooks-registry.cjs",
+        "tpm/gsd-core/pi/gsd.cjs",
+        "tpm/gsd-core/scripts/affected-tests-lib.cjs",
+        "tpm/gsd-core/scripts/audit-workflow-script-paths.cjs",
+        "tpm/gsd-core/scripts/build-hooks.js",
+        "tpm/gsd-core/scripts/changeset/cli.cjs",
+        "tpm/gsd-core/scripts/changeset/github-release-notes.cjs",
+        "tpm/gsd-core/scripts/changeset/lint.cjs",
+        "tpm/gsd-core/scripts/changeset/new.cjs",
+        "tpm/gsd-core/scripts/changeset/parse.cjs",
+        "tpm/gsd-core/scripts/changeset/render.cjs",
+        "tpm/gsd-core/scripts/changeset/serialize.cjs",
+        "tpm/gsd-core/scripts/check-alias-drift.cjs",
+        "tpm/gsd-core/scripts/check-coverage-gate.cjs",
+        "tpm/gsd-core/scripts/check-env.cjs",
+        "tpm/gsd-core/scripts/check-glossary-refs.cjs",
+        "tpm/gsd-core/scripts/check-npm-integrity.cjs",
+        "tpm/gsd-core/scripts/ci-guard-runner.cjs",
+        "tpm/gsd-core/scripts/ci-prepare-test-scope.cjs",
+        "tpm/gsd-core/scripts/ci-rebase-check.cjs",
+        "tpm/gsd-core/scripts/ci-test-scope.cjs",
+        "tpm/gsd-core/scripts/command-contract-helpers.cjs",
+        "tpm/gsd-core/scripts/diff-touches-shipped-paths.cjs",
+        "tpm/gsd-core/scripts/fix-slash-commands.cjs",
+        "tpm/gsd-core/scripts/gen-adr-index.cjs",
+        "tpm/gsd-core/scripts/gen-capability-matrix.cjs",
+        "tpm/gsd-core/scripts/gen-capability-registry.cjs",
+        "tpm/gsd-core/scripts/gen-golden-install-parity-zcode.cjs",
+        "tpm/gsd-core/scripts/gen-install-tree-fixtures.cjs",
+        "tpm/gsd-core/scripts/gen-inventory-manifest.cjs",
+        "tpm/gsd-core/scripts/gen-loop-host-contract.cjs",
+        "tpm/gsd-core/scripts/gen-plugin-skills.cjs",
+        "tpm/gsd-core/scripts/gen-registry.cjs",
+        "tpm/gsd-core/scripts/gen-research-agents.cjs",
+        "tpm/gsd-core/scripts/gen-test-timings.cjs",
+        "tpm/gsd-core/scripts/generate-package-identity.cjs",
+        "tpm/gsd-core/scripts/git-merge-regen-driver.cjs",
+        "tpm/gsd-core/scripts/issue-dedupe.cjs",
+        "tpm/gsd-core/scripts/issue-version-gate.cjs",
+        "tpm/gsd-core/scripts/lib/allowlist-ratchet.cjs",
+        "tpm/gsd-core/scripts/lib/cli-exit.cjs",
+        "tpm/gsd-core/scripts/lint-allow-test-rule-refs.cjs",
+        "tpm/gsd-core/scripts/lint-command-contract.cjs",
+        "tpm/gsd-core/scripts/lint-compiled-artifact-sync.cjs",
+        "tpm/gsd-core/scripts/lint-descriptions.cjs",
+        "tpm/gsd-core/scripts/lint-docs-required.cjs",
+        "tpm/gsd-core/scripts/lint-fix-has-regression-test.cjs",
+        "tpm/gsd-core/scripts/lint-legacy-dir-name.cjs",
+        "tpm/gsd-core/scripts/lint-package-identity-drift.cjs",
+        "tpm/gsd-core/scripts/lint-phase-id-drift.cjs",
+        "tpm/gsd-core/scripts/lint-portable-timeout.cjs",
+        "tpm/gsd-core/scripts/lint-pr-check-project-dir.cjs",
+        "tpm/gsd-core/scripts/lint-regression-test-names.cjs",
+        "tpm/gsd-core/scripts/lint-resolution-provenance.cjs",
+        "tpm/gsd-core/scripts/lint-shell-command-projection-drift.cjs",
+        "tpm/gsd-core/scripts/lint-skill-deps.cjs",
+        "tpm/gsd-core/scripts/lint-table-schema-drift.cjs",
+        "tpm/gsd-core/scripts/lint-test-file-count.cjs",
+        "tpm/gsd-core/scripts/mutation-matrix.cjs",
+        "tpm/gsd-core/scripts/pr-target-policy.cjs",
+        "tpm/gsd-core/scripts/pr-template-policy.cjs",
+        "tpm/gsd-core/scripts/registry-schema.cjs",
+        "tpm/gsd-core/scripts/release-notes/conventional-title.cjs",
+        "tpm/gsd-core/scripts/release-notes/discord-release-summary.cjs",
+        "tpm/gsd-core/scripts/release-notes/format-github-release-notes.cjs",
+        "tpm/gsd-core/scripts/release-tarball-smoke.cjs",
+        "tpm/gsd-core/scripts/research-profiles.cjs",
+        "tpm/gsd-core/scripts/run-affected-tests.cjs",
+        "tpm/gsd-core/scripts/run-tests.cjs",
+        "tpm/gsd-core/scripts/slurm-adapter.cjs",
+        "tpm/gsd-core/scripts/strip-prose-atrefs.cjs",
+        "tpm/gsd-core/scripts/sync-manifest-versions.cjs",
+        "tpm/gsd-core/scripts/sync-next-version.cjs",
+        "tpm/gsd-core/scripts/sync-runtime-launcher.cjs",
+        "tpm/gsd-core/scripts/test-failure-reasons.cjs",
+        "tpm/gsd-core/scripts/update-size-baseline.cjs",
+        "tpm/gsd-core/scripts/validate-registry.cjs",
+        "tpm/gsd-core/scripts/verify-npm-publish.cjs",
+        "tpm/gsd-core/scripts/workflow-policy.cjs",
+        "tpm/gsd-core/scripts/workflow-size.cjs",
+        "tpm/gsd-core/stryker.config.mjs",
+        "tpm/gsd-core/vscode/browser.js",
+        "tpm/gsd-core/vscode/extension.js",
+        "tpm/gsd-core/vscode/host-binding.js",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/card-lookup.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/card-redaction.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/change-events.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/command.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher-workspace.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-helpers.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-workspace-methods.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/persistence-types.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-automation.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-card-helpers.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-change-tracker.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-constants.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-core.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/packages/workboard-contract/src/index.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/index.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/lib/lit-controller.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/lib/registry.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/lib/translate.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/lib/types.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/ar.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/de.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/en-agents.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/en.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/es.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/fa.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/fr.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/hi.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/id.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/it.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/ja-JP.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/ko.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/nl.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/pl.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/pt-BR.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/ru.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/th.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/tr.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/uk.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/vi.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/zh-CN.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/i18n/locales/zh-TW.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/board-presentation.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/capability.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/card-state.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/change-payload.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/derived.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/execution.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/index.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/lifecycle-reconciliation.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/lifecycle.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/live-refresh.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/loading.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/metadata-contract-normalization.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/metadata-normalization.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/mutations.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/normalization-utils.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/normalization.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/runtime.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/session-capture.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/session-card-lookup.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/task-links.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/lib/workboard/types.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/agent-filter.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/board-filter.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/route-location.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/route.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/view-card-actions.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/view-card-details.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/view-card-modal.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/view-card.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/view-helpers.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/view.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/workboard-card-dashboard.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/workboard-page.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/pages/workboard/workboard-select.ts",
+        "tpm/openclaw-78d6c6c-workboard-source/ui/src/workboard-contract.ts",
+        "ui/dist/assets/ar-sieuQE5D.js",
+        "ui/dist/assets/de-JpB04PPQ.js",
+        "ui/dist/assets/es-DPcGIlIc.js",
+        "ui/dist/assets/fa-CTp_PaiD.js",
+        "ui/dist/assets/fr-BiEWvU8j.js",
+        "ui/dist/assets/hi-C5gHOW5c.js",
+        "ui/dist/assets/id-BIDAE87U.js",
+        "ui/dist/assets/index-GPTJmKZa.js",
+        "ui/dist/assets/it-Dtnrwmrf.js",
+        "ui/dist/assets/ja-JP-CTwtluDU.js",
+        "ui/dist/assets/ko-D44bMX49.js",
+        "ui/dist/assets/nl-W40q74yK.js",
+        "ui/dist/assets/pl-CN6LhaTt.js",
+        "ui/dist/assets/pt-BR-DZsMRu40.js",
+        "ui/dist/assets/ru-B-WasB3H.js",
+        "ui/dist/assets/th-CxdFMrUi.js",
+        "ui/dist/assets/tr-D_1CL45Y.js",
+        "ui/dist/assets/uk-CyWjkTDM.js",
+        "ui/dist/assets/vi-9VesEHi3.js",
+        "ui/dist/assets/zh-CN-Bi7WbbCU.js",
+        "ui/dist/assets/zh-TW-DQOlLXh-.js",
+        "ui/src/components/modal-dialog.ts",
+        "ui/src/gateway-client.ts",
+        "ui/src/host-context.ts",
+        "ui/src/i18n/index.ts",
+        "ui/src/i18n/lib/lit-controller.ts",
+        "ui/src/i18n/lib/registry.ts",
+        "ui/src/i18n/lib/translate.ts",
+        "ui/src/i18n/lib/types.ts",
+        "ui/src/i18n/locales/ar.ts",
+        "ui/src/i18n/locales/de.ts",
+        "ui/src/i18n/locales/en-agents.ts",
+        "ui/src/i18n/locales/en.ts",
+        "ui/src/i18n/locales/es.ts",
+        "ui/src/i18n/locales/fa.ts",
+        "ui/src/i18n/locales/fr.ts",
+        "ui/src/i18n/locales/hi.ts",
+        "ui/src/i18n/locales/id.ts",
+        "ui/src/i18n/locales/it.ts",
+        "ui/src/i18n/locales/ja-JP.ts",
+        "ui/src/i18n/locales/ko.ts",
+        "ui/src/i18n/locales/nl.ts",
+        "ui/src/i18n/locales/pl.ts",
+        "ui/src/i18n/locales/pt-BR.ts",
+        "ui/src/i18n/locales/ru.ts",
+        "ui/src/i18n/locales/th.ts",
+        "ui/src/i18n/locales/tr.ts",
+        "ui/src/i18n/locales/uk.ts",
+        "ui/src/i18n/locales/vi.ts",
+        "ui/src/i18n/locales/zh-CN.ts",
+        "ui/src/i18n/locales/zh-TW.ts",
+        "ui/src/lib/markdown.ts",
+        "ui/src/local-storage.ts",
+        "ui/src/main.ts",
+        "ui/src/pages/projects/project-view.ts",
+        "ui/vite.config.ts",
+        "vitest.config.ts"
+      ],
+      "pluginManifests": [
+        {
+          "path": "openclaw.plugin.json",
+          "id": "taskfold",
+          "name": "Taskfold",
+          "version": null,
+          "keys": [
+            "activation",
+            "catalog",
+            "commandAliases",
+            "configSchema",
+            "contracts",
+            "dashboard",
+            "description",
+            "enabledByDefault",
+            "id",
+            "name",
+            "toolMetadata"
+          ],
+          "contracts": [
+            "tools"
+          ],
+          "providerAuthEnvVars": {},
+          "channelEnvVars": {},
+          "activation": {
+            "onStartup": true,
+            "onCommands": [
+              "taskfold"
+            ]
+          }
+        }
+      ],
+      "securityManifests": [],
+      "package": {
+        "path": "package.json",
+        "name": "@johnson9316-bit/taskfold",
+        "version": "0.2.0",
+        "type": "module",
+        "main": "./dist/index.js",
+        "npmPack": {
+          "advertised": false,
+          "private": false,
+          "filesMode": "allowlist",
+          "files": [
+            "dist",
+            "ui/dist",
+            "docs/CLAW_HUB_PUBLISHING.md",
+            "LICENSE",
+            "README.md",
+            "THIRD-PARTY-NOTICES",
+            "UPSTREAM.md",
+            "openclaw.plugin.json"
+          ],
+          "invalidFileSpecs": []
+        },
+        "dependencies": [
+          "@noble/ed25519",
+          "commander",
+          "dompurify",
+          "lit",
+          "marked",
+          "turndown",
+          "typebox"
+        ],
+        "peerDependencies": [
+          "openclaw"
+        ],
+        "optionalDependencies": [],
+        "openclaw": {
+          "extensions": [
+            "./dist/index.js"
+          ],
+          "runtimeExtensions": [],
+          "setupEntry": null,
+          "compatPluginApi": ">=2026.7.1",
+          "buildOpenClawVersion": "2026.7.1-2",
+          "buildPluginSdkVersion": null,
+          "install": null,
+          "release": null,
+          "unsupportedMetadata": [],
+          "entrypoints": [
+            {
+              "kind": "extension",
+              "specifier": "./dist/index.js",
+              "relativePath": "dist/index.js",
+              "exists": true,
+              "requiresBuild": true
+            }
+          ]
+        }
+      },
+      "packages": [
+        {
+          "path": "package.json",
+          "name": "@johnson9316-bit/taskfold",
+          "version": "0.2.0",
+          "type": "module",
+          "main": "./dist/index.js",
+          "npmPack": {
+            "advertised": false,
+            "private": false,
+            "filesMode": "allowlist",
+            "files": [
+              "dist",
+              "ui/dist",
+              "docs/CLAW_HUB_PUBLISHING.md",
+              "LICENSE",
+              "README.md",
+              "THIRD-PARTY-NOTICES",
+              "UPSTREAM.md",
+              "openclaw.plugin.json"
+            ],
+            "invalidFileSpecs": []
+          },
+          "dependencies": [
+            "@noble/ed25519",
+            "commander",
+            "dompurify",
+            "lit",
+            "marked",
+            "turndown",
+            "typebox"
+          ],
+          "peerDependencies": [
+            "openclaw"
+          ],
+          "optionalDependencies": [],
+          "openclaw": {
+            "extensions": [
+              "./dist/index.js"
+            ],
+            "runtimeExtensions": [],
+            "setupEntry": null,
+            "compatPluginApi": ">=2026.7.1",
+            "buildOpenClawVersion": "2026.7.1-2",
+            "buildPluginSdkVersion": null,
+            "install": null,
+            "release": null,
+            "unsupportedMetadata": [],
+            "entrypoints": [
+              {
+                "kind": "extension",
+                "specifier": "./dist/index.js",
+                "relativePath": "dist/index.js",
+                "exists": true,
+                "requiresBuild": true
+              }
+            ]
+          }
+        },
+        {
+          "path": "tpm/gsd-core/package.json",
+          "name": "@opengsd/gsd-core",
+          "version": "1.8.0",
+          "type": null,
+          "main": ".opencode/plugins/gsd-core.js",
+          "npmPack": {
+            "advertised": false,
+            "private": false,
+            "filesMode": "allowlist",
+            "files": [
+              "bin",
+              "commands",
+              "skills",
+              "gsd-core",
+              "assets",
+              "agents",
+              ".claude-plugin",
+              ".opencode",
+              "GEMINI.md",
+              "hooks",
+              "scripts",
+              "pi",
+              "vscode"
+            ],
+            "invalidFileSpecs": []
+          },
+          "dependencies": [
+            "@anthropic-ai/claude-agent-sdk",
+            "ws"
+          ],
+          "peerDependencies": [],
+          "optionalDependencies": [
+            "fallow"
+          ],
+          "openclaw": null
+        },
+        {
+          "path": "tpm/gsd-core/vscode/package.json",
+          "name": "gsd-core-vscode",
+          "version": "1.8.0",
+          "type": null,
+          "main": "./extension.js",
+          "npmPack": {
+            "advertised": false,
+            "private": false,
+            "filesMode": "implicit",
+            "files": [],
+            "invalidFileSpecs": []
+          },
+          "dependencies": [],
+          "peerDependencies": [],
+          "optionalDependencies": [],
+          "openclaw": null
+        }
+      ],
+      "sdkImports": [
+        "openclaw/plugin-sdk/agent-runtime",
+        "openclaw/plugin-sdk/core",
+        "openclaw/plugin-sdk/error-runtime",
+        "openclaw/plugin-sdk/gateway-runtime",
+        "openclaw/plugin-sdk/number-runtime",
+        "openclaw/plugin-sdk/plugin-entry",
+        "openclaw/plugin-sdk/plugin-runtime",
+        "openclaw/plugin-sdk/plugin-state-runtime",
+        "openclaw/plugin-sdk/runtime-config-snapshot",
+        "openclaw/plugin-sdk/runtime-doctor",
+        "openclaw/plugin-sdk/security-runtime",
+        "openclaw/plugin-sdk/sqlite-runtime",
+        "openclaw/plugin-sdk/state-paths",
+        "openclaw/plugin-sdk/string-coerce-runtime",
+        "openclaw/plugin-sdk/text-utility-runtime",
+        "openclaw/plugin-sdk/tool-results"
+      ],
+      "sdkImportDetails": [
+        {
+          "specifier": "openclaw/plugin-sdk/agent-runtime",
+          "file": "dist/index.js",
+          "line": 474,
+          "ref": "dist/index.js:474"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/agent-runtime",
+          "file": "dist/index.js",
+          "line": 491,
+          "ref": "dist/index.js:491"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/agent-runtime",
+          "file": "src/backend/src/gateway.ts",
+          "line": 3,
+          "ref": "src/backend/src/gateway.ts:3"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/agent-runtime",
+          "file": "src/backend/src/workspace-access.ts",
+          "line": 8,
+          "ref": "src/backend/src/workspace-access.ts:8"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/core",
+          "file": "dist/index.js",
+          "line": 10536,
+          "ref": "dist/index.js:10536"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/core",
+          "file": "src/backend/src/tools.ts",
+          "line": 3,
+          "ref": "src/backend/src/tools.ts:3"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "dist/index.js",
+          "line": 10301,
+          "ref": "dist/index.js:10301"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "dist/index.js",
+          "line": 183,
+          "ref": "dist/index.js:183"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "dist/index.js",
+          "line": 3426,
+          "ref": "dist/index.js:3426"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "dist/index.js",
+          "line": 479,
+          "ref": "dist/index.js:479"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "dist/index.js",
+          "line": 864,
+          "ref": "dist/index.js:864"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "src/backend/src/card-execution.ts",
+          "line": 4,
+          "ref": "src/backend/src/card-execution.ts:4"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "src/backend/src/cli.ts",
+          "line": 8,
+          "ref": "src/backend/src/cli.ts:8"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "src/backend/src/dispatcher.ts",
+          "line": 8,
+          "ref": "src/backend/src/dispatcher.ts:8"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "src/backend/src/gateway-helpers.ts",
+          "line": 3,
+          "ref": "src/backend/src/gateway-helpers.ts:3"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "src/backend/src/reconciler.ts",
+          "line": 15,
+          "ref": "src/backend/src/reconciler.ts:15"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts",
+          "line": 8,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts:8"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts",
+          "line": 8,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts:8"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/error-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-helpers.ts",
+          "line": 3,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-helpers.ts:3"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/gateway-runtime",
+          "file": "dist/index.js",
+          "line": 184,
+          "ref": "dist/index.js:184"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/gateway-runtime",
+          "file": "src/backend/src/cli.ts",
+          "line": 9,
+          "ref": "src/backend/src/cli.ts:9"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/gateway-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts",
+          "line": 9,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts:9"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "dist/index.js",
+          "line": 185,
+          "ref": "dist/index.js:185"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "dist/index.js",
+          "line": 3427,
+          "ref": "dist/index.js:3427"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "dist/index.js",
+          "line": 6035,
+          "ref": "dist/index.js:6035"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "dist/index.js",
+          "line": 865,
+          "ref": "dist/index.js:865"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "dist/index.js",
+          "line": 878,
+          "ref": "dist/index.js:878"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "src/backend/src/cli.ts",
+          "line": 10,
+          "ref": "src/backend/src/cli.ts:10"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "src/backend/src/dispatcher.ts",
+          "line": 9,
+          "ref": "src/backend/src/dispatcher.ts:9"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "src/backend/src/gateway-helpers.ts",
+          "line": 4,
+          "ref": "src/backend/src/gateway-helpers.ts:4"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "src/backend/src/store-constants.ts",
+          "line": 5,
+          "ref": "src/backend/src/store-constants.ts:5"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "src/backend/src/store-workflow.ts",
+          "line": 10,
+          "ref": "src/backend/src/store-workflow.ts:10"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts",
+          "line": 10,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts:10"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts",
+          "line": 9,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts:9"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-helpers.ts",
+          "line": 4,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/gateway-helpers.ts:4"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/number-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-constants.ts",
+          "line": 5,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-constants.ts:5"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-entry",
+          "file": "dist/index.js",
+          "line": 470,
+          "ref": "dist/index.js:470"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-entry",
+          "file": "src/backend/api.ts",
+          "line": 6,
+          "ref": "src/backend/api.ts:6"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-entry",
+          "file": "src/backend/src/tools-card-mutations.ts",
+          "line": 2,
+          "ref": "src/backend/src/tools-card-mutations.ts:2"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-entry",
+          "file": "src/backend/src/tools.ts",
+          "line": 4,
+          "ref": "src/backend/src/tools.ts:4"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-entry",
+          "file": "src/backend/src/tools.ts",
+          "line": 5,
+          "ref": "src/backend/src/tools.ts:5"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-entry",
+          "file": "src/backend/src/workspace-access.ts",
+          "line": 13,
+          "ref": "src/backend/src/workspace-access.ts:13"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-runtime",
+          "file": "src/backend/src/card-execution.ts",
+          "line": 5,
+          "ref": "src/backend/src/card-execution.ts:5"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-runtime",
+          "file": "src/backend/src/dispatcher-workspace.ts",
+          "line": 3,
+          "ref": "src/backend/src/dispatcher-workspace.ts:3"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-runtime",
+          "file": "src/backend/src/dispatcher.ts",
+          "line": 10,
+          "ref": "src/backend/src/dispatcher.ts:10"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-runtime",
+          "file": "src/backend/src/reconciler.ts",
+          "line": 16,
+          "ref": "src/backend/src/reconciler.ts:16"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher-workspace.ts",
+          "line": 3,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher-workspace.ts:3"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts",
+          "line": 10,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts:10"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-state-runtime",
+          "file": "dist/doctor-contract-api.js",
+          "line": 6,
+          "ref": "dist/doctor-contract-api.js:6"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-state-runtime",
+          "file": "dist/index.js",
+          "line": 4225,
+          "ref": "dist/index.js:4225"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-state-runtime",
+          "file": "src/backend/src/sqlite-store.ts",
+          "line": 24,
+          "ref": "src/backend/src/sqlite-store.ts:24"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/plugin-state-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts",
+          "line": 22,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts:22"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/runtime-config-snapshot",
+          "file": "dist/index.js",
+          "line": 186,
+          "ref": "dist/index.js:186"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/runtime-config-snapshot",
+          "file": "src/backend/src/cli.ts",
+          "line": 11,
+          "ref": "src/backend/src/cli.ts:11"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/runtime-config-snapshot",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts",
+          "line": 11,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts:11"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/runtime-doctor",
+          "file": "src/backend/doctor-contract-api.ts",
+          "line": 5,
+          "ref": "src/backend/doctor-contract-api.ts:5"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 10537,
+          "ref": "dist/index.js:10537"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 480,
+          "ref": "dist/index.js:480"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 483,
+          "ref": "dist/index.js:483"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 495,
+          "ref": "dist/index.js:495"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 6036,
+          "ref": "dist/index.js:6036"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 866,
+          "ref": "dist/index.js:866"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "dist/index.js",
+          "line": 871,
+          "ref": "dist/index.js:871"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/card-execution.ts",
+          "line": 6,
+          "ref": "src/backend/src/card-execution.ts:6"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/dispatcher-workspace.ts",
+          "line": 4,
+          "ref": "src/backend/src/dispatcher-workspace.ts:4"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/dispatcher.ts",
+          "line": 11,
+          "ref": "src/backend/src/dispatcher.ts:11"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/store-card-helpers.ts",
+          "line": 17,
+          "ref": "src/backend/src/store-card-helpers.ts:17"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/store-workflow.ts",
+          "line": 11,
+          "ref": "src/backend/src/store-workflow.ts:11"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/tools.ts",
+          "line": 6,
+          "ref": "src/backend/src/tools.ts:6"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "src/backend/src/workspace-access.ts",
+          "line": 17,
+          "ref": "src/backend/src/workspace-access.ts:17"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher-workspace.ts",
+          "line": 4,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher-workspace.ts:4"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts",
+          "line": 11,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/dispatcher.ts:11"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/security-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-card-helpers.ts",
+          "line": 17,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-card-helpers.ts:17"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/sqlite-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts",
+          "line": 23,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts:23"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/state-paths",
+          "file": "dist/doctor-contract-api.js",
+          "line": 7,
+          "ref": "dist/doctor-contract-api.js:7"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/state-paths",
+          "file": "dist/index.js",
+          "line": 4226,
+          "ref": "dist/index.js:4226"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/state-paths",
+          "file": "src/backend/src/sqlite-store.ts",
+          "line": 25,
+          "ref": "src/backend/src/sqlite-store.ts:25"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/state-paths",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts",
+          "line": 24,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/sqlite-store.ts:24"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/string-coerce-runtime",
+          "file": "dist/index.js",
+          "line": 187,
+          "ref": "dist/index.js:187"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/string-coerce-runtime",
+          "file": "src/backend/src/cli.ts",
+          "line": 12,
+          "ref": "src/backend/src/cli.ts:12"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/string-coerce-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts",
+          "line": 12,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/cli.ts:12"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/text-utility-runtime",
+          "file": "dist/index.js",
+          "line": 872,
+          "ref": "dist/index.js:872"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/text-utility-runtime",
+          "file": "src/backend/src/store-card-helpers.ts",
+          "line": 18,
+          "ref": "src/backend/src/store-card-helpers.ts:18"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/text-utility-runtime",
+          "file": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-card-helpers.ts",
+          "line": 18,
+          "ref": "tpm/openclaw-78d6c6c-workboard-source/extensions/workboard/src/store-card-helpers.ts:18"
+        },
+        {
+          "specifier": "openclaw/plugin-sdk/tool-results",
+          "file": "src/backend/src/tools-card-mutations.ts",
+          "line": 3,
+          "ref": "src/backend/src/tools-card-mutations.ts:3"
+        }
+      ],
+      "sdkDeprecations": []
+    }
+  ],
+  "issues": [],
+  "contractProbes": [],
+  "logs": [
+    {
+      "fixture": "taskfold",
+      "code": "seam-inventory",
+      "level": "log",
+      "message": "observed 1 hooks, 7 registrations, and 1 manifest contracts",
+      "evidence": [
+        "hook:subagent_ended",
+        "registration:definePluginEntry",
+        "registration:registerCli",
+        "registration:registerCommand",
+        "registration:registerGatewayMethod",
+        "registration:registerHttpRoute",
+        "registration:registerService",
+        "registration:registerTool",
+        "manifestContract:tools"
+      ]
+    },
+    {
+      "fixture": "taskfold",
+      "code": "package-metadata",
+      "level": "log",
+      "message": "selected package metadata for plugin contract checks",
+      "evidence": [
+        "package.json",
+        "@johnson9316-bit/taskfold",
+        "version:0.2.0"
+      ]
+    },
+    {
+      "fixture": "taskfold",
+      "code": "declarative-contracts",
+      "level": "log",
+      "message": "fixture declares manifest contracts that can be checked without executing plugin code",
+      "evidence": [
+        "tools"
+      ]
+    },
+    {
+      "fixture": "openclaw",
+      "code": "target-openclaw-unavailable",
+      "level": "log",
+      "message": "target OpenClaw checkout was not available, so compat record coverage was not checked",
+      "evidence": [
+        "not configured"
+      ]
+    }
+  ],
+  "decisions": []
+}

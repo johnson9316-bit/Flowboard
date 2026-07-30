@@ -68,8 +68,8 @@ async function request(
 describe("taskfold static Control UI route", () => {
   it("serves immutable assets and SPA fallbacks", async () => {
     const root = createUiRoot();
-    const asset = await request(root, "/taskfold/assets/app.js");
-    const fallback = await request(root, "/taskfold/cards/card-1");
+    const asset = await request(root, "/plugins/taskfold/assets/app.js");
+    const fallback = await request(root, "/plugins/taskfold/cards/card-1");
 
     expect(asset.status).toBe(200);
     expect(asset.headers["cache-control"]).toContain("immutable");
@@ -81,8 +81,12 @@ describe("taskfold static Control UI route", () => {
   it("rejects missing assets, encoded traversal, and non-read methods", async () => {
     const root = createUiRoot();
 
-    await expect(request(root, "/taskfold/assets/missing.js")).resolves.toMatchObject({ status: 404 });
-    await expect(request(root, "/taskfold/%2e%2e/secret")).resolves.toMatchObject({ status: 404 });
-    await expect(request(root, "/taskfold/", "POST")).resolves.toMatchObject({ status: 405 });
+    await expect(request(root, "/plugins/taskfold/assets/missing.js")).resolves.toMatchObject({
+      status: 404,
+    });
+    await expect(request(root, "/plugins/taskfold/%2e%2e/secret")).resolves.toMatchObject({
+      status: 404,
+    });
+    await expect(request(root, "/plugins/taskfold/", "POST")).resolves.toMatchObject({ status: 405 });
   });
 });

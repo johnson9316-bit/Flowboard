@@ -41,11 +41,11 @@ export default definePluginEntry({
       description: "Gateway-local board for agent-owned work.",
       icon: "kanban",
       group: "control",
-      path: "/taskfold/",
+      path: "/plugins/taskfold/",
       requiredScopes: ["operator.write"],
     });
     api.registerHttpRoute({
-      path: "/taskfold/",
+      path: "/plugins/taskfold/",
       auth: "plugin",
       match: "prefix",
       handler: createTaskfoldStaticUiHandler(),

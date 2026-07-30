@@ -16025,7 +16025,7 @@ function createTaskfoldTools(params) {
 import fs4 from "node:fs";
 import path5 from "node:path";
 import { fileURLToPath } from "node:url";
-var UI_PREFIX = "/taskfold/";
+var UI_PREFIX = "/plugins/taskfold/";
 var MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -16142,11 +16142,11 @@ var index_default = definePluginEntry({
       description: "Gateway-local board for agent-owned work.",
       icon: "kanban",
       group: "control",
-      path: "/taskfold/",
+      path: "/plugins/taskfold/",
       requiredScopes: ["operator.write"]
     });
     api.registerHttpRoute({
-      path: "/taskfold/",
+      path: "/plugins/taskfold/",
       auth: "plugin",
       match: "prefix",
       handler: createTaskfoldStaticUiHandler()
