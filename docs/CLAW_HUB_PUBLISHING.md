@@ -1,4 +1,4 @@
-# Publishing Flowboard to ClawHub
+# Publishing Taskfold to ClawHub
 
 This document records the release workflow for the official OpenClaw package
 registry, ClawHub. It is intentionally written in English because the package
@@ -12,14 +12,14 @@ package; that channel is controlled by the OpenClaw maintainers.
 
 | Field | Value |
 | --- | --- |
-| ClawHub package | `@johnson9316-bit/flowboard` |
-| OpenClaw runtime ID | `flowboard` |
-| GitHub repository | `johnson9316-bit/Flowboard` |
+| ClawHub package | `@johnson9316-bit/taskfold` |
+| OpenClaw runtime ID | `taskfold` |
+| GitHub repository | `johnson9316-bit/Taskfold` |
 | Package family | `code-plugin` |
 | Distribution artifact | npm pack tarball |
 
-The unscoped `flowboard` package is already owned by an unrelated community
-package. Do not publish or install Flowboard under that name.
+Use the scoped `@johnson9316-bit/taskfold` identity for every publication and
+installation command.
 
 ## Release Preconditions
 
@@ -35,7 +35,7 @@ npm run build
 npm run check:public-names
 npm run pack:check
 npx clawhub package validate . --json
-openclaw plugins inspect flowboard --runtime
+openclaw plugins inspect taskfold --runtime
 openclaw plugins doctor
 ```
 
@@ -45,7 +45,7 @@ openclaw plugins doctor
 ### Runtime Capture Note
 
 ClawHub CLI `0.23.1`'s optional `package validate --runtime --allow-execute`
-currently fails while mocking `resolveStateDir` for Flowboard's OpenClaw
+currently fails while mocking `resolveStateDir` for Taskfold's OpenClaw
 `2026.7.1-2` compatibility layer. The static ClawHub validation reports zero
 issues, and the real-Gateway `plugins inspect --runtime` plus `plugins doctor`
 checks above are the release gate until that upstream mock incompatibility is
@@ -67,13 +67,13 @@ Publish the current Git commit from the repository root:
 ```bash
 npx clawhub package publish . \
   --family code-plugin \
-  --name @johnson9316-bit/flowboard \
-  --display-name Flowboard \
+  --name @johnson9316-bit/taskfold \
+  --display-name Taskfold \
   --version <version> \
   --changelog "<release notes>" \
   --categories productivity \
   --topics openclaw,kanban,project-management,milestones,worktree \
-  --source-repo johnson9316-bit/Flowboard \
+  --source-repo johnson9316-bit/Taskfold \
   --source-commit "$(git rev-parse HEAD)" \
   --source-ref "v<version>"
 ```
@@ -81,17 +81,17 @@ npx clawhub package publish . \
 Create and push the matching annotated tag before publishing:
 
 ```bash
-git tag -a "v<version>" -m "Flowboard v<version>"
+git tag -a "v<version>" -m "Taskfold v<version>"
 git push origin main "v<version>"
 ```
 
 After publication, verify both the registry package and the install path:
 
 ```bash
-npx clawhub package inspect @johnson9316-bit/flowboard
-npx clawhub package readiness @johnson9316-bit/flowboard
-openclaw plugins install clawhub:@johnson9316-bit/flowboard
-openclaw plugins inspect flowboard --runtime
+npx clawhub package inspect @johnson9316-bit/taskfold
+npx clawhub package readiness @johnson9316-bit/taskfold
+openclaw plugins install clawhub:@johnson9316-bit/taskfold
+openclaw plugins inspect taskfold --runtime
 openclaw plugins doctor
 ```
 
@@ -103,8 +103,8 @@ publisher account must be authenticated when running this command:
 
 ```bash
 npx clawhub package trusted-publisher set \
-  @johnson9316-bit/flowboard \
-  --repository johnson9316-bit/Flowboard \
+  @johnson9316-bit/taskfold \
+  --repository johnson9316-bit/Taskfold \
   --workflow-filename package-publish.yml
 ```
 

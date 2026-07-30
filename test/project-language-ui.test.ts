@@ -5,8 +5,8 @@ type TemplateLike = {
   values: unknown[];
 };
 
-let createFlowboardProjectUiState: typeof import("../ui/src/pages/projects/project-view.ts")["createFlowboardProjectUiState"];
-let renderFlowboardProjects: typeof import("../ui/src/pages/projects/project-view.ts")["renderFlowboardProjects"];
+let createTaskfoldProjectUiState: typeof import("../ui/src/pages/projects/project-view.ts")["createTaskfoldProjectUiState"];
+let renderTaskfoldProjects: typeof import("../ui/src/pages/projects/project-view.ts")["renderTaskfoldProjects"];
 let i18n: typeof import("../ui/src/i18n/index.ts")["i18n"];
 
 function templateText(value: unknown): string {
@@ -39,7 +39,7 @@ beforeAll(async () => {
       },
     },
   });
-  ({ createFlowboardProjectUiState, renderFlowboardProjects } = await import(
+  ({ createTaskfoldProjectUiState, renderTaskfoldProjects } = await import(
     "../ui/src/pages/projects/project-view.ts"
   ));
   ({ i18n } = await import("../ui/src/i18n/index.ts"));
@@ -47,7 +47,7 @@ beforeAll(async () => {
 
 function createController(setLocale = vi.fn()) {
   return {
-    state: createFlowboardProjectUiState(),
+    state: createTaskfoldProjectUiState(),
     connected: true,
     locale: "en",
     requestUpdate: vi.fn(),
@@ -56,13 +56,13 @@ function createController(setLocale = vi.fn()) {
   };
 }
 
-describe("Flowboard project language selector", () => {
+describe("Taskfold project language selector", () => {
   it("renders English and Simplified Chinese beside the project actions", async () => {
     await i18n.setLocale("en", { persist: false });
     const controller = createController();
-    const view = templateText(renderFlowboardProjects(controller as never));
+    const view = templateText(renderTaskfoldProjects(controller as never));
 
-    expect(view).toContain("flowboard-project__language-select");
+    expect(view).toContain("taskfold-project__language-select");
     expect(view).toContain('value="zh-CN"');
     expect(view).toContain('value="en"');
     expect(view).toContain("Simplified Chinese");
@@ -73,7 +73,7 @@ describe("Flowboard project language selector", () => {
     const setLocale = vi.fn();
     const controller = createController(setLocale);
     controller.state.languageSwitching = true;
-    const view = templateText(renderFlowboardProjects(controller as never));
+    const view = templateText(renderTaskfoldProjects(controller as never));
 
     expect(view).toContain("@change=");
     expect(view).toContain("?disabled=");

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { FlowboardChange } from "../../contract/index.js";
-import type { FlowboardKeyedStore } from "./persistence-types.js";
+import type { TaskfoldChange } from "../../contract/index.js";
+import type { TaskfoldKeyedStore } from "./persistence-types.js";
 
 /**
  * Revisions reserved per round trip to the backing store. Large enough that a
@@ -8,14 +8,14 @@ import type { FlowboardKeyedStore } from "./persistence-types.js";
  */
 const CHANGE_REVISION_BLOCK = 10_000;
 
-export class FlowboardChangeTracker {
+export class TaskfoldChangeTracker {
   private readonly epoch: string;
   private revision: number;
   private revisionCeiling: number;
-  private latestChange: FlowboardChange | undefined;
+  private latestChange: TaskfoldChange | undefined;
   private mutationRevision = 0;
   private externalDataVersion: number | undefined;
-  private readonly listeners = new Set<(change: FlowboardChange) => void>();
+  private readonly listeners = new Set<(change: TaskfoldChange) => void>();
   private readonly reserveRevisions: (count: number) => number;
 
   constructor(
@@ -42,7 +42,7 @@ export class FlowboardChangeTracker {
     return ++this.revision;
   }
 
-  track<T>(store: FlowboardKeyedStore<T>): FlowboardKeyedStore<T> {
+  track<T>(store: TaskfoldKeyedStore<T>): TaskfoldKeyedStore<T> {
     return {
       register: async (key, value) => {
         await store.register(key, value);
@@ -71,7 +71,7 @@ export class FlowboardChangeTracker {
     };
   }
 
-  subscribe(listener: (change: FlowboardChange) => void): () => void {
+  subscribe(listener: (change: TaskfoldChange) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
@@ -80,7 +80,7 @@ export class FlowboardChangeTracker {
     this.emit();
   }
 
-  current(): FlowboardChange | undefined {
+  current(): TaskfoldChange | undefined {
     return this.latestChange;
   }
 

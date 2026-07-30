@@ -1,4 +1,4 @@
-.flowboard-project {
+.taskfold-project {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -6,87 +6,87 @@
   min-height: 0;
 }
 
-.flowboard-project__topbar,
-.flowboard-project__section-heading,
-.flowboard-project__column-header,
-.flowboard-project__modal-panel > header,
-.flowboard-project__modal-panel > footer,
-.flowboard-project__detail-panel > header,
-.flowboard-project__detail-panel > footer,
-.flowboard-project__document,
-.flowboard-project__card-footer,
-.flowboard-project__overview-item-top,
-.flowboard-project__heading-actions,
-.flowboard-project__topbar-actions,
-.flowboard-project__column-actions {
+.taskfold-project__topbar,
+.taskfold-project__section-heading,
+.taskfold-project__column-header,
+.taskfold-project__modal-panel > header,
+.taskfold-project__modal-panel > footer,
+.taskfold-project__detail-panel > header,
+.taskfold-project__detail-panel > footer,
+.taskfold-project__document,
+.taskfold-project__card-footer,
+.taskfold-project__overview-item-top,
+.taskfold-project__heading-actions,
+.taskfold-project__topbar-actions,
+.taskfold-project__column-actions {
   align-items: center;
   display: flex;
   gap: 8px;
 }
 
-.flowboard-project__topbar {
+.taskfold-project__topbar {
   border-bottom: 1px solid var(--border);
   justify-content: space-between;
   min-height: 38px;
   padding: 0 2px 10px;
 }
 
-.flowboard-project__brand {
+.taskfold-project__brand {
   align-items: baseline;
   display: flex;
   gap: 8px;
 }
 
-.flowboard-project__brand strong {
+.taskfold-project__brand strong {
   font-size: 15px;
   letter-spacing: 0;
 }
 
-.flowboard-project__brand span,
-.flowboard-project__refreshing {
+.taskfold-project__brand span,
+.taskfold-project__refreshing {
   color: var(--muted);
   font-size: 12px;
 }
 
-.flowboard-project__topbar-actions {
+.taskfold-project__topbar-actions {
   justify-content: flex-end;
 }
 
-.flowboard-project__language {
+.taskfold-project__language {
   display: inline-flex;
 }
 
-.flowboard-project__language-select {
+.taskfold-project__language-select {
   font-size: 12px;
   min-width: 120px;
   padding: 5px 7px;
 }
 
-.flowboard-project__language-error {
+.taskfold-project__language-error {
   color: var(--danger);
   flex-basis: 100%;
   font-size: 11px;
   text-align: right;
 }
 
-.flowboard-project__all-projects {
+.taskfold-project__all-projects {
   align-items: center;
   display: inline-flex;
   gap: 8px;
 }
 
-.flowboard-project__all-projects strong {
+.taskfold-project__all-projects strong {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.flowboard-project__all-projects.is-active {
+.taskfold-project__all-projects.is-active {
   border-color: var(--accent);
   color: var(--text);
 }
 
-.flowboard-project__refresh,
-.flowboard-project__icon-button {
+.taskfold-project__refresh,
+.taskfold-project__icon-button {
   align-items: center;
   background: transparent;
   border: 1px solid transparent;
@@ -100,32 +100,32 @@
   width: 30px;
 }
 
-.flowboard-project__refresh:hover,
-.flowboard-project__icon-button:hover {
+.taskfold-project__refresh:hover,
+.taskfold-project__icon-button:hover {
   background: var(--panel-strong);
   border-color: var(--border);
   color: var(--text);
 }
 
-.flowboard-project__icon-button:disabled {
+.taskfold-project__icon-button:disabled {
   cursor: default;
   opacity: 0.35;
 }
 
-.flowboard-project__order-actions {
+.taskfold-project__order-actions {
   align-items: center;
   display: inline-flex;
   flex: 0 0 auto;
   gap: 1px;
 }
 
-.flowboard-project__order-button {
+.taskfold-project__order-button {
   font-size: 14px;
   height: 24px;
   width: 24px;
 }
 
-.flowboard-project__project-toolbar {
+.taskfold-project__project-toolbar {
   align-items: center;
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -134,8 +134,8 @@
   padding: 0 2px 10px;
 }
 
-.flowboard-project__nav-item,
-.flowboard-project__nav-project {
+.taskfold-project__nav-item,
+.taskfold-project__nav-project {
   align-items: center;
   background: transparent;
   border: 1px solid transparent;
@@ -148,43 +148,43 @@
   width: 100%;
 }
 
-.flowboard-project__project-row {
+.taskfold-project__project-row {
   align-items: center;
   display: flex;
   gap: 2px;
   flex: 0 0 auto;
 }
 
-.flowboard-project__project-row .flowboard-project__nav-project {
+.taskfold-project__project-row .taskfold-project__nav-project {
   flex: 1;
   min-width: 0;
 }
 
-.flowboard-project__nav-item:hover,
-.flowboard-project__nav-project:hover,
-.flowboard-project__nav-item.is-active,
-.flowboard-project__nav-project.is-selected {
+.taskfold-project__nav-item:hover,
+.taskfold-project__nav-project:hover,
+.taskfold-project__nav-item.is-active,
+.taskfold-project__nav-project.is-selected {
   background: var(--panel-strong);
   border-color: var(--border);
   color: var(--text);
 }
 
-.flowboard-project__nav-item strong,
-.flowboard-project__nav-project small {
+.taskfold-project__nav-item strong,
+.taskfold-project__nav-project small {
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   margin-left: auto;
 }
 
-.flowboard-project__nav-project-name {
+.taskfold-project__nav-project-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.flowboard-project__project-color {
+.taskfold-project__project-color {
   --project-color: var(--accent);
   background: var(--project-color);
   display: inline-block;
@@ -193,10 +193,10 @@
   width: 8px;
 }
 
-.flowboard-project__search input,
-.flowboard-project input,
-.flowboard-project select,
-.flowboard-project textarea {
+.taskfold-project__search input,
+.taskfold-project input,
+.taskfold-project select,
+.taskfold-project textarea {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -207,24 +207,24 @@
   width: 100%;
 }
 
-.flowboard-project__search {
+.taskfold-project__search {
   flex: 0 1 220px;
 }
 
-.flowboard-project textarea {
+.taskfold-project textarea {
   min-height: 92px;
   resize: vertical;
 }
 
-.flowboard-project input:focus,
-.flowboard-project select:focus,
-.flowboard-project textarea:focus {
+.taskfold-project input:focus,
+.taskfold-project select:focus,
+.taskfold-project textarea:focus {
   border-color: var(--accent);
   outline: 2px solid color-mix(in srgb, var(--accent) 20%, transparent);
   outline-offset: 1px;
 }
 
-.flowboard-project__checkbox {
+.taskfold-project__checkbox {
   align-items: center;
   color: var(--muted);
   display: flex;
@@ -234,7 +234,7 @@
   flex: 0 0 auto;
 }
 
-.flowboard-project__checkbox input {
+.taskfold-project__checkbox input {
   accent-color: var(--accent);
   height: 14px;
   min-height: 0;
@@ -242,7 +242,7 @@
   width: 14px;
 }
 
-.flowboard-project__project-list {
+.taskfold-project__project-list {
   align-items: center;
   display: inline-flex;
   flex: 1;
@@ -252,26 +252,26 @@
   padding: 1px;
 }
 
-.flowboard-project__empty-side,
-.flowboard-project__empty-column {
+.taskfold-project__empty-side,
+.taskfold-project__empty-column {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
 
-.flowboard-project__main {
+.taskfold-project__main {
   flex: 1;
   min-width: 0;
 }
 
-.flowboard-project__tabs {
+.taskfold-project__tabs {
   border-bottom: 1px solid var(--border);
   display: flex;
   gap: 16px;
   margin-bottom: 14px;
 }
 
-.flowboard-project__tabs button {
+.taskfold-project__tabs button {
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -280,41 +280,41 @@
   padding: 0 2px;
 }
 
-.flowboard-project__tabs button:hover,
-.flowboard-project__tabs button.is-active {
+.taskfold-project__tabs button:hover,
+.taskfold-project__tabs button.is-active {
   border-bottom-color: var(--accent);
   color: var(--text);
 }
 
-.flowboard-project__section-heading {
+.taskfold-project__section-heading {
   justify-content: space-between;
   margin-bottom: 18px;
 }
 
-.flowboard-project__section-heading h1 {
+.taskfold-project__section-heading h1 {
   font-size: 20px;
   line-height: 1.2;
   margin: 0;
 }
 
-.flowboard-project__section-heading p {
+.taskfold-project__section-heading p {
   color: var(--muted);
   font-size: 13px;
   margin: 5px 0 0;
 }
 
-.flowboard-project__heading-actions {
+.taskfold-project__heading-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
-.flowboard-project__overview-grid {
+.taskfold-project__overview-grid {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
 }
 
-.flowboard-project__overview-item {
+.taskfold-project__overview-item {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -323,26 +323,26 @@
   padding: 14px;
 }
 
-.flowboard-project__overview-item:hover {
+.taskfold-project__overview-item:hover {
   border-color: var(--accent);
 }
 
-.flowboard-project__overview-item.is-archived {
+.taskfold-project__overview-item.is-archived {
   opacity: 0.65;
 }
 
-.flowboard-project__overview-item-top {
+.taskfold-project__overview-item-top {
   color: var(--muted);
   font-size: 11px;
 }
 
-.flowboard-project__overview-item-id {
+.taskfold-project__overview-item-id {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.flowboard-project__badge {
+.taskfold-project__badge {
   background: color-mix(in srgb, var(--warn) 18%, transparent);
   color: var(--warn);
   font-size: 10px;
@@ -350,13 +350,13 @@
   padding: 2px 5px;
 }
 
-.flowboard-project__overview-item h2 {
+.taskfold-project__overview-item h2 {
   font-size: 15px;
   line-height: 1.3;
   margin: 12px 0 5px;
 }
 
-.flowboard-project__overview-item p {
+.taskfold-project__overview-item p {
   color: var(--muted);
   display: -webkit-box;
   font-size: 12px;
@@ -367,7 +367,7 @@
   -webkit-line-clamp: 2;
 }
 
-.flowboard-project__overview-item footer {
+.taskfold-project__overview-item footer {
   color: var(--muted);
   display: flex;
   font-size: 11px;
@@ -375,7 +375,7 @@
   margin-top: 20px;
 }
 
-.flowboard-project__blank {
+.taskfold-project__blank {
   align-items: center;
   color: var(--muted);
   display: flex;
@@ -386,7 +386,7 @@
   text-align: center;
 }
 
-.flowboard-project__kanban {
+.taskfold-project__kanban {
   display: grid;
   gap: 12px;
   grid-auto-columns: minmax(250px, 1fr);
@@ -396,7 +396,7 @@
   padding-bottom: 8px;
 }
 
-.flowboard-project__column {
+.taskfold-project__column {
   background: color-mix(in srgb, var(--panel) 74%, var(--bg) 26%);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -405,40 +405,40 @@
   min-width: 0;
 }
 
-.flowboard-project__column.is-completed,
-.flowboard-project__column.is-archived {
+.taskfold-project__column.is-completed,
+.taskfold-project__column.is-archived {
   opacity: 0.72;
 }
 
-.flowboard-project__column-header {
+.taskfold-project__column-header {
   border-bottom: 1px solid var(--border);
   justify-content: space-between;
   min-height: 58px;
   padding: 10px;
 }
 
-.flowboard-project__column-header h2 {
+.taskfold-project__column-header h2 {
   font-size: 13px;
   line-height: 1.2;
   margin: 0;
 }
 
-.flowboard-project__column-header span {
+.taskfold-project__column-header span {
   color: var(--muted);
   display: block;
   font-size: 11px;
   margin-top: 4px;
 }
 
-.flowboard-project__column-actions {
+.taskfold-project__column-actions {
   flex-wrap: nowrap;
 }
 
-.flowboard-project__column-actions .flowboard-project__order-actions {
+.taskfold-project__column-actions .taskfold-project__order-actions {
   margin-right: 2px;
 }
 
-.flowboard-project__card-list {
+.taskfold-project__card-list {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -447,7 +447,7 @@
   padding: 8px;
 }
 
-.flowboard-project__card {
+.taskfold-project__card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -457,19 +457,19 @@
   position: relative;
 }
 
-.flowboard-project__card:hover {
+.taskfold-project__card:hover {
   border-color: var(--border-strong);
 }
 
-.flowboard-project__card:active {
+.taskfold-project__card:active {
   cursor: grabbing;
 }
 
-.flowboard-project__card.is-archived {
+.taskfold-project__card.is-archived {
   opacity: 0.6;
 }
 
-.flowboard-project__card-main {
+.taskfold-project__card-main {
   background: transparent;
   border: 0;
   color: var(--text);
@@ -481,25 +481,25 @@
   width: 100%;
 }
 
-.flowboard-project__priority {
+.taskfold-project__priority {
   background: var(--muted);
   height: 8px;
   margin-top: 4px;
   width: 8px;
 }
 
-.flowboard-project__priority.priority-low { background: var(--success); }
-.flowboard-project__priority.priority-normal { background: var(--info); }
-.flowboard-project__priority.priority-high { background: var(--warn); }
-.flowboard-project__priority.priority-urgent { background: var(--danger); }
+.taskfold-project__priority.priority-low { background: var(--success); }
+.taskfold-project__priority.priority-normal { background: var(--info); }
+.taskfold-project__priority.priority-high { background: var(--warn); }
+.taskfold-project__priority.priority-urgent { background: var(--danger); }
 
-.flowboard-project__card-title {
+.taskfold-project__card-title {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
 }
 
-.flowboard-project__card-notes {
+.taskfold-project__card-notes {
   color: var(--muted);
   font-size: 11px;
   grid-column: 2;
@@ -509,14 +509,14 @@
   white-space: nowrap;
 }
 
-.flowboard-project__delivery-badges {
+.taskfold-project__delivery-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   grid-column: 2;
 }
 
-.flowboard-project__delivery-badges small {
+.taskfold-project__delivery-badges small {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
   color: var(--muted);
@@ -525,12 +525,12 @@
   padding: 2px 4px;
 }
 
-.flowboard-project__card-footer {
+.taskfold-project__card-footer {
   justify-content: space-between;
   margin-top: 9px;
 }
 
-.flowboard-project__compact-select {
+.taskfold-project__compact-select {
   background: transparent;
   border: 0;
   color: var(--muted);
@@ -540,13 +540,13 @@
   width: auto;
 }
 
-.flowboard-project__move-card {
+.taskfold-project__move-card {
   max-width: 112px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.flowboard-project__card-archived {
+.taskfold-project__card-archived {
   color: var(--warn);
   font-size: 10px;
   position: absolute;
@@ -554,57 +554,57 @@
   top: 8px;
 }
 
-.flowboard-project__settings-form {
+.taskfold-project__settings-form {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   max-width: 880px;
 }
 
-.flowboard-project__settings-form label,
-.flowboard-project__modal-panel label,
-.flowboard-project__detail-body > label {
+.taskfold-project__settings-form label,
+.taskfold-project__modal-panel label,
+.taskfold-project__detail-body > label {
   color: var(--muted);
   display: grid;
   font-size: 12px;
   gap: 6px;
 }
 
-.flowboard-project__settings-form small {
+.taskfold-project__settings-form small {
   color: var(--muted);
   line-height: 1.4;
 }
 
-.flowboard-project__wide-field,
-.flowboard-project__form-actions {
+.taskfold-project__wide-field,
+.taskfold-project__form-actions {
   grid-column: 1 / -1;
 }
 
-.flowboard-project__form-actions {
+.taskfold-project__form-actions {
   border-top: 1px solid var(--border);
   padding-top: 14px;
 }
 
-.flowboard-project__documents {
+.taskfold-project__documents {
   display: grid;
   gap: 18px;
 }
 
-.flowboard-project__document-search {
+.taskfold-project__document-search {
   flex: 1 1 220px;
   max-width: 340px;
 }
 
-.flowboard-project__document-search input,
-.flowboard-project__document-source-filter {
+.taskfold-project__document-search input,
+.taskfold-project__document-source-filter {
   min-width: 0;
 }
 
-.flowboard-project__document-source-filter {
+.taskfold-project__document-source-filter {
   width: auto;
 }
 
-.flowboard-project__document-index {
+.taskfold-project__document-index {
   border-bottom: 1px solid var(--border);
   border-top: 1px solid var(--border);
   display: grid;
@@ -613,7 +613,7 @@
   overflow-x: auto;
 }
 
-.flowboard-project__document-group {
+.taskfold-project__document-group {
   border-right: 1px solid var(--border);
   display: grid;
   gap: 8px;
@@ -621,21 +621,21 @@
   padding: 12px;
 }
 
-.flowboard-project__document-group:last-child {
+.taskfold-project__document-group:last-child {
   border-right: 0;
 }
 
-.flowboard-project__document-group h2 {
+.taskfold-project__document-group h2 {
   font-size: 12px;
   margin: 0;
 }
 
-.flowboard-project__document-list {
+.taskfold-project__document-list {
   display: grid;
   gap: 4px;
 }
 
-.flowboard-project__document-index-item {
+.taskfold-project__document-index-item {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text);
@@ -648,17 +648,17 @@
   width: 100%;
 }
 
-.flowboard-project__document-index-item:hover,
-.flowboard-project__document-index-item.is-selected {
+.taskfold-project__document-index-item:hover,
+.taskfold-project__document-index-item.is-selected {
   background: var(--panel-strong);
   border-color: var(--border);
 }
 
-.flowboard-project__document-index-item.is-hidden {
+.taskfold-project__document-index-item.is-hidden {
   opacity: 0.58;
 }
 
-.flowboard-project__document-index-item > span {
+.taskfold-project__document-index-item > span {
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
@@ -666,7 +666,7 @@
   white-space: nowrap;
 }
 
-.flowboard-project__document-index-item > small {
+.taskfold-project__document-index-item > small {
   color: var(--muted);
   font-size: 10px;
   overflow: hidden;
@@ -674,9 +674,9 @@
   white-space: nowrap;
 }
 
-.flowboard-project__document-index-item em,
-.flowboard-project__document-source-tag,
-.flowboard-project__document-unsaved {
+.taskfold-project__document-index-item em,
+.taskfold-project__document-source-tag,
+.taskfold-project__document-unsaved {
   border: 1px solid var(--border);
   color: var(--muted);
   font-size: 10px;
@@ -687,30 +687,30 @@
   width: fit-content;
 }
 
-.flowboard-project__document-index-item em {
+.taskfold-project__document-index-item em {
   margin-top: 1px;
 }
 
-.flowboard-project__document-unsaved {
+.taskfold-project__document-unsaved {
   border-color: color-mix(in srgb, var(--warn) 60%, var(--border));
   color: var(--warn);
 }
 
-.flowboard-project__document-reader {
+.taskfold-project__document-reader {
   border-top: 1px solid var(--border);
   min-height: 460px;
   overflow: auto;
   padding: 18px 0 0;
 }
 
-.flowboard-project__document-reader.is-empty {
+.taskfold-project__document-reader.is-empty {
   align-items: center;
   color: var(--muted);
   display: flex;
   justify-content: center;
 }
 
-.flowboard-project__document-reader header {
+.taskfold-project__document-reader header {
   align-items: flex-start;
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -721,26 +721,26 @@
   padding-bottom: 12px;
 }
 
-.flowboard-project__document-reader h2 {
+.taskfold-project__document-reader h2 {
   font-size: 16px;
   line-height: 1.3;
   margin: 0;
 }
 
-.flowboard-project__document-reader-heading,
-.flowboard-project__document-reader-actions,
-.flowboard-project__document-editor-actions {
+.taskfold-project__document-reader-heading,
+.taskfold-project__document-reader-actions,
+.taskfold-project__document-editor-actions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.flowboard-project__document-reader-title {
+.taskfold-project__document-reader-title {
   min-width: 0;
 }
 
-.flowboard-project__document-reader header small {
+.taskfold-project__document-reader header small {
   color: var(--muted);
   display: block;
   font-size: 11px;
@@ -748,30 +748,30 @@
   overflow-wrap: anywhere;
 }
 
-.flowboard-project__document-full-path {
+.taskfold-project__document-full-path {
   opacity: 0.72;
 }
 
-.flowboard-project__document-reader-actions {
+.taskfold-project__document-reader-actions {
   justify-content: flex-end;
 }
 
-.flowboard-project__document-reader-message {
+.taskfold-project__document-reader-message {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
 }
 
-.flowboard-project__document-reader-message.is-error {
+.taskfold-project__document-reader-message.is-error {
   color: var(--danger);
 }
 
-.flowboard-project__document-editor {
+.taskfold-project__document-editor {
   display: grid;
   gap: 10px;
 }
 
-.flowboard-project__document-editor-toolbar {
+.taskfold-project__document-editor-toolbar {
   align-items: center;
   border: 1px solid var(--border);
   display: flex;
@@ -779,7 +779,7 @@
   padding: 4px;
 }
 
-.flowboard-project__editor-button {
+.taskfold-project__editor-button {
   align-items: center;
   background: transparent;
   border: 1px solid transparent;
@@ -792,12 +792,12 @@
   padding: 0 7px;
 }
 
-.flowboard-project__editor-button:hover {
+.taskfold-project__editor-button:hover {
   background: var(--panel-strong);
   border-color: var(--border);
 }
 
-.flowboard-project__rich-editor {
+.taskfold-project__rich-editor {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--text);
@@ -808,24 +808,24 @@
   padding: 14px;
 }
 
-.flowboard-project__rich-editor:focus {
+.taskfold-project__rich-editor:focus {
   border-color: var(--accent);
   outline: 2px solid color-mix(in srgb, var(--accent) 20%, transparent);
   outline-offset: 1px;
 }
 
-.flowboard-project__rich-editor > :first-child {
+.taskfold-project__rich-editor > :first-child {
   margin-top: 0;
 }
 
-.flowboard-project__rich-editor h1,
-.flowboard-project__rich-editor h2,
-.flowboard-project__rich-editor h3,
-.flowboard-project__rich-editor h4 {
+.taskfold-project__rich-editor h1,
+.taskfold-project__rich-editor h2,
+.taskfold-project__rich-editor h3,
+.taskfold-project__rich-editor h4 {
   line-height: 1.3;
 }
 
-.flowboard-project__rich-editor code {
+.taskfold-project__rich-editor code {
   background: var(--panel-strong);
   border: 1px solid var(--border);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
@@ -833,42 +833,42 @@
   padding: 1px 4px;
 }
 
-.flowboard-project__rich-editor pre {
+.taskfold-project__rich-editor pre {
   background: var(--panel-strong);
   border: 1px solid var(--border);
   overflow: auto;
   padding: 12px;
 }
 
-.flowboard-project__document-editor-actions {
+.taskfold-project__document-editor-actions {
   border-top: 1px solid var(--border);
   justify-content: flex-end;
   padding-top: 10px;
 }
 
-.flowboard-markdown {
+.taskfold-markdown {
   color: var(--text);
   font-size: 13px;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
 
-.flowboard-markdown > :first-child {
+.taskfold-markdown > :first-child {
   margin-top: 0;
 }
 
-.flowboard-markdown h1,
-.flowboard-markdown h2,
-.flowboard-markdown h3,
-.flowboard-markdown h4 {
+.taskfold-markdown h1,
+.taskfold-markdown h2,
+.taskfold-markdown h3,
+.taskfold-markdown h4 {
   line-height: 1.3;
 }
 
-.flowboard-markdown h1 { font-size: 22px; }
-.flowboard-markdown h2 { font-size: 18px; }
-.flowboard-markdown h3 { font-size: 15px; }
+.taskfold-markdown h1 { font-size: 22px; }
+.taskfold-markdown h2 { font-size: 18px; }
+.taskfold-markdown h3 { font-size: 15px; }
 
-.flowboard-markdown code {
+.taskfold-markdown code {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
@@ -876,51 +876,51 @@
   padding: 1px 4px;
 }
 
-.flowboard-markdown pre {
+.taskfold-markdown pre {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   overflow: auto;
   padding: 12px;
 }
 
-.flowboard-markdown pre code {
+.taskfold-markdown pre code {
   background: transparent;
   border: 0;
   padding: 0;
 }
 
-.flowboard-markdown table {
+.taskfold-markdown table {
   border-collapse: collapse;
   display: block;
   max-width: 100%;
   overflow: auto;
 }
 
-.flowboard-markdown td,
-.flowboard-markdown th {
+.taskfold-markdown td,
+.taskfold-markdown th {
   border: 1px solid var(--border);
   padding: 6px 8px;
   text-align: left;
 }
 
-.flowboard-project__detail-section {
+.taskfold-project__detail-section {
   border-top: 1px solid var(--border);
   display: grid;
   gap: 10px;
   padding-top: 14px;
 }
 
-.flowboard-project__detail-section h3 {
+.taskfold-project__detail-section h3 {
   font-size: 13px;
   margin: 0;
 }
 
-.flowboard-project__execution-section {
+.taskfold-project__execution-section {
   gap: 12px;
 }
 
-.flowboard-project__execution-heading,
-.flowboard-project__execution-actions {
+.taskfold-project__execution-heading,
+.taskfold-project__execution-actions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -928,53 +928,53 @@
   justify-content: space-between;
 }
 
-.flowboard-project__execution-state {
+.taskfold-project__execution-state {
   color: var(--success);
   font-size: 12px;
   font-weight: 600;
   margin: 0;
 }
 
-.flowboard-project__execution-facts {
+.taskfold-project__execution-facts {
   display: grid;
   gap: 7px;
   margin: 0;
 }
 
-.flowboard-project__execution-facts div {
+.taskfold-project__execution-facts div {
   display: grid;
   gap: 8px;
   grid-template-columns: 112px minmax(0, 1fr);
 }
 
-.flowboard-project__execution-facts dt,
-.flowboard-project__execution-facts dd {
+.taskfold-project__execution-facts dt,
+.taskfold-project__execution-facts dd {
   font-size: 12px;
   margin: 0;
 }
 
-.flowboard-project__execution-facts dt {
+.taskfold-project__execution-facts dt {
   color: var(--muted);
 }
 
-.flowboard-project__execution-facts dd {
+.taskfold-project__execution-facts dd {
   overflow-wrap: anywhere;
 }
 
-.flowboard-project__execution-preview {
+.taskfold-project__execution-preview {
   border: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;
   padding: 8px;
 }
 
-.flowboard-project__execution-preview summary {
+.taskfold-project__execution-preview summary {
   color: var(--text);
   cursor: pointer;
   font-weight: 600;
 }
 
-.flowboard-project__execution-preview pre {
+.taskfold-project__execution-preview pre {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--text);
@@ -988,23 +988,23 @@
   white-space: pre-wrap;
 }
 
-.flowboard-project__execution-steer {
+.taskfold-project__execution-steer {
   display: grid;
   gap: 8px;
 }
 
-.flowboard-project__execution-steer label {
+.taskfold-project__execution-steer label {
   color: var(--muted);
   display: grid;
   font-size: 12px;
   gap: 6px;
 }
 
-.flowboard-project__execution-steer textarea {
+.taskfold-project__execution-steer textarea {
   min-height: 70px;
 }
 
-.flowboard-project__execution-error {
+.taskfold-project__execution-error {
   color: var(--danger);
   font-size: 12px;
   line-height: 1.5;
@@ -1012,35 +1012,35 @@
   overflow-wrap: anywhere;
 }
 
-.flowboard-project__delivery-form,
-.flowboard-project__source-reference,
-.flowboard-project__evidence-form,
-.flowboard-project__detail-list {
+.taskfold-project__delivery-form,
+.taskfold-project__source-reference,
+.taskfold-project__evidence-form,
+.taskfold-project__detail-list {
   display: grid;
   gap: 8px;
 }
 
-.flowboard-project__detail-empty {
+.taskfold-project__detail-empty {
   color: var(--muted);
   font-size: 12px;
   margin: 0;
 }
 
-.flowboard-project__source-reference {
+.taskfold-project__source-reference {
   background: color-mix(in srgb, var(--panel-strong) 50%, transparent);
   border: 1px solid var(--border);
   padding: 8px;
 }
 
-.flowboard-project__evidence-form {
+.taskfold-project__evidence-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.flowboard-project__evidence-form .btn {
+.taskfold-project__evidence-form .btn {
   justify-self: start;
 }
 
-.flowboard-project__evidence-item {
+.taskfold-project__evidence-item {
   align-items: center;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   display: grid;
@@ -1049,38 +1049,38 @@
   padding: 6px 0;
 }
 
-.flowboard-project__evidence-item span {
+.taskfold-project__evidence-item span {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 
-.flowboard-project__evidence-item small {
+.taskfold-project__evidence-item small {
   color: var(--muted);
   font-size: 11px;
   grid-column: 1;
   overflow-wrap: anywhere;
 }
 
-.flowboard-project__evidence-item .flowboard-project__icon-button {
+.taskfold-project__evidence-item .taskfold-project__icon-button {
   grid-column: 2;
   grid-row: 1 / span 2;
 }
 
-.flowboard-project__inline-actions {
+.taskfold-project__inline-actions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
 }
 
-.flowboard-project__move-card-title {
+.taskfold-project__move-card-title {
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
   margin: 0;
 }
 
-.flowboard-project__modal-panel {
+.taskfold-project__modal-panel {
   --openclaw-modal-width: min(560px, calc(100vw - 40px));
   background: var(--panel);
   display: grid;
@@ -1091,32 +1091,32 @@
   width: var(--openclaw-modal-width);
 }
 
-.flowboard-project__modal-panel > header,
-.flowboard-project__detail-panel > header {
+.taskfold-project__modal-panel > header,
+.taskfold-project__detail-panel > header {
   justify-content: space-between;
 }
 
-.flowboard-project__modal-panel h2,
-.flowboard-project__detail-panel h2 {
+.taskfold-project__modal-panel h2,
+.taskfold-project__detail-panel h2 {
   font-size: 17px;
   margin: 0;
 }
 
-.flowboard-project__modal-panel > footer,
-.flowboard-project__detail-panel > footer {
+.taskfold-project__modal-panel > footer,
+.taskfold-project__detail-panel > footer {
   border-top: 1px solid var(--border);
   justify-content: flex-end;
   margin-top: 4px;
   padding-top: 13px;
 }
 
-.flowboard-project__modal-grid {
+.taskfold-project__modal-grid {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.flowboard-project__detail-panel {
+.taskfold-project__detail-panel {
   --openclaw-modal-width: min(520px, calc(100vw - 40px));
   background: var(--panel);
   display: flex;
@@ -1126,59 +1126,59 @@
   width: var(--openclaw-modal-width);
 }
 
-.flowboard-project__detail-panel header small {
+.taskfold-project__detail-panel header small {
   color: var(--muted);
   display: block;
   font-size: 11px;
   margin-bottom: 4px;
 }
 
-.flowboard-project__detail-body {
+.taskfold-project__detail-body {
   display: grid;
   gap: 14px;
   overflow: auto;
   padding: 15px 0;
 }
 
-.flowboard-project__detail-body h3 {
+.taskfold-project__detail-body h3 {
   font-size: 16px;
   margin: 0;
 }
 
-.flowboard-project__detail-notes {
+.taskfold-project__detail-notes {
   color: var(--muted);
   line-height: 1.5;
   margin: 0;
   white-space: pre-wrap;
 }
 
-.flowboard-project__detail-body dl {
+.taskfold-project__detail-body dl {
   display: grid;
   gap: 7px;
   margin: 0;
 }
 
-.flowboard-project__detail-body dl div {
+.taskfold-project__detail-body dl div {
   display: grid;
   gap: 8px;
   grid-template-columns: 100px minmax(0, 1fr);
 }
 
-.flowboard-project__detail-body dt,
-.flowboard-project__detail-body dd {
+.taskfold-project__detail-body dt,
+.taskfold-project__detail-body dd {
   font-size: 12px;
   margin: 0;
 }
 
-.flowboard-project__detail-body dt {
+.taskfold-project__detail-body dt {
   color: var(--muted);
 }
 
-.flowboard-project__detail-body dd {
+.taskfold-project__detail-body dd {
   overflow-wrap: anywhere;
 }
 
-.flowboard-project__sr-only {
+.taskfold-project__sr-only {
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   height: 1px;
@@ -1194,74 +1194,74 @@
 }
 
 @media (max-width: 820px) {
-  .flowboard-project__project-list {
+  .taskfold-project__project-list {
     flex-basis: 100%;
     order: 3;
   }
 
-  .flowboard-project__kanban {
+  .taskfold-project__kanban {
     min-height: calc(100vh - 230px);
   }
 
-  .flowboard-project__document-index {
+  .taskfold-project__document-index {
     grid-template-columns: repeat(5, minmax(180px, 1fr));
   }
 
-  .flowboard-project__document-reader {
+  .taskfold-project__document-reader {
     min-height: 340px;
   }
 }
 
 @media (max-width: 560px) {
-  .flowboard-project__topbar,
-  .flowboard-project__section-heading {
+  .taskfold-project__topbar,
+  .taskfold-project__section-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .flowboard-project__topbar-actions,
-  .flowboard-project__heading-actions {
+  .taskfold-project__topbar-actions,
+  .taskfold-project__heading-actions {
     justify-content: flex-start;
   }
 
-  .flowboard-project__project-toolbar {
+  .taskfold-project__project-toolbar {
     align-items: stretch;
   }
 
-  .flowboard-project__search {
+  .taskfold-project__search {
     flex-basis: 100%;
   }
 
-  .flowboard-project__document-search {
+  .taskfold-project__document-search {
     flex-basis: 100%;
     max-width: none;
   }
 
-  .flowboard-project__document-reader {
+  .taskfold-project__document-reader {
     padding-top: 14px;
   }
 
-  .flowboard-project__document-reader-actions {
+  .taskfold-project__document-reader-actions {
     justify-content: flex-start;
   }
 
-  .flowboard-project__settings-form,
-  .flowboard-project__modal-grid,
-  .flowboard-project__evidence-form {
+  .taskfold-project__settings-form,
+  .taskfold-project__modal-grid,
+  .taskfold-project__evidence-form {
     grid-template-columns: 1fr;
   }
 
-  .flowboard-project__execution-facts div {
+  .taskfold-project__execution-facts div {
     grid-template-columns: 1fr;
     gap: 3px;
   }
 
-  .flowboard-project__settings-form .flowboard-project__wide-field,
-  .flowboard-project__form-actions {
+  .taskfold-project__settings-form .taskfold-project__wide-field,
+  .taskfold-project__form-actions {
     grid-column: auto;
   }
 
-  .flowboard-project__kanban {
+  .taskfold-project__kanban {
     grid-auto-columns: minmax(236px, 84vw);
   }
 }

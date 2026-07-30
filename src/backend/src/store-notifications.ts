@@ -1,8 +1,8 @@
 import type {
-  FlowboardNotification,
-  FlowboardNotificationSubscription,
+  TaskfoldNotification,
+  TaskfoldNotificationSubscription,
 } from "../../contract/index.js";
-import type { PersistedFlowboardNotificationSubscription } from "./persistence-types.js";
+import type { PersistedTaskfoldNotificationSubscription } from "./persistence-types.js";
 import {
   cardRunId,
   cardSessionKey,
@@ -10,21 +10,21 @@ import {
   notificationSequence,
 } from "./store-card-helpers.js";
 import type {
-  FlowboardNotificationEventsInput,
-  FlowboardNotificationListOptions,
-  FlowboardNotificationSubscribeInput,
+  TaskfoldNotificationEventsInput,
+  TaskfoldNotificationListOptions,
+  TaskfoldNotificationSubscribeInput,
 } from "./store-inputs.js";
 import {
   normalizeBoardId,
   normalizeBoundedString,
   normalizeNotificationSubscription,
 } from "./store-normalizers.js";
-import { FlowboardWorkflowStore } from "./store-workflow.js";
+import { TaskfoldWorkflowStore } from "./store-workflow.js";
 
-export class FlowboardNotificationStore extends FlowboardWorkflowStore {
+export class TaskfoldNotificationStore extends TaskfoldWorkflowStore {
   async subscribeNotifications(
-    input: FlowboardNotificationSubscribeInput,
-  ): Promise<FlowboardNotificationSubscription> {
+    input: TaskfoldNotificationSubscribeInput,
+  ): Promise<TaskfoldNotificationSubscription> {
     return await this.enqueueMutation(async () => {
       const subscription = normalizeNotificationSubscription(input);
       await this.subscriptionStore.register(subscription.id, { version: 1, subscription });
@@ -33,14 +33,14 @@ export class FlowboardNotificationStore extends FlowboardWorkflowStore {
   }
 
   async listNotificationSubscriptions(
-    input: FlowboardNotificationListOptions = {},
-  ): Promise<{ subscriptions: FlowboardNotificationSubscription[] }> {
+    input: TaskfoldNotificationListOptions = {},
+  ): Promise<{ subscriptions: TaskfoldNotificationSubscription[] }> {
     const boardId = normalizeBoardId(input.boardId);
     const cardId = normalizeBoundedString(input.cardId, undefined, 120, "card id");
     const subscriptions = (await this.subscriptionStore.entries())
       .map((entry) => entry.value)
       .filter(
-        (entry): entry is PersistedFlowboardNotificationSubscription =>
+        (entry): entry is PersistedTaskfoldNotificationSubscription =>
           entry?.version === 1 && Boolean(entry.subscription?.id),
       )
       .map((entry) => entry.subscription)
@@ -56,9 +56,9 @@ export class FlowboardNotificationStore extends FlowboardWorkflowStore {
     }));
   }
 
-  private async collectNotificationEvents(input: FlowboardNotificationEventsInput = {}): Promise<{
-    subscription?: FlowboardNotificationSubscription;
-    events: FlowboardNotification[];
+  private async collectNotificationEvents(input: TaskfoldNotificationEventsInput = {}): Promise<{
+    subscription?: TaskfoldNotificationSubscription;
+    events: TaskfoldNotification[];
   }> {
     const subscriptionId = normalizeBoundedString(
       input.subscriptionId,
@@ -83,7 +83,7 @@ export class FlowboardNotificationStore extends FlowboardWorkflowStore {
     const effectiveBoardId = effectiveCardId ? undefined : (subscription?.boardId ?? boardId);
     const effectiveSessionKey = subscription?.sessionKey;
     const effectiveRunId = subscription?.runId;
-    const events: FlowboardNotification[] = [];
+    const events: TaskfoldNotification[] = [];
     for (const card of await this.list({ boardId: effectiveBoardId })) {
       if (card.metadata?.archivedAt || (effectiveCardId && card.id !== effectiveCardId)) {
         continue;
@@ -140,16 +140,16 @@ export class FlowboardNotificationStore extends FlowboardWorkflowStore {
     return { ...(subscription ? { subscription } : {}), events: sorted };
   }
 
-  async notificationEvents(input: FlowboardNotificationEventsInput = {}): Promise<{
-    subscription?: FlowboardNotificationSubscription;
-    events: FlowboardNotification[];
+  async notificationEvents(input: TaskfoldNotificationEventsInput = {}): Promise<{
+    subscription?: TaskfoldNotificationSubscription;
+    events: TaskfoldNotification[];
   }> {
     return await this.collectNotificationEvents(input);
   }
 
-  async advanceNotificationEvents(input: FlowboardNotificationEventsInput = {}): Promise<{
-    subscription?: FlowboardNotificationSubscription;
-    events: FlowboardNotification[];
+  async advanceNotificationEvents(input: TaskfoldNotificationEventsInput = {}): Promise<{
+    subscription?: TaskfoldNotificationSubscription;
+    events: TaskfoldNotification[];
   }> {
     const subscriptionId = normalizeBoundedString(
       input.subscriptionId,
@@ -167,7 +167,7 @@ export class FlowboardNotificationStore extends FlowboardWorkflowStore {
       }
       const last = result.events.at(-1)!;
       const lastSequence = notificationSequence(last);
-      const subscription: FlowboardNotificationSubscription = {
+      const subscription: TaskfoldNotificationSubscription = {
         ...result.subscription,
         lastEventAt: last.createdAt,
         lastEventId: last.id,

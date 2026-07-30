@@ -1,15 +1,15 @@
-// Flowboard plugin module implements store behavior.
+// Taskfold plugin module implements store behavior.
 import { randomUUID } from "node:crypto";
-import type { FlowboardAttachment, FlowboardCard } from "../../contract/index.js";
+import type { TaskfoldAttachment, TaskfoldCard } from "../../contract/index.js";
 import type {
-  PersistedFlowboardAttachment,
-  PersistedFlowboardBoard,
-  PersistedFlowboardMilestone,
-  PersistedFlowboardNotificationSubscription,
-  PersistedFlowboardProjectDocument,
-  FlowboardKeyedStore,
+  PersistedTaskfoldAttachment,
+  PersistedTaskfoldBoard,
+  PersistedTaskfoldMilestone,
+  PersistedTaskfoldNotificationSubscription,
+  PersistedTaskfoldProjectDocument,
+  TaskfoldKeyedStore,
 } from "./persistence-types.js";
-import { createFlowboardSqliteStores } from "./sqlite-store.js";
+import { createTaskfoldSqliteStores } from "./sqlite-store.js";
 import {
   cardBoardId,
   closeRunningAttempts,
@@ -22,18 +22,18 @@ import {
 } from "./store-card-helpers.js";
 import { buildWorkerContext } from "./worker-prompt.js";
 import {
-  isFlowboardClaimReclaimable,
+  isTaskfoldClaimReclaimable,
   MAX_ATTACHMENT_ENTRIES,
   MAX_CARDS,
   MAX_CARD_NOTIFICATIONS,
   secondsToDurationMs,
 } from "./store-constants.js";
 import type {
-  FlowboardBulkInput,
-  FlowboardCardPatch,
-  FlowboardDiagnosticsResult,
-  FlowboardDispatchOptions,
-  FlowboardDispatchResult,
+  TaskfoldBulkInput,
+  TaskfoldCardPatch,
+  TaskfoldDiagnosticsResult,
+  TaskfoldDispatchOptions,
+  TaskfoldDispatchResult,
 } from "./store-inputs.js";
 import {
   metadataIsEmpty,
@@ -41,13 +41,13 @@ import {
   normalizeTimestamp,
   trimMetadataToBudget,
 } from "./store-normalizers.js";
-import { FlowboardProjectStore } from "./store-projects.js";
+import { TaskfoldProjectStore } from "./store-projects.js";
 
-export type { FlowboardDispatchResult } from "./store-inputs.js";
+export type { TaskfoldDispatchResult } from "./store-inputs.js";
 
 // Capability layers split review boundaries only; the core still owns persistence and mutation order.
-export class FlowboardStore extends FlowboardProjectStore {
-  private async shouldAutoOrchestrate(card: FlowboardCard): Promise<boolean> {
+export class TaskfoldStore extends TaskfoldProjectStore {
+  private async shouldAutoOrchestrate(card: TaskfoldCard): Promise<boolean> {
     if (
       card.status !== "triage" ||
       card.metadata?.archivedAt ||
@@ -60,15 +60,15 @@ export class FlowboardStore extends FlowboardProjectStore {
   }
 
   async dispatch(
-    input: number | FlowboardDispatchOptions = Date.now(),
-  ): Promise<FlowboardDispatchResult> {
+    input: number | TaskfoldDispatchOptions = Date.now(),
+  ): Promise<TaskfoldDispatchResult> {
     const now = typeof input === "number" ? input : normalizeTimestamp(input.now, Date.now());
     const boardId = typeof input === "number" ? undefined : normalizeBoardId(input.boardId);
     return await this.enqueueMutation(async () => {
-      const promoted: FlowboardCard[] = [];
-      const reclaimed: FlowboardCard[] = [];
-      const blocked: FlowboardCard[] = [];
-      const orchestrated: FlowboardCard[] = [];
+      const promoted: TaskfoldCard[] = [];
+      const reclaimed: TaskfoldCard[] = [];
+      const blocked: TaskfoldCard[] = [];
+      const orchestrated: TaskfoldCard[] = [];
       const orchestratedByBoard = new Map<string, number>();
       for (const card of await this.list({ boardId })) {
         if (await this.isProjectArchived(cardBoardId(card))) {
@@ -87,7 +87,7 @@ export class FlowboardStore extends FlowboardProjectStore {
         const timedOut =
           Boolean(maxRuntimeSeconds && runtimeStartedAt) &&
           now - runtimeStartedAt! > secondsToDurationMs(maxRuntimeSeconds!);
-        const claimExpired = isFlowboardClaimReclaimable(claim, now);
+        const claimExpired = isTaskfoldClaimReclaimable(claim, now);
         const retriesExhausted = retryBudgetExhausted(latest);
         if (latest.status === "running" && (timedOut || claimExpired)) {
           const reason = timedOut
@@ -175,7 +175,7 @@ export class FlowboardStore extends FlowboardProjectStore {
     });
   }
 
-  async bulkUpdate(input: FlowboardBulkInput): Promise<{ cards: FlowboardCard[] }> {
+  async bulkUpdate(input: TaskfoldBulkInput): Promise<{ cards: TaskfoldCard[] }> {
     const ids = Array.isArray(input.ids)
       ? input.ids.filter((id): id is string => typeof id === "string" && id.trim() !== "")
       : [];
@@ -184,9 +184,9 @@ export class FlowboardStore extends FlowboardProjectStore {
     }
     const patch =
       input.patch && typeof input.patch === "object" && !Array.isArray(input.patch)
-        ? (input.patch as FlowboardCardPatch)
+        ? (input.patch as TaskfoldCardPatch)
         : {};
-    const cards: FlowboardCard[] = [];
+    const cards: TaskfoldCard[] = [];
     for (const id of ids) {
       const updated =
         input.archived === undefined
@@ -197,7 +197,7 @@ export class FlowboardStore extends FlowboardProjectStore {
     return { cards };
   }
 
-  async archive(id: string, archived: unknown): Promise<FlowboardCard> {
+  async archive(id: string, archived: unknown): Promise<TaskfoldCard> {
     const shouldArchive = archived !== false;
     return await this.updateMetadata(id, (existing) => ({
       ...existing.metadata,
@@ -206,8 +206,8 @@ export class FlowboardStore extends FlowboardProjectStore {
   }
 
   async exportCards(): Promise<{
-    cards: FlowboardCard[];
-    attachments: FlowboardAttachment[];
+    cards: TaskfoldCard[];
+    attachments: TaskfoldAttachment[];
     exportedAt: number;
   }> {
     const cards = await this.list();
@@ -215,7 +215,7 @@ export class FlowboardStore extends FlowboardProjectStore {
     return { cards, attachments, exportedAt: Date.now() };
   }
 
-  async diagnostics(now = Date.now()): Promise<FlowboardDiagnosticsResult> {
+  async diagnostics(now = Date.now()): Promise<TaskfoldDiagnosticsResult> {
     const cards = await this.list();
     const rows = cards.flatMap((card) => {
       const diagnostics = computeCardDiagnostics(card, now);
@@ -227,10 +227,10 @@ export class FlowboardStore extends FlowboardProjectStore {
     };
   }
 
-  async refreshDiagnostics(now = Date.now()): Promise<FlowboardDiagnosticsResult> {
+  async refreshDiagnostics(now = Date.now()): Promise<TaskfoldDiagnosticsResult> {
     return await this.enqueueMutation(async () => {
       const cards = await this.list();
-      const rows: FlowboardDiagnosticsResult["diagnostics"] = [];
+      const rows: TaskfoldDiagnosticsResult["diagnostics"] = [];
       for (const card of cards) {
         const latest = await this.get(card.id);
         if (!latest || latest.metadata?.archivedAt) {
@@ -272,48 +272,48 @@ export class FlowboardStore extends FlowboardProjectStore {
     openKeyedStore: (options: {
       namespace: string;
       maxEntries: number;
-    }) => FlowboardKeyedStore<unknown>,
+    }) => TaskfoldKeyedStore<unknown>,
   ) {
-    return new FlowboardStore(
+    return new TaskfoldStore(
       openKeyedStore({
-        namespace: "flowboard.cards",
+        namespace: "taskfold.cards",
         maxEntries: MAX_CARDS,
-      }) as FlowboardKeyedStore,
+      }) as TaskfoldKeyedStore,
       {
         boards: openKeyedStore({
-          namespace: "flowboard.boards",
+          namespace: "taskfold.boards",
           maxEntries: 200,
-        }) as FlowboardKeyedStore<PersistedFlowboardBoard>,
+        }) as TaskfoldKeyedStore<PersistedTaskfoldBoard>,
         milestones: openKeyedStore({
-          namespace: "flowboard.milestones",
+          namespace: "taskfold.milestones",
           maxEntries: 2000,
-        }) as FlowboardKeyedStore<PersistedFlowboardMilestone>,
+        }) as TaskfoldKeyedStore<PersistedTaskfoldMilestone>,
         documents: openKeyedStore({
-          namespace: "flowboard.project-documents",
+          namespace: "taskfold.project-documents",
           maxEntries: 4000,
-        }) as FlowboardKeyedStore<PersistedFlowboardProjectDocument>,
+        }) as TaskfoldKeyedStore<PersistedTaskfoldProjectDocument>,
         subscriptions: openKeyedStore({
-          namespace: "flowboard.notify",
+          namespace: "taskfold.notify",
           maxEntries: 2000,
-        }) as FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>,
+        }) as TaskfoldKeyedStore<PersistedTaskfoldNotificationSubscription>,
         attachments: openKeyedStore({
-          namespace: "flowboard.attachments",
+          namespace: "taskfold.attachments",
           maxEntries: MAX_ATTACHMENT_ENTRIES,
-        }) as FlowboardKeyedStore<PersistedFlowboardAttachment>,
+        }) as TaskfoldKeyedStore<PersistedTaskfoldAttachment>,
       },
     );
   }
 
   static openSqlite() {
-    return FlowboardStore.fromSqliteStores(createFlowboardSqliteStores());
+    return TaskfoldStore.fromSqliteStores(createTaskfoldSqliteStores());
   }
 
   /**
    * Single wiring point from SQLite stores to a card store. Tests use this too,
    * so a newly added capability cannot be silently missing under test only.
    */
-  static fromSqliteStores(stores: ReturnType<typeof createFlowboardSqliteStores>) {
-    return new FlowboardStore(stores.cards, {
+  static fromSqliteStores(stores: ReturnType<typeof createTaskfoldSqliteStores>) {
+    return new TaskfoldStore(stores.cards, {
       boards: stores.boards,
       milestones: stores.milestones,
       documents: stores.documents,

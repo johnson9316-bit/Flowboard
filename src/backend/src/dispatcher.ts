@@ -1,39 +1,39 @@
-// Flowboard plugin module implements dispatcher behavior.
+// Taskfold plugin module implements dispatcher behavior.
 import path from "node:path";
 import type {
-  FlowboardCard,
-  FlowboardExecution,
-  FlowboardWorkspace,
+  TaskfoldCard,
+  TaskfoldExecution,
+  TaskfoldWorkspace,
 } from "../../contract/index.js";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { isFutureDateTimestampMs } from "openclaw/plugin-sdk/number-runtime";
 import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
 import { canonicalPathFromExistingAncestor } from "openclaw/plugin-sdk/security-runtime";
 import {
-  assertRestrictedFlowboardTarget,
+  assertRestrictedTaskfoldTarget,
   managedWorktreeName,
   resolveDispatchWorkspaceAccess,
   type ResolveAgentWorkspaceRuntime,
 } from "./dispatcher-workspace.js";
 import { cardBoardId } from "./store-card-helpers.js";
 import { buildWorkerPrompt } from "./worker-prompt.js";
-import { isFlowboardClaimReclaimable } from "./store-constants.js";
-import { FlowboardStore, type FlowboardDispatchResult } from "./store.js";
+import { isTaskfoldClaimReclaimable } from "./store-constants.js";
+import { TaskfoldStore, type TaskfoldDispatchResult } from "./store.js";
 import {
-  assertCanonicalFlowboardRootAccess,
-  assertFlowboardWorkspaceSourceAccess,
-  FLOWBOARD_REQUIRED_WORKER_TOOLS,
-  type FlowboardWorkspaceAccess,
+  assertCanonicalTaskfoldRootAccess,
+  assertTaskfoldWorkspaceSourceAccess,
+  TASKFOLD_REQUIRED_WORKER_TOOLS,
+  type TaskfoldWorkspaceAccess,
 } from "./workspace-access.js";
 
 const DEFAULT_DISPATCH_MAX_STARTS = 3;
-const DEFAULT_DISPATCH_OWNER = "flowboard-dispatcher";
+const DEFAULT_DISPATCH_OWNER = "taskfold-dispatcher";
 
-export type FlowboardSubagentRuntime = Pick<PluginRuntime["subagent"], "run">;
-export type FlowboardWorktreeRuntime = PluginRuntime["worktrees"];
+export type TaskfoldSubagentRuntime = Pick<PluginRuntime["subagent"], "run">;
+export type TaskfoldWorktreeRuntime = PluginRuntime["worktrees"];
 
-export async function createManagedFlowboardWorktree(params: {
-  worktrees: FlowboardWorktreeRuntime;
+export async function createManagedTaskfoldWorktree(params: {
+  worktrees: TaskfoldWorktreeRuntime;
   repoRoot: string;
   name: string;
   baseRef?: string;
@@ -44,13 +44,13 @@ export async function createManagedFlowboardWorktree(params: {
     name: params.name,
     ...(params.baseRef ? { baseRef: params.baseRef } : {}),
     // This host release has a fixed managed-worktree owner enum. Card IDs
-    // remain globally unique and Flowboard data stays in its own SQLite namespace.
+    // remain globally unique and Taskfold data stays in its own SQLite namespace.
     ownerKind: "workboard",
     ownerId: params.ownerId,
   });
 }
 
-type FlowboardDispatchStartOptions = {
+type TaskfoldDispatchStartOptions = {
   maxStarts?: number;
   model?: string;
   provider?: string;
@@ -60,32 +60,32 @@ type FlowboardDispatchStartOptions = {
   materializeWorktree?: boolean;
   resolveAgentWorkspace?: (agentId?: string) => string;
   resolveAgentWorkspaceRuntime?: ResolveAgentWorkspaceRuntime;
-  workspaceAccess?: FlowboardWorkspaceAccess;
+  workspaceAccess?: TaskfoldWorkspaceAccess;
 };
 
-type FlowboardStartedRun = {
+type TaskfoldStartedRun = {
   cardId: string;
   title: string;
   sessionKey: string;
   runId: string;
 };
 
-type FlowboardStartFailure = {
+type TaskfoldStartFailure = {
   cardId: string;
   title: string;
   error: string;
 };
 
-type FlowboardDispatchAndStartResult = FlowboardDispatchResult & {
-  started: FlowboardStartedRun[];
-  startFailures: FlowboardStartFailure[];
+type TaskfoldDispatchAndStartResult = TaskfoldDispatchResult & {
+  started: TaskfoldStartedRun[];
+  startFailures: TaskfoldStartFailure[];
 };
 
-type FlowboardDispatchStartParams = {
-  store: FlowboardStore;
-  subagent: FlowboardSubagentRuntime;
-  worktrees?: FlowboardWorktreeRuntime;
-  options?: FlowboardDispatchStartOptions;
+type TaskfoldDispatchStartParams = {
+  store: TaskfoldStore;
+  subagent: TaskfoldSubagentRuntime;
+  worktrees?: TaskfoldWorktreeRuntime;
+  options?: TaskfoldDispatchStartOptions;
 };
 
 function normalizePositiveInteger(value: number | undefined, fallback: number): number {
@@ -103,28 +103,28 @@ function sanitizeSessionSegment(value: string | undefined, fallback: string): st
   return (sanitized || fallback).slice(0, 96);
 }
 
-function cardIsArchived(card: FlowboardCard): boolean {
+function cardIsArchived(card: TaskfoldCard): boolean {
   return Boolean(card.metadata?.archivedAt);
 }
 
-function cardHasActiveClaim(card: FlowboardCard, now: number): boolean {
+function cardHasActiveClaim(card: TaskfoldCard, now: number): boolean {
   const claim = card.metadata?.claim;
   return Boolean(claim && isFutureDateTimestampMs(claim.expiresAt, { nowMs: now }));
 }
 
-export function buildSessionKey(card: FlowboardCard): string {
+export function buildSessionKey(card: TaskfoldCard): string {
   const boardId = sanitizeSessionSegment(cardBoardId(card), "default");
   const cardId = sanitizeSessionSegment(card.id, "card");
-  const suffix = `subagent:flowboard-${boardId}-${cardId}`;
+  const suffix = `subagent:taskfold-${boardId}-${cardId}`;
   return card.agentId ? `agent:${sanitizeSessionSegment(card.agentId, "agent")}:${suffix}` : suffix;
 }
 
 export function buildExecution(params: {
-  card: FlowboardCard;
+  card: TaskfoldCard;
   sessionKey: string;
   runId: string;
   now: number;
-}): FlowboardExecution {
+}): TaskfoldExecution {
   return {
     id: params.card.execution?.id ?? `${params.card.id}:agent-session`,
     kind: "agent-session",
@@ -138,11 +138,11 @@ export function buildExecution(params: {
 }
 
 async function materializeWorkspace(params: {
-  card: FlowboardCard;
-  worktrees?: FlowboardWorktreeRuntime;
+  card: TaskfoldCard;
+  worktrees?: TaskfoldWorktreeRuntime;
   materializeWorktree: boolean;
-  workspaceAccess: FlowboardWorkspaceAccess;
-}): Promise<{ workspace?: FlowboardWorkspace; cwd?: string }> {
+  workspaceAccess: TaskfoldWorkspaceAccess;
+}): Promise<{ workspace?: TaskfoldWorkspace; cwd?: string }> {
   const workspace = params.card.metadata?.automation?.workspace;
   if (!workspace || workspace.kind === "scratch") {
     return {};
@@ -154,7 +154,7 @@ async function materializeWorkspace(params: {
   }
   // Persisted cards can outlive the caller that created them. Keep the exact
   // canonical path that passes this dispatcher's current boundary check.
-  const canonicalSourcePath = await assertFlowboardWorkspaceSourceAccess(
+  const canonicalSourcePath = await assertTaskfoldWorkspaceSourceAccess(
     workspace,
     params.workspaceAccess,
   );
@@ -162,7 +162,7 @@ async function materializeWorkspace(params: {
     throw new Error("worktree workspace path is required");
   }
   if (workspace.kind === "dir" || !params.workspaceAccess.unrestricted) {
-    await assertCanonicalFlowboardRootAccess(canonicalSourcePath, params.workspaceAccess);
+    await assertCanonicalTaskfoldRootAccess(canonicalSourcePath, params.workspaceAccess);
     return workspace.kind === "worktree"
       ? { cwd: canonicalSourcePath, workspace: { kind: "dir", path: canonicalSourcePath } }
       : { cwd: canonicalSourcePath };
@@ -173,7 +173,7 @@ async function materializeWorkspace(params: {
   if (!params.worktrees) {
     throw new Error("managed worktree runtime is unavailable");
   }
-  const worktree = await createManagedFlowboardWorktree({
+  const worktree = await createManagedTaskfoldWorktree({
     worktrees: params.worktrees,
     repoRoot: canonicalSourcePath,
     name: managedWorktreeName(params.card.id),
@@ -208,8 +208,8 @@ async function materializeWorkspace(params: {
   };
 }
 
-function sortReadyCards(a: FlowboardCard, b: FlowboardCard): number {
-  const priorityRank: Record<FlowboardCard["priority"], number> = {
+function sortReadyCards(a: TaskfoldCard, b: TaskfoldCard): number {
+  const priorityRank: Record<TaskfoldCard["priority"], number> = {
     urgent: 0,
     high: 1,
     normal: 2,
@@ -222,7 +222,7 @@ function sortReadyCards(a: FlowboardCard, b: FlowboardCard): number {
   );
 }
 
-function resolveDispatchOwner(card: FlowboardCard, now: number, ownerOverride?: string): string {
+function resolveDispatchOwner(card: TaskfoldCard, now: number, ownerOverride?: string): string {
   return (
     ownerOverride ||
     (cardHasActiveClaim(card, now) ? card.metadata?.claim?.ownerId : undefined) ||
@@ -232,12 +232,12 @@ function resolveDispatchOwner(card: FlowboardCard, now: number, ownerOverride?: 
 }
 
 function selectStartableCards(
-  cards: FlowboardCard[],
+  cards: TaskfoldCard[],
   limit: number,
-  candidates: FlowboardCard[],
+  candidates: TaskfoldCard[],
   ownerOverride: string | undefined,
   now: number,
-): FlowboardCard[] {
+): TaskfoldCard[] {
   if (limit <= 0) {
     return [];
   }
@@ -247,7 +247,7 @@ function selectStartableCards(
     // Owner capacity is global but cleanup is board-scoped; retain the same
     // heartbeat grace as cleanup before a stale running card releases its slot.
     const consumesOwnerSlot =
-      !isFlowboardClaimReclaimable(claim, now) &&
+      !isTaskfoldClaimReclaimable(claim, now) &&
       (card.status === "running" ||
         (card.status !== "done" && cardHasActiveClaim(card, now)) ||
         card.execution?.status === "running");
@@ -259,8 +259,8 @@ function selectStartableCards(
     const owner = claim?.ownerId ?? resolveDispatchOwner(card, now);
     runningByOwner.set(owner, (runningByOwner.get(owner) ?? 0) + 1);
   }
-  const selected: FlowboardCard[] = [];
-  const fallback: FlowboardCard[] = [];
+  const selected: TaskfoldCard[] = [];
+  const fallback: TaskfoldCard[] = [];
   const selectedOwners = new Set<string>();
   for (const card of candidates
     .filter(
@@ -283,19 +283,19 @@ function selectStartableCards(
   return [...selected, ...fallback];
 }
 
-export async function dispatchAndStartFlowboardCards(
-  params: FlowboardDispatchStartParams,
-): Promise<FlowboardDispatchAndStartResult> {
+export async function dispatchAndStartTaskfoldCards(
+  params: TaskfoldDispatchStartParams,
+): Promise<TaskfoldDispatchAndStartResult> {
   // Simultaneous passes no longer need to be serialized here: each start commits
   // its claim through a database compare-and-swap, so a card can only be claimed
   // once even when the passes come from different Gateway processes. Overlapping
   // passes may now select the same card, and the loser records a start failure.
-  return await runFlowboardDispatch(params);
+  return await runTaskfoldDispatch(params);
 }
 
-async function runFlowboardDispatch(
-  params: FlowboardDispatchStartParams,
-): Promise<FlowboardDispatchAndStartResult> {
+async function runTaskfoldDispatch(
+  params: TaskfoldDispatchStartParams,
+): Promise<TaskfoldDispatchAndStartResult> {
   const now = params.options?.now ?? Date.now();
   const boardId = params.options?.boardId;
   const dispatch = await params.store.dispatch({ now, boardId });
@@ -303,10 +303,10 @@ async function runFlowboardDispatch(
     params.options?.maxStarts,
     DEFAULT_DISPATCH_MAX_STARTS,
   );
-  const started: FlowboardStartedRun[] = [];
-  const startFailures: FlowboardStartFailure[] = [];
+  const started: TaskfoldStartedRun[] = [];
+  const startFailures: TaskfoldStartFailure[] = [];
   const cards = await params.store.list();
-  const candidates: FlowboardCard[] = [];
+  const candidates: TaskfoldCard[] = [];
   for (const candidate of await params.store.list({ boardId })) {
     if (!(await params.store.isProjectArchived(cardBoardId(candidate)))) {
       candidates.push(candidate);
@@ -329,11 +329,11 @@ async function runFlowboardDispatch(
     }
     const sessionKey = buildSessionKey(card);
     let claimValue = "";
-    let materializedWorkspace: FlowboardWorkspace | undefined;
+    let materializedWorkspace: TaskfoldWorkspace | undefined;
     let implicitWorkspaceCwd: string | undefined;
     let runStarted = false;
     const requestedWorkspace = card.metadata?.automation?.workspace;
-    let workspaceAccess: FlowboardWorkspaceAccess;
+    let workspaceAccess: TaskfoldWorkspaceAccess;
     let targetWorkspace: string | undefined;
     let persistWorkspaceAccess: boolean;
     try {
@@ -363,8 +363,8 @@ async function runFlowboardDispatch(
         }
         try {
           implicitWorkspaceCwd = targetWorkspace;
-          await assertCanonicalFlowboardRootAccess(implicitWorkspaceCwd, workspaceAccess);
-          await assertRestrictedFlowboardTarget({
+          await assertCanonicalTaskfoldRootAccess(implicitWorkspaceCwd, workspaceAccess);
+          await assertRestrictedTaskfoldTarget({
             root: implicitWorkspaceCwd,
             agentId: card.agentId,
             sessionKey,
@@ -383,7 +383,7 @@ async function runFlowboardDispatch(
       }
     } else {
       try {
-        const canonicalSourcePath = await assertFlowboardWorkspaceSourceAccess(
+        const canonicalSourcePath = await assertTaskfoldWorkspaceSourceAccess(
           requestedWorkspace,
           workspaceAccess,
         );
@@ -392,11 +392,11 @@ async function runFlowboardDispatch(
           requestedWorkspace.kind === "dir" &&
           workspaceAccess.unrestricted
         ) {
-          await assertCanonicalFlowboardRootAccess(canonicalSourcePath, workspaceAccess);
+          await assertCanonicalTaskfoldRootAccess(canonicalSourcePath, workspaceAccess);
         }
         if (canonicalSourcePath && !workspaceAccess.unrestricted) {
-          await assertCanonicalFlowboardRootAccess(canonicalSourcePath, workspaceAccess);
-          await assertRestrictedFlowboardTarget({
+          await assertCanonicalTaskfoldRootAccess(canonicalSourcePath, workspaceAccess);
+          await assertRestrictedTaskfoldTarget({
             root: canonicalSourcePath,
             agentId: card.agentId,
             sessionKey,
@@ -442,7 +442,7 @@ async function runFlowboardDispatch(
       });
       const runCwd = materialized.cwd ?? implicitWorkspaceCwd;
       if (runCwd && !workspaceAccess.unrestricted) {
-        await assertRestrictedFlowboardTarget({
+        await assertRestrictedTaskfoldTarget({
           root: runCwd,
           // Claim may populate agentId; keep the sessionKey target identity.
           agentId: card.agentId,
@@ -466,11 +466,11 @@ async function runFlowboardDispatch(
         }),
         ...(params.options?.provider ? { provider: params.options.provider } : {}),
         ...(params.options?.model ? { model: params.options.model } : {}),
-        lane: `flowboard:${cardBoardId(card)}:${card.id}`,
+        lane: `taskfold:${cardBoardId(card)}:${card.id}`,
         // Keyed on the winning claim token, which is minted once per claim and so
         // identifies exactly this dispatch attempt. A millisecond timestamp could
         // collide between two attempts and changed on unrelated card writes.
-        idempotencyKey: `flowboard:${card.id}:${claimValue}`,
+        idempotencyKey: `taskfold:${card.id}:${claimValue}`,
         lightContext: true,
         deliver: false,
         ...(runCwd ? { cwd: runCwd } : {}),

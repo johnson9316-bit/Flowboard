@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { createFlowboardSqliteStores } from "../src/backend/src/sqlite-store.js";
+import { createTaskfoldSqliteStores } from "../src/backend/src/sqlite-store.js";
+import { TaskfoldStore } from "../src/backend/src/store.js";
 
 const roots: string[] = [];
 
@@ -14,17 +15,17 @@ afterEach(() => {
 });
 
 function createSchema3Database(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-schema3-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-schema3-"));
   roots.push(root);
-  const dbPath = path.join(root, "flowboard.sqlite");
+  const dbPath = path.join(root, "taskfold.sqlite");
   const db = new DatabaseSync(dbPath);
   db.exec(`
-    CREATE TABLE flowboard_schema_migrations (
+    CREATE TABLE taskfold_schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
     ) STRICT;
-    INSERT INTO flowboard_schema_migrations (id, applied_at) VALUES ('schema-3', 1);
-    CREATE TABLE flowboard_boards (
+    INSERT INTO taskfold_schema_migrations (id, applied_at) VALUES ('schema-3', 1);
+    CREATE TABLE taskfold_boards (
       id TEXT PRIMARY KEY,
       name TEXT,
       description TEXT,
@@ -36,7 +37,7 @@ function createSchema3Database(): string {
       updated_at INTEGER NOT NULL,
       archived_at INTEGER
     ) STRICT;
-    CREATE TABLE flowboard_cards (
+    CREATE TABLE taskfold_cards (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -52,7 +53,7 @@ function createSchema3Database(): string {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     ) STRICT;
-    CREATE TABLE flowboard_card_events (
+    CREATE TABLE taskfold_card_events (
       id TEXT PRIMARY KEY,
       card_id TEXT NOT NULL,
       ordinal INTEGER NOT NULL,
@@ -66,7 +67,7 @@ function createSchema3Database(): string {
   `);
   db.prepare(
     `
-      INSERT INTO flowboard_cards
+      INSERT INTO taskfold_cards
         (id, board_id, title, status, priority, position, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
@@ -76,17 +77,17 @@ function createSchema3Database(): string {
 }
 
 function createSchema4Database(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-schema4-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-schema4-"));
   roots.push(root);
-  const dbPath = path.join(root, "flowboard.sqlite");
+  const dbPath = path.join(root, "taskfold.sqlite");
   const db = new DatabaseSync(dbPath);
   db.exec(`
-    CREATE TABLE flowboard_schema_migrations (
+    CREATE TABLE taskfold_schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
     ) STRICT;
-    INSERT INTO flowboard_schema_migrations (id, applied_at) VALUES ('schema-4', 1);
-    CREATE TABLE flowboard_cards (
+    INSERT INTO taskfold_schema_migrations (id, applied_at) VALUES ('schema-4', 1);
+    CREATE TABLE taskfold_cards (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -103,7 +104,7 @@ function createSchema4Database(): string {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     ) STRICT;
-    CREATE TABLE flowboard_card_events (
+    CREATE TABLE taskfold_card_events (
       id TEXT PRIMARY KEY,
       card_id TEXT NOT NULL,
       ordinal INTEGER NOT NULL,
@@ -116,7 +117,7 @@ function createSchema4Database(): string {
       session_key TEXT,
       run_id TEXT
     ) STRICT;
-    CREATE TABLE flowboard_project_documents (
+    CREATE TABLE taskfold_project_documents (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       document_key TEXT NOT NULL,
@@ -136,7 +137,7 @@ function createSchema4Database(): string {
   `);
   db.prepare(
     `
-      INSERT INTO flowboard_project_documents (
+      INSERT INTO taskfold_project_documents (
         id, board_id, document_key, section, type, title, position, system, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
@@ -156,10 +157,69 @@ function createSchema4Database(): string {
   return dbPath;
 }
 
-describe("Flowboard SQLite schema migrations", () => {
+describe("Taskfold SQLite schema migrations", () => {
+  it("copies and renames a legacy Flowboard database without changing its cards", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-flowboard-migration-"));
+    roots.push(root);
+    const legacyDbPath = path.join(root, "flowboard.sqlite");
+    const taskfoldDbPath = path.join(root, "taskfold.sqlite");
+    const legacyStores = createTaskfoldSqliteStores({ dbPath: legacyDbPath });
+    const legacyStore = TaskfoldStore.fromSqliteStores(legacyStores);
+    const legacyCard = await legacyStore.create({
+      title: "Preserve this card",
+      status: "done",
+      priority: "high",
+    });
+    legacyStores.close();
+
+    const legacyDb = new DatabaseSync(legacyDbPath);
+    try {
+      const names = (
+        legacyDb
+          .prepare(
+            `
+              SELECT name
+              FROM sqlite_master
+              WHERE type = 'table' AND name LIKE 'taskfold!_%' ESCAPE '!'
+              ORDER BY name ASC
+            `,
+          )
+          .all() as Array<{ name: string }>
+      ).map((row) => row.name);
+      for (const name of names) {
+        legacyDb.exec(`ALTER TABLE "${name}" RENAME TO "${name.replace(/^taskfold_/, "flowboard_")}"`);
+      }
+    } finally {
+      legacyDb.close();
+    }
+
+    const stores = createTaskfoldSqliteStores({
+      dbPath: taskfoldDbPath,
+      legacyDbPath,
+    });
+    const migratedCard = await stores.cards.lookup(legacyCard.id);
+    stores.close();
+
+    const migratedDb = new DatabaseSync(taskfoldDbPath);
+    try {
+      const tables = (
+        migratedDb
+          .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name ASC")
+          .all() as Array<{ name: string }>
+      ).map((row) => row.name);
+      expect(tables).toContain("taskfold_cards");
+      expect(tables.some((name) => name.startsWith("flowboard_"))).toBe(false);
+      expect(migratedCard).toMatchObject({
+        card: { id: legacyCard.id, title: "Preserve this card", status: "done" },
+      });
+    } finally {
+      migratedDb.close();
+    }
+  });
+
   it("upgrades a schema-3 database without replacing old cards", async () => {
     const dbPath = createSchema3Database();
-    const stores = createFlowboardSqliteStores({ dbPath });
+    const stores = createTaskfoldSqliteStores({ dbPath });
     const legacy = await stores.cards.lookup("legacy-card");
     stores.close();
 
@@ -174,11 +234,11 @@ describe("Flowboard SQLite schema migrations", () => {
           (row) => row.name,
         );
 
-      expect(columns("flowboard_cards")).toEqual(expect.arrayContaining(["milestone_id"]));
-      expect(columns("flowboard_card_events")).toEqual(
+      expect(columns("taskfold_cards")).toEqual(expect.arrayContaining(["milestone_id"]));
+      expect(columns("taskfold_card_events")).toEqual(
         expect.arrayContaining(["from_milestone_id", "to_milestone_id"]),
       );
-      expect(columns("flowboard_boards")).toEqual(
+      expect(columns("taskfold_boards")).toEqual(
         expect.arrayContaining([
           "position",
           "version",
@@ -190,20 +250,20 @@ describe("Flowboard SQLite schema migrations", () => {
           "homepage_url",
         ]),
       );
-      expect(columns("flowboard_milestones")).toEqual(
+      expect(columns("taskfold_milestones")).toEqual(
         expect.arrayContaining(["board_id", "position", "state"]),
       );
-      expect(columns("flowboard_project_documents")).toEqual(
+      expect(columns("taskfold_project_documents")).toEqual(
         expect.arrayContaining(["document_key", "section", "source", "type", "system"]),
       );
-      expect(columns("flowboard_cards")).toEqual(
+      expect(columns("taskfold_cards")).toEqual(
         expect.arrayContaining(["revision", "claim_owner_id"]),
       );
-      expect(indexes("flowboard_cards")).toContain("flowboard_cards_board_milestone_position_idx");
-      expect(indexes("flowboard_cards")).toContain("flowboard_cards_claim_owner_idx");
+      expect(indexes("taskfold_cards")).toContain("taskfold_cards_board_milestone_position_idx");
+      expect(indexes("taskfold_cards")).toContain("taskfold_cards_claim_owner_idx");
       expect(
         db
-          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-7'")
+          .prepare("SELECT id FROM taskfold_schema_migrations WHERE id = 'schema-7'")
           .get(),
       ).toBeTruthy();
       expect(legacy).toMatchObject({
@@ -217,7 +277,7 @@ describe("Flowboard SQLite schema migrations", () => {
 
   it("upgrades schema-4 databases with delivery and source-reference tables", async () => {
     const dbPath = createSchema4Database();
-    const stores = createFlowboardSqliteStores({ dbPath });
+    const stores = createTaskfoldSqliteStores({ dbPath });
     const legacyDocument = await stores.documents.lookup("legacy-document");
     stores.close();
 
@@ -229,13 +289,13 @@ describe("Flowboard SQLite schema migrations", () => {
 
       expect(tables).toEqual(
         expect.arrayContaining([
-          "flowboard_card_delivery",
-          "flowboard_card_source_references",
+          "taskfold_card_delivery",
+          "taskfold_card_source_references",
         ]),
       );
       expect(
         db
-          .prepare("SELECT id FROM flowboard_schema_migrations WHERE id = 'schema-7'")
+          .prepare("SELECT id FROM taskfold_schema_migrations WHERE id = 'schema-7'")
           .get(),
       ).toBeTruthy();
       expect(legacyDocument).toMatchObject({

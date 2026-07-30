@@ -2,11 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
-  FlowboardProjectDocument,
-  FlowboardProjectDocumentRead,
-  FlowboardWorkspaceAccess,
+  TaskfoldProjectDocument,
+  TaskfoldProjectDocumentRead,
+  TaskfoldWorkspaceAccess,
 } from "../../contract/index.js";
-import { assertFlowboardWorkspaceSourceAccess } from "./workspace-access.js";
+import { assertTaskfoldWorkspaceSourceAccess } from "./workspace-access.js";
 
 const MAX_PROJECT_DOCUMENT_BYTES = 1024 * 1024;
 const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown"]);
@@ -49,7 +49,7 @@ function encodeDocumentContent(content: unknown): Buffer {
   return bytes;
 }
 
-function assertMarkdownPath(document: FlowboardProjectDocument): string {
+function assertMarkdownPath(document: TaskfoldProjectDocument): string {
   if (document.type !== "path" || !document.target) {
     throw new Error("only Markdown documents and Markdown file paths can be previewed.");
   }
@@ -64,8 +64,8 @@ function assertMarkdownPath(document: FlowboardProjectDocument): string {
 }
 
 async function resolveProjectDocumentFile(params: {
-  document: FlowboardProjectDocument;
-  access: FlowboardWorkspaceAccess;
+  document: TaskfoldProjectDocument;
+  access: TaskfoldWorkspaceAccess;
 }): Promise<ResolvedProjectDocumentFile> {
   const target = assertMarkdownPath(params.document);
   let resolvedPath: string;
@@ -74,7 +74,7 @@ async function resolveProjectDocumentFile(params: {
   } catch {
     throw new Error("project document file does not exist.");
   }
-  await assertFlowboardWorkspaceSourceAccess({ kind: "dir", path: resolvedPath }, params.access);
+  await assertTaskfoldWorkspaceSourceAccess({ kind: "dir", path: resolvedPath }, params.access);
   let stat: Awaited<ReturnType<typeof fs.stat>>;
   try {
     stat = await fs.stat(resolvedPath);
@@ -96,10 +96,10 @@ async function resolveProjectDocumentFile(params: {
   return { content: decodeUtf8(bytes), bytes, path: resolvedPath, stat };
 }
 
-export async function readFlowboardProjectDocument(params: {
-  document: FlowboardProjectDocument;
-  access: FlowboardWorkspaceAccess;
-}): Promise<FlowboardProjectDocumentRead> {
+export async function readTaskfoldProjectDocument(params: {
+  document: TaskfoldProjectDocument;
+  access: TaskfoldWorkspaceAccess;
+}): Promise<TaskfoldProjectDocumentRead> {
   const { document } = params;
   if (document.type === "markdown") {
     const content = document.content ?? "";
@@ -121,12 +121,12 @@ export async function readFlowboardProjectDocument(params: {
   };
 }
 
-export async function writeFlowboardProjectDocumentPath(params: {
-  document: FlowboardProjectDocument;
+export async function writeTaskfoldProjectDocumentPath(params: {
+  document: TaskfoldProjectDocument;
   content: unknown;
   expectedRevision: unknown;
-  access: FlowboardWorkspaceAccess;
-}): Promise<FlowboardProjectDocumentRead> {
+  access: TaskfoldWorkspaceAccess;
+}): Promise<TaskfoldProjectDocumentRead> {
   if (!params.access.unrestricted && !params.access.writable) {
     throw new Error("project document workspace access is read-only.");
   }
@@ -142,7 +142,7 @@ export async function writeFlowboardProjectDocumentPath(params: {
   const directory = path.dirname(current.path);
   const temporaryPath = path.join(
     directory,
-    `.${path.basename(current.path)}.flowboard-${randomUUID()}.tmp`,
+    `.${path.basename(current.path)}.taskfold-${randomUUID()}.tmp`,
   );
   const originalMode = Number(current.stat.mode) & 0o7777;
   try {
@@ -159,7 +159,7 @@ export async function writeFlowboardProjectDocumentPath(params: {
     await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
     throw error;
   }
-  return await readFlowboardProjectDocument({
+  return await readTaskfoldProjectDocument({
     document: params.document,
     access: params.access,
   });

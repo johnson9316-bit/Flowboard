@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   root: path.dirname(fileURLToPath(import.meta.url)),
-  base: "/flowboard/",
+  base: "/taskfold/",
   build: {
     outDir: "dist",
     emptyOutDir: true,

@@ -26,36 +26,36 @@ npm run pack:check
 
 All commands passed. The public-name audit inspected 36 active files and
 found no public `workboard` registrations. The test suite checks the
-Flowboard board-ID contract, change-wait cursor behavior, imported Workboard
+Taskfold board-ID contract, change-wait cursor behavior, imported Workboard
 host wiring, locale source coverage, and the authenticated static route's
 assets, SPA fallback, encoded traversal rejection, missing-asset behavior,
 and method restriction.
 
 The UI build emitted the imported Workboard bundle plus dynamic locale chunks,
 including `zh-CN` and `zh-TW`. The host source contains no periodic
-`cards.list` polling; it waits on `flowboard.changes.wait` and passes returned
+`cards.list` polling; it waits on `taskfold.changes.wait` and passes returned
 revisions into the upstream live-refresh state machine.
 
 ### Runtime checks
 
 Completed against the local OpenClaw installation after moving the source to
-`/home/john/src/personal/Flowboard`:
+`/home/john/src/personal/Taskfold`:
 
 ```bash
 openclaw config validate
-openclaw plugins install --link /home/john/src/personal/Flowboard
+openclaw plugins install --link /home/john/src/personal/Taskfold
 openclaw gateway restart
-openclaw plugins inspect flowboard --runtime
+openclaw plugins inspect taskfold --runtime
 openclaw plugins doctor
-openclaw flowboard --help
-openclaw flowboard list --json
+openclaw taskfold --help
+openclaw taskfold list --json
 openclaw workboard list
 ```
 
-Runtime inspection reported the Flowboard tools, slash command, CLI command,
+Runtime inspection reported the Taskfold tools, slash command, CLI command,
 change event service, Gateway RPC methods, and one HTTP route. `plugins doctor`
-reported no plugin issues. `openclaw flowboard list --json` returned an empty
-Flowboard board, while the bundled `workboard` command continued to read its
+reported no plugin issues. `openclaw taskfold list --json` returned an empty
+Taskfold board, while the bundled `workboard` command continued to read its
 own existing card, confirming their command registrations and SQLite namespaces
 do not collide.
 
@@ -70,13 +70,13 @@ production build, and `npm pack --dry-run` passed with a clean worktree.
 This verifies that the committed repository contains every build input and
 checked-in artifact required for local development.
 
-After pushing the initial Flowboard commit, repeat the installation check from
+After pushing the initial Taskfold commit, repeat the installation check from
 a clean GitHub clone:
 
 ```bash
-git clone https://github.com/johnson9316-bit/Flowboard.git Flowboard
-openclaw plugins install --link /path/to/Flowboard
-openclaw plugins inspect flowboard --runtime
+git clone https://github.com/johnson9316-bit/Taskfold.git Taskfold
+openclaw plugins install --link /path/to/Taskfold
+openclaw plugins inspect taskfold --runtime
 ```
 
 The release is not considered Git-distribution-verified until this sequence
@@ -113,7 +113,7 @@ follows is what was checked against the running system, not against mocks.
   day — so no card was ever reconciled. `runtime.gateway.isAvailable()` checks the
   request context, not the trust gate, which is why the guard passed.
 - Task records are unreachable too: `runtime.tasks.runs.bindSession({sessionKey})`
-  scopes every lookup to `task.ownerKey`, which for a Flowboard run is the
+  scopes every lookup to `task.ownerKey`, which for a Taskfold run is the
   *requester* session that spawned the subagent (`agent:main:main`), not the card's
   session — and the dispatch path never learns it.
 - `runtime.subagent.waitForRun({runId})` returns `timeout` for a run that is not
@@ -137,7 +137,7 @@ bug.
 ### Reconciler against the live database
 
 Driven through the store's own API against
-`~/.openclaw/plugins/flowboard/flowboard.sqlite`, on one throwaway card:
+`~/.openclaw/plugins/taskfold/taskfold.sqlite`, on one throwaway card:
 
 - A run with a fresh heartbeat: `checked 1, updated 0, finished 0` — untouched. This
   is the regression line for the sweep that would have force-failed live runs.
@@ -150,7 +150,7 @@ The loop inside the real Gateway process was confirmed separately, by leaving a
 claim to lapse and watching it act with no client attached:
 
 ```
-flowboard reconciled 1 active cards: 0 updated, 0 orphaned runs closed, 1 claims reclaimed, 0 skipped.
+taskfold reconciled 1 active cards: 0 updated, 0 orphaned runs closed, 1 claims reclaimed, 0 skipped.
 ```
 
 Zero `reconcile failed` warnings have been logged since the restart onto this build.
@@ -160,19 +160,19 @@ Zero `reconcile failed` warnings have been logged since the restart onto this bu
 First completed run of the smoke test that had been outstanding since M1, now that
 `gateway.controlUi.embedSandbox` is set to `trusted`. A Playwright session visited
 the token URL from `openclaw dashboard --no-open` so the Control UI provisioned a
-device identity, then opened `/flowboard/` on the same origin and drove the real
+device identity, then opened `/taskfold/` on the same origin and drove the real
 WebSocket:
 
 - Board list, project view, milestone columns, and card detail all render with live
   data. Zero console errors and zero page errors throughout.
 - Creating a card through the UI persisted it (`revision 1`, visible immediately).
-- **Live refresh:** a card moved by `openclaw flowboard move` outside the browser
+- **Live refresh:** a card moved by `openclaw taskfold move` outside the browser
   appeared in the open page **within one second**, with one navigation entry — the
   long poll alone, no reload and no interaction. This is the pure-observer claim.
 - Locale switching to English works. No dynamic locale chunk is fetched because
   English is the statically imported fallback; the picker offers only these two
   locales, so the dynamic chunks are not reachable from the UI.
-- The UI has **no comment affordance** — `flowboard.cards.comment` has no caller in
+- The UI has **no comment affordance** — `taskfold.cards.comment` has no caller in
   `ui/src`. Of 83 registered Gateway methods, 42 are called by the UI and 41 are
   agent/CLI-only (claim, heartbeat, complete, block, comment, attachments,
   notifications, export, stats). Every method the UI calls is registered. The M1
@@ -182,15 +182,15 @@ WebSocket:
 
 - All 16 read-only Gateway methods called with `{}`: the ten that need no argument
   answer normally, and the six that require an id return a structured
-  `flowboard_error` rather than crashing.
+  `taskfold_error` rather than crashing.
 - Four independent client processes claiming one card concurrently: exactly one won,
   the other three got `card already claimed by racer-2`. Genuinely cross-process
   compare-and-swap is covered separately by `test/card-revision.test.ts`.
 - Schema 6 to 7 on a copy of the production database (103 cards): marker added, all
-  three columns and the claim-owner index created, `flowboard_meta` populated, no
+  three columns and the claim-owner index created, `taskfold_meta` populated, no
   rows lost. Every migrated row reads back at `revision 0`; the first write stamps
   it to 1, and a stale `expectedRevision: 0` is then refused.
-- The `/flowboard/` HTTP route is declared `auth: "plugin"`, which means the plugin
+- The `/taskfold/` HTTP route is declared `auth: "plugin"`, which means the plugin
   owns authentication — and it does not authenticate. The HTML shell and JS assets
   are served without credentials. Encoded and raw traversal both 404, a missing
   asset 404s, deep routes fall back to the shell, and non-GET returns 405, so what
@@ -198,8 +198,8 @@ WebSocket:
   loopback bind; worth revisiting before binding to a LAN or tailnet.
 
 Not verified in this pass: dispatching a real worker run end to end. `openclaw
-flowboard dispatch` refused with `target agent is not sandboxed for this
-restricted Flowboard card`, which is the workspace gate behaving correctly;
+taskfold dispatch` refused with `target agent is not sandboxed for this
+restricted Taskfold card`, which is the workspace gate behaving correctly;
 clearing it needs `--admin` full-host access, which was not granted to an
 unattended probe. Attempted and found broken below, once granted.
 
@@ -214,42 +214,42 @@ Two runs, same result for two different reasons:
 
 - **Run 1**: the worker called `workboard_heartbeat`, `workboard_comment`,
   `workboard_proof`, `workboard_complete` — the bundled Workboard plugin's
-  tools, not Flowboard's — despite the prompt naming `flowboard_*` explicitly
+  tools, not Taskfold's — despite the prompt naming `taskfold_*` explicitly
   twice. All four calls returned `card not found` (wrong plugin's card store).
   The card still converged to `status: review`, `execution.status: done`,
   `attempt.status: succeeded`, with zero comments, zero proof, no summary.
-- **Run 2**: told explicitly and only to call `flowboard_complete`, the model's
+- **Run 2**: told explicitly and only to call `taskfold_complete`, the model's
   own reasoning (captured in the session transcript) states it has no
-  `flowboard_*` tool in its available tool list at all — only `workboard_*`.
+  `taskfold_*` tool in its available tool list at all — only `workboard_*`.
   It then called the generic `exec` tool to `echo` a string that looks like a
-  tool call (`flowboard_complete({...})`), which "succeeded" because `echo`
+  tool call (`taskfold_complete({...})`), which "succeeded" because `echo`
   always does, and its final message reports the card as blocked on a missing
   tool. The card still converged to `review` the same way.
 
 Root cause, traced through `src/backend/src/dispatcher.ts` and
-`src/backend/src/workspace-access.ts`: the only place Flowboard ever asks the
-host to attach the Flowboard tool set (and require
-`flowboard_heartbeat`/`flowboard_complete`/`flowboard_block`) to a dispatched
-subagent is `assertRestrictedFlowboardTarget` →
-`resolveAgentFlowboardWorkspaceRuntime`, which passes
-`confinedToolNames: FLOWBOARD_TOOL_NAMES` and
-`requiredToolNames: FLOWBOARD_REQUIRED_WORKER_TOOLS` to the host's
+`src/backend/src/workspace-access.ts`: the only place Taskfold ever asks the
+host to attach the Taskfold tool set (and require
+`taskfold_heartbeat`/`taskfold_complete`/`taskfold_block`) to a dispatched
+subagent is `assertRestrictedTaskfoldTarget` →
+`resolveAgentTaskfoldWorkspaceRuntime`, which passes
+`confinedToolNames: TASKFOLD_TOOL_NAMES` and
+`requiredToolNames: TASKFOLD_REQUIRED_WORKER_TOOLS` to the host's
 `prepareSandboxWorkspaceAuthority`. All three call sites of
-`assertRestrictedFlowboardTarget` in `dispatcher.ts` (lines ~367, ~399, ~445)
+`assertRestrictedTaskfoldTarget` in `dispatcher.ts` (lines ~367, ~399, ~445)
 are gated by `if (!workspaceAccess.unrestricted)`. `params.subagent.run(...)`
 (`dispatcher.ts:459`), the call that actually spawns the worker, passes no
 tool list of its own — it relies entirely on that gated call having already
 happened. `--admin` makes `workspaceAccess.unrestricted` true, so none of the
-three call sites fire, so the host never hears about Flowboard's tools for
+three call sites fire, so the host never hears about Taskfold's tools for
 that run, so the subagent gets whatever its underlying agent profile's static
 default tools are (here: the bundled Workboard plugin plus generic tools like
-`exec`, but not Flowboard).
+`exec`, but not Taskfold).
 
 Meanwhile `finishExecutionForRun` (`store-workflow.ts:205-206`,
 `succeeded = outcome === "ok"`) treats the host's `subagent_ended` event as a
 pass/fail signal on its own — `outcome: "ok"` means only "the agent turn ended
-without a host-level error," not "the worker called `flowboard_complete`" or
-did anything Flowboard-shaped at all. Combined, a `--admin` dispatch converges
+without a host-level error," not "the worker called `taskfold_complete`" or
+did anything Taskfold-shaped at all. Combined, a `--admin` dispatch converges
 every run to `review` — indistinguishable on the card from a genuine
 completion — with no comment, proof, or summary recorded, regardless of
 whether the worker did anything.
@@ -257,7 +257,7 @@ whether the worker did anything.
 ### The real root cause is one level deeper — a host SDK gap, not an `if`
 
 Attempting the fix implied above (route `--admin` through
-`assertRestrictedFlowboardTarget` too, unconditionally) revealed it would not
+`assertRestrictedTaskfoldTarget` too, unconditionally) revealed it would not
 have worked. `prepareSandboxWorkspaceAuthority` is supplied in `gateway.ts:93-99`
 via `(api.runtime as unknown as { sandbox?: { prepareWorkspaceAuthority?: ... } }).sandbox`
 — an `as unknown as` cast reaching for a property that does not exist on this
@@ -265,14 +265,14 @@ host. `grep -rn "prepareWorkspaceAuthority" node_modules/openclaw/` returns zero
 matches in the installed OpenClaw 2026.7.1-2 package, and the public `PluginRuntime`
 type (`node_modules/openclaw/dist/types-DaHgOqFX.d.ts:8424`) has no `sandbox`
 field at all. So `sandbox` is always `undefined`, `prepareSandboxWorkspaceAuthority`
-is always `undefined`, and `resolveAgentFlowboardWorkspaceRuntime` always takes its
+is always `undefined`, and `resolveAgentTaskfoldWorkspaceRuntime` always takes its
 `if (!sandboxRuntime)` early return — `{ sandboxed: false, workspaceAccess: { unrestricted: true } }`
 — regardless of `--admin`. This means:
 
 - A normal (non-admin) dispatch of a card with restricted workspace access is
-  **also** broken on this host version: `assertRestrictedFlowboardTarget` always
+  **also** broken on this host version: `assertRestrictedTaskfoldTarget` always
   resolves `sandboxed: false` and throws `target agent is not sandboxed for this
-  restricted Flowboard card` — not because no agent on this host happens to be
+  restricted Taskfold card` — not because no agent on this host happens to be
   sandboxed, but because the hook this code depends on to find out doesn't exist.
 - The public SDK does export a real sandbox-status function —
   `resolveSandboxRuntimeStatus` from `openclaw/plugin-sdk/sandbox`
@@ -296,10 +296,10 @@ dispatch path hits the same gap. The one historical successful run (card
 `252615eb`, referenced in earlier planning) could not be reconstructed or
 explained by this investigation.
 
-Not verified as a result: a worker actually calling `flowboard_heartbeat`,
-`flowboard_comment`, `flowboard_proof`, or `flowboard_complete` for real, and
+Not verified as a result: a worker actually calling `taskfold_heartbeat`,
+`taskfold_comment`, `taskfold_proof`, or `taskfold_complete` for real, and
 any of the 43 tools being exercised at all — both attempts had zero working
-Flowboard tool calls between them. Recorded in [[需求/8.6-问题修复.md]] as a
+Taskfold tool calls between them. Recorded in [[需求/8.6-问题修复.md]] as a
 host capability gap, not something this round fixed.
 
 ## Architecture rework — July 29, 2026
@@ -335,7 +335,7 @@ Covered by new automated tests:
   and warns on the last attempt within the retry budget.
 
 The UI was checked in a real browser against `npm run dev`: the declared
-`<flowboard-app>` mount point upgrades to the Lit element and renders, with no
+`<taskfold-app>` mount point upgrades to the Lit element and renders, with no
 page errors. It no longer replaces `document.body` to compensate for a
 name mismatch.
 

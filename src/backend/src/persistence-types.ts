@@ -1,45 +1,45 @@
-// Flowboard plugin module implements persistence types behavior.
+// Taskfold plugin module implements persistence types behavior.
 import type {
-  FlowboardAttachment,
-  FlowboardBoardMetadata,
-  FlowboardCard,
-  FlowboardMilestone,
-  FlowboardNotificationSubscription,
-  FlowboardProjectDocument,
+  TaskfoldAttachment,
+  TaskfoldBoardMetadata,
+  TaskfoldCard,
+  TaskfoldMilestone,
+  TaskfoldNotificationSubscription,
+  TaskfoldProjectDocument,
 } from "../../contract/index.js";
 
-export type PersistedFlowboardCard = {
+export type PersistedTaskfoldCard = {
   version: 1;
-  card: FlowboardCard;
+  card: TaskfoldCard;
 };
 
-export type PersistedFlowboardBoard = {
+export type PersistedTaskfoldBoard = {
   version: 1;
-  board: FlowboardBoardMetadata;
+  board: TaskfoldBoardMetadata;
 };
 
-export type PersistedFlowboardMilestone = {
+export type PersistedTaskfoldMilestone = {
   version: 1;
-  milestone: FlowboardMilestone;
+  milestone: TaskfoldMilestone;
 };
 
-export type PersistedFlowboardProjectDocument = {
+export type PersistedTaskfoldProjectDocument = {
   version: 1;
-  document: FlowboardProjectDocument;
+  document: TaskfoldProjectDocument;
 };
 
-export type PersistedFlowboardNotificationSubscription = {
+export type PersistedTaskfoldNotificationSubscription = {
   version: 1;
-  subscription: FlowboardNotificationSubscription;
+  subscription: TaskfoldNotificationSubscription;
 };
 
-export type PersistedFlowboardAttachment = {
+export type PersistedTaskfoldAttachment = {
   version: 1;
-  attachment: FlowboardAttachment;
+  attachment: TaskfoldAttachment;
   contentBase64: string;
 };
 
-export type FlowboardKeyedStore<T = PersistedFlowboardCard> = {
+export type TaskfoldKeyedStore<T = PersistedTaskfoldCard> = {
   register(key: string, value: T): Promise<void>;
   lookup(key: string): Promise<T | undefined>;
   delete(key: string): Promise<boolean>;

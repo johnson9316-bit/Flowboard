@@ -1,30 +1,30 @@
 import { randomUUID } from "node:crypto";
 import {
-  FLOWBOARD_STATUSES,
-  type FlowboardAttemptStatus,
-  type FlowboardCard,
-  type FlowboardDiagnostic,
-  type FlowboardDiagnosticAction,
-  type FlowboardDiagnosticKind,
-  type FlowboardDiagnosticSeverity,
-  type FlowboardEvent,
-  type FlowboardExecution,
-  type FlowboardMetadata,
-  type FlowboardNotification,
-  type FlowboardRunAttempt,
-  type FlowboardStatus,
+  TASKFOLD_STATUSES,
+  type TaskfoldAttemptStatus,
+  type TaskfoldCard,
+  type TaskfoldDiagnostic,
+  type TaskfoldDiagnosticAction,
+  type TaskfoldDiagnosticKind,
+  type TaskfoldDiagnosticSeverity,
+  type TaskfoldEvent,
+  type TaskfoldExecution,
+  type TaskfoldMetadata,
+  type TaskfoldNotification,
+  type TaskfoldRunAttempt,
+  type TaskfoldStatus,
 } from "../../contract/index.js";
 import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import { truncateUtf16Safe } from "openclaw/plugin-sdk/text-utility-runtime";
 import {
   BLOCKED_TOO_LONG_MS,
-  FLOWBOARD_PROMPT_VERSION,
+  TASKFOLD_PROMPT_VERSION,
   MAX_CARD_ATTEMPTS,
   MAX_CARD_EVENTS,
   READY_STRANDED_MS,
   RUNNING_HEARTBEAT_STALE_MS,
 } from "./store-constants.js";
-import type { FlowboardMutationScope } from "./store-inputs.js";
+import type { TaskfoldMutationScope } from "./store-inputs.js";
 import {
   metadataIsEmpty,
   normalizeEvents,
@@ -33,9 +33,9 @@ import {
   removeUndefinedMetadataFields,
 } from "./store-normalizers.js";
 
-export function compareCards(left: FlowboardCard, right: FlowboardCard): number {
+export function compareCards(left: TaskfoldCard, right: TaskfoldCard): number {
   if (left.status !== right.status) {
-    return FLOWBOARD_STATUSES.indexOf(left.status) - FLOWBOARD_STATUSES.indexOf(right.status);
+    return TASKFOLD_STATUSES.indexOf(left.status) - TASKFOLD_STATUSES.indexOf(right.status);
   }
   if (left.position !== right.position) {
     return left.position - right.position;
@@ -43,15 +43,15 @@ export function compareCards(left: FlowboardCard, right: FlowboardCard): number 
   return left.createdAt - right.createdAt;
 }
 
-export function cardSessionKey(card: FlowboardCard): string | undefined {
+export function cardSessionKey(card: TaskfoldCard): string | undefined {
   return card.sessionKey ?? card.execution?.sessionKey;
 }
 
-export function cardRunId(card: FlowboardCard): string | undefined {
+export function cardRunId(card: TaskfoldCard): string | undefined {
   return card.runId ?? card.execution?.runId;
 }
 
-function executionAttemptStatus(execution: FlowboardExecution): FlowboardAttemptStatus {
+function executionAttemptStatus(execution: TaskfoldExecution): TaskfoldAttemptStatus {
   if (execution.status === "running") {
     return "running";
   }
@@ -65,10 +65,10 @@ function executionAttemptStatus(execution: FlowboardExecution): FlowboardAttempt
 }
 
 export function syncExecutionAttemptMetadata(
-  metadata: FlowboardMetadata,
-  execution: FlowboardExecution | undefined,
+  metadata: TaskfoldMetadata,
+  execution: TaskfoldExecution | undefined,
   now: number,
-): FlowboardMetadata {
+): TaskfoldMetadata {
   if (!execution) {
     return metadata;
   }
@@ -86,7 +86,7 @@ export function syncExecutionAttemptMetadata(
     execution.status === "blocked" && existingAttempt?.status === "stopped"
       ? "stopped"
       : executionAttemptStatus(execution);
-  const nextAttempt: FlowboardRunAttempt = {
+  const nextAttempt: TaskfoldRunAttempt = {
     id: existingAttempt?.id ?? key,
     status: attemptStatus,
     startedAt: existingAttempt?.startedAt ?? execution.startedAt,
@@ -101,7 +101,7 @@ export function syncExecutionAttemptMetadata(
       : {}),
     // Stamped once when the attempt appears, then carried forward, so a prompt
     // change mid-run cannot relabel an attempt already under way.
-    promptVersion: existingAttempt?.promptVersion ?? FLOWBOARD_PROMPT_VERSION,
+    promptVersion: existingAttempt?.promptVersion ?? TASKFOLD_PROMPT_VERSION,
   };
   if (existingIndex >= 0) {
     attempts[existingIndex] = nextAttempt;
@@ -126,10 +126,10 @@ export function syncExecutionAttemptMetadata(
 }
 
 export function appendEvent(
-  card: FlowboardCard,
-  event: Omit<FlowboardEvent, "id" | "at">,
+  card: TaskfoldCard,
+  event: Omit<TaskfoldEvent, "id" | "at">,
   at = Date.now(),
-): FlowboardEvent[] {
+): TaskfoldEvent[] {
   return [
     ...normalizeEvents(card.events),
     {
@@ -162,7 +162,7 @@ export function lifecycleStatusSourceUpdatedAtFromPatch(metadata: unknown): numb
   return sourceUpdatedAt;
 }
 
-function latestStatusTransitionAt(card: FlowboardCard): number | undefined {
+function latestStatusTransitionAt(card: TaskfoldCard): number | undefined {
   for (let index = (card.events?.length ?? 0) - 1; index >= 0; index -= 1) {
     const event = card.events?.[index];
     if (
@@ -180,7 +180,7 @@ function latestStatusTransitionAt(card: FlowboardCard): number | undefined {
 }
 
 export function shouldSkipPersistedLifecycleStatusUpdate(
-  existing: FlowboardCard,
+  existing: TaskfoldCard,
   sourceUpdatedAt: number,
 ): boolean {
   const lifecycleStatusSourceUpdatedAt = existing.metadata?.lifecycleStatusSourceUpdatedAt;
@@ -192,9 +192,9 @@ export function shouldSkipPersistedLifecycleStatusUpdate(
 }
 
 export function updateEvent(
-  existing: FlowboardCard,
-  next: FlowboardCard,
-): Omit<FlowboardEvent, "id" | "at"> {
+  existing: TaskfoldCard,
+  next: TaskfoldCard,
+): Omit<TaskfoldEvent, "id" | "at"> {
   if (
     existing.metadata?.workerProtocol?.state !== next.metadata?.workerProtocol?.state &&
     next.metadata?.workerProtocol?.state === "violated"
@@ -320,7 +320,7 @@ export function updateEvent(
   return { kind: "edited" };
 }
 
-export function removeUndefinedCardFields(card: FlowboardCard): FlowboardCard {
+export function removeUndefinedCardFields(card: TaskfoldCard): TaskfoldCard {
   const next = { ...card };
   for (const key of [
     "notes",
@@ -347,8 +347,8 @@ export function removeUndefinedCardFields(card: FlowboardCard): FlowboardCard {
 }
 
 export function assertCanMutateClaimedCard(
-  card: FlowboardCard,
-  scope: FlowboardMutationScope | undefined,
+  card: TaskfoldCard,
+  scope: TaskfoldMutationScope | undefined,
 ) {
   if (!scope) {
     return;
@@ -364,21 +364,21 @@ export function assertCanMutateClaimedCard(
   }
 }
 
-export function retryBudgetExhausted(card: FlowboardCard): boolean {
+export function retryBudgetExhausted(card: TaskfoldCard): boolean {
   const maxRetries = card.metadata?.automation?.maxRetries;
   return Boolean(maxRetries && (card.metadata?.failureCount ?? 0) > maxRetries);
 }
 
 function diagnostic(
   params: {
-    kind: FlowboardDiagnosticKind;
-    severity: FlowboardDiagnosticSeverity;
+    kind: TaskfoldDiagnosticKind;
+    severity: TaskfoldDiagnosticSeverity;
     title: string;
     detail: string;
-    actions: FlowboardDiagnosticAction[];
+    actions: TaskfoldDiagnosticAction[];
   },
   now: number,
-): FlowboardDiagnostic {
+): TaskfoldDiagnostic {
   return {
     ...params,
     firstSeenAt: now,
@@ -388,9 +388,9 @@ function diagnostic(
 }
 
 export function mergeDiagnostics(
-  previous: readonly FlowboardDiagnostic[] | undefined,
-  next: FlowboardDiagnostic[],
-): FlowboardDiagnostic[] {
+  previous: readonly TaskfoldDiagnostic[] | undefined,
+  next: TaskfoldDiagnostic[],
+): TaskfoldDiagnostic[] {
   const byKind = new Map(previous?.map((entry) => [entry.kind, entry]));
   return next.map((entry) => {
     const prior = byKind.get(entry.kind);
@@ -407,7 +407,7 @@ export function mergeDiagnostics(
 /**
  * The freshest evidence that whoever owns this card is still working. Only
  * `store.heartbeat()` refreshes `claim.lastHeartbeatAt`, so a claimed run that is
- * genuinely still active but whose worker never calls `flowboard_heartbeat` (the
+ * genuinely still active but whose worker never calls `taskfold_heartbeat` (the
  * prompt asks for it, but nothing enforces it) must not be judged solely on that
  * one timestamp — any card write (a log, a proof, a comment) is also evidence of
  * activity. Taking the max of all three keeps the liveness check from mistaking
@@ -415,7 +415,7 @@ export function mergeDiagnostics(
  * liveness by exactly the rule the `running_without_heartbeat` diagnostic uses,
  * rather than a second definition that could drift from it.
  */
-export function flowboardLastActivityAt(card: FlowboardCard): number {
+export function taskfoldLastActivityAt(card: TaskfoldCard): number {
   return Math.max(
     card.metadata?.claim?.lastHeartbeatAt ?? 0,
     card.execution?.updatedAt ?? 0,
@@ -423,13 +423,13 @@ export function flowboardLastActivityAt(card: FlowboardCard): number {
   );
 }
 
-export function computeCardDiagnostics(card: FlowboardCard, now: number): FlowboardDiagnostic[] {
+export function computeCardDiagnostics(card: TaskfoldCard, now: number): TaskfoldDiagnostic[] {
   if (card.metadata?.archivedAt) {
     return [];
   }
-  const diagnostics: FlowboardDiagnostic[] = [];
+  const diagnostics: TaskfoldDiagnostic[] = [];
   const claim = card.metadata?.claim;
-  const lastHeartbeatAt = flowboardLastActivityAt(card);
+  const lastHeartbeatAt = taskfoldLastActivityAt(card);
   if (
     (card.status === "todo" || card.status === "backlog" || card.status === "ready") &&
     card.agentId &&
@@ -538,29 +538,29 @@ export function capText(value: string | undefined, max: number): string | undefi
   return value.length <= max ? value : `${truncateUtf16Safe(value, Math.max(0, max - 1))}…`;
 }
 
-export function cardBoardId(card: FlowboardCard): string {
+export function cardBoardId(card: TaskfoldCard): string {
   return card.metadata?.automation?.boardId ?? "default";
 }
 
-export function cardParentIds(card: FlowboardCard): string[] {
+export function cardParentIds(card: TaskfoldCard): string[] {
   return (card.metadata?.links ?? [])
     .filter((link) => link.type === "parent" && link.targetCardId)
     .map((link) => link.targetCardId!)
     .filter((id, index, ids) => ids.indexOf(id) === index);
 }
 
-export function cardChildIds(card: FlowboardCard): string[] {
+export function cardChildIds(card: TaskfoldCard): string[] {
   return (card.metadata?.links ?? [])
     .filter((link) => link.type === "child" && link.targetCardId)
     .map((link) => link.targetCardId!)
     .filter((id, index, ids) => ids.indexOf(id) === index);
 }
 
-export function latestRunningAttempt(card: FlowboardCard): FlowboardRunAttempt | undefined {
+export function latestRunningAttempt(card: TaskfoldCard): TaskfoldRunAttempt | undefined {
   return card.metadata?.attempts?.findLast((attempt) => attempt.status === "running");
 }
 
-export function isDependencyPromotableStatus(status: FlowboardStatus): boolean {
+export function isDependencyPromotableStatus(status: TaskfoldStatus): boolean {
   return (
     status === "backlog" ||
     status === "triage" ||
@@ -571,7 +571,7 @@ export function isDependencyPromotableStatus(status: FlowboardStatus): boolean {
 }
 
 export function isActiveDependencyTarget(
-  card: FlowboardCard,
+  card: TaskfoldCard,
   options: { allowStatusOnly?: boolean } = {},
 ): boolean {
   return (
@@ -583,11 +583,11 @@ export function isActiveDependencyTarget(
 }
 
 export function closeRunningAttempts(
-  attempts: FlowboardRunAttempt[] | undefined,
+  attempts: TaskfoldRunAttempt[] | undefined,
   now: number,
-  status: FlowboardAttemptStatus,
+  status: TaskfoldAttemptStatus,
   reason?: string,
-): FlowboardRunAttempt[] | undefined {
+): TaskfoldRunAttempt[] | undefined {
   if (!attempts?.some((attempt) => attempt.status === "running")) {
     return attempts;
   }
@@ -598,13 +598,13 @@ export function closeRunningAttempts(
   );
 }
 
-export function notificationSequence(event: FlowboardNotification): number | undefined {
+export function notificationSequence(event: TaskfoldNotification): number | undefined {
   return typeof event.sequence === "number" && Number.isFinite(event.sequence)
     ? Math.trunc(event.sequence)
     : undefined;
 }
 
-export function compareNotifications(a: FlowboardNotification, b: FlowboardNotification): number {
+export function compareNotifications(a: TaskfoldNotification, b: TaskfoldNotification): number {
   if (a.createdAt !== b.createdAt) {
     return a.createdAt - b.createdAt;
   }

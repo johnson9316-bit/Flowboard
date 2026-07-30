@@ -1,5 +1,5 @@
-import type { FlowboardWorkspace, FlowboardWorkspaceAccess } from "../../contract/index.js";
-// Flowboard workspace access follows the caller's canonical filesystem boundary.
+import type { TaskfoldWorkspace, TaskfoldWorkspaceAccess } from "../../contract/index.js";
+// Taskfold workspace access follows the caller's canonical filesystem boundary.
 import {
   listAgentIds,
   resolveAgentConfig,
@@ -16,16 +16,16 @@ import {
   isPathInside,
 } from "openclaw/plugin-sdk/security-runtime";
 
-export type { FlowboardWorkspaceAccess } from "../../contract/index.js";
+export type { TaskfoldWorkspaceAccess } from "../../contract/index.js";
 
-type FlowboardConfig = NonNullable<OpenClawPluginToolContext["config"]>;
-type FlowboardSandboxWorkspaceRuntime = {
+type TaskfoldConfig = NonNullable<OpenClawPluginToolContext["config"]>;
+type TaskfoldSandboxWorkspaceRuntime = {
   sandboxed: boolean;
   workspaceAccess: "ro" | "rw";
   confinementError?: string;
 };
-type FlowboardSandboxWorkspaceRequest = {
-  config: FlowboardConfig;
+type TaskfoldSandboxWorkspaceRequest = {
+  config: TaskfoldConfig;
   agentId?: string;
   sessionKey: string;
   workspaceDir?: string;
@@ -35,72 +35,72 @@ type FlowboardSandboxWorkspaceRequest = {
   modelId?: string;
 };
 type ResolveSandboxWorkspaceAuthority = (
-  params: Omit<FlowboardSandboxWorkspaceRequest, "workspaceDir" | "confinedToolNames" | "requiredToolNames" | "modelProvider" | "modelId">,
-) => FlowboardSandboxWorkspaceRuntime | undefined;
+  params: Omit<TaskfoldSandboxWorkspaceRequest, "workspaceDir" | "confinedToolNames" | "requiredToolNames" | "modelProvider" | "modelId">,
+) => TaskfoldSandboxWorkspaceRuntime | undefined;
 type PrepareSandboxWorkspaceAuthority = (
-  params: FlowboardSandboxWorkspaceRequest,
-) => FlowboardSandboxWorkspaceRuntime | Promise<FlowboardSandboxWorkspaceRuntime>;
+  params: TaskfoldSandboxWorkspaceRequest,
+) => TaskfoldSandboxWorkspaceRuntime | Promise<TaskfoldSandboxWorkspaceRuntime>;
 
-export const FLOWBOARD_TOOL_NAMES = [
-  "flowboard_list",
-  "flowboard_create",
-  "flowboard_link",
-  "flowboard_read",
-  "flowboard_claim",
-  "flowboard_heartbeat",
-  "flowboard_complete",
-  "flowboard_attachment_add",
-  "flowboard_attachment_read",
-  "flowboard_attachment_delete",
-  "flowboard_block",
-  "flowboard_boards",
-  "flowboard_board_create",
-  "flowboard_board_archive",
-  "flowboard_board_delete",
-  "flowboard_stats",
-  "flowboard_runs",
-  "flowboard_specify",
-  "flowboard_decompose",
-  "flowboard_notify_subscribe",
-  "flowboard_notify_list",
-  "flowboard_notify_events",
-  "flowboard_notify_advance",
-  "flowboard_notify_unsubscribe",
-  "flowboard_promote",
-  "flowboard_reassign",
-  "flowboard_reclaim",
-  "flowboard_dispatch",
-  "flowboard_release",
-  "flowboard_comment",
-  "flowboard_proof",
-  "flowboard_worker_log",
-  "flowboard_protocol_violation",
-  "flowboard_unblock",
-  "flowboard_move",
-  "flowboard_projects",
-  "flowboard_project_create",
-  "flowboard_project_read",
-  "flowboard_milestone_create",
-  "flowboard_move_milestone",
-  "flowboard_move_project",
-  "flowboard_project_documents",
-  "flowboard_project_document_create",
+export const TASKFOLD_TOOL_NAMES = [
+  "taskfold_list",
+  "taskfold_create",
+  "taskfold_link",
+  "taskfold_read",
+  "taskfold_claim",
+  "taskfold_heartbeat",
+  "taskfold_complete",
+  "taskfold_attachment_add",
+  "taskfold_attachment_read",
+  "taskfold_attachment_delete",
+  "taskfold_block",
+  "taskfold_boards",
+  "taskfold_board_create",
+  "taskfold_board_archive",
+  "taskfold_board_delete",
+  "taskfold_stats",
+  "taskfold_runs",
+  "taskfold_specify",
+  "taskfold_decompose",
+  "taskfold_notify_subscribe",
+  "taskfold_notify_list",
+  "taskfold_notify_events",
+  "taskfold_notify_advance",
+  "taskfold_notify_unsubscribe",
+  "taskfold_promote",
+  "taskfold_reassign",
+  "taskfold_reclaim",
+  "taskfold_dispatch",
+  "taskfold_release",
+  "taskfold_comment",
+  "taskfold_proof",
+  "taskfold_worker_log",
+  "taskfold_protocol_violation",
+  "taskfold_unblock",
+  "taskfold_move",
+  "taskfold_projects",
+  "taskfold_project_create",
+  "taskfold_project_read",
+  "taskfold_milestone_create",
+  "taskfold_move_milestone",
+  "taskfold_move_project",
+  "taskfold_project_documents",
+  "taskfold_project_document_create",
 ] as const;
 
-export const FLOWBOARD_REQUIRED_WORKER_TOOLS = [
-  "flowboard_heartbeat",
-  "flowboard_complete",
-  "flowboard_block",
+export const TASKFOLD_REQUIRED_WORKER_TOOLS = [
+  "taskfold_heartbeat",
+  "taskfold_complete",
+  "taskfold_block",
 ] as const;
 
-export function resolveFlowboardAgentWorkspace(config: FlowboardConfig, agentId?: string): string {
+export function resolveTaskfoldAgentWorkspace(config: TaskfoldConfig, agentId?: string): string {
   return resolveAgentWorkspaceDir(config, agentId ?? resolveDefaultAgentId(config));
 }
 
-export function resolveConfiguredFlowboardWorkspaceAccess(params: {
-  config: FlowboardConfig;
+export function resolveConfiguredTaskfoldWorkspaceAccess(params: {
+  config: TaskfoldConfig;
   unrestricted: boolean;
-}): FlowboardWorkspaceAccess {
+}): TaskfoldWorkspaceAccess {
   if (params.unrestricted) {
     return { unrestricted: true };
   }
@@ -113,28 +113,28 @@ export function resolveConfiguredFlowboardWorkspaceAccess(params: {
   };
 }
 
-export type FlowboardTargetWorkspaceRuntime = {
+export type TaskfoldTargetWorkspaceRuntime = {
   sandboxed: boolean;
-  workspaceAccess: FlowboardWorkspaceAccess;
+  workspaceAccess: TaskfoldWorkspaceAccess;
   confinementError?: string;
 };
 
-export async function resolveAgentFlowboardWorkspaceRuntime(params: {
-  config: FlowboardConfig;
+export async function resolveAgentTaskfoldWorkspaceRuntime(params: {
+  config: TaskfoldConfig;
   agentId?: string;
   sessionKey: string;
   workspaceDir: string;
   modelProvider?: string;
   modelId?: string;
   prepareSandboxWorkspaceAuthority?: PrepareSandboxWorkspaceAuthority;
-}): Promise<FlowboardTargetWorkspaceRuntime> {
+}): Promise<TaskfoldTargetWorkspaceRuntime> {
   const agentId = params.agentId ?? resolveDefaultAgentId(params.config);
   const sandboxRuntime = params.prepareSandboxWorkspaceAuthority
     ? await params.prepareSandboxWorkspaceAuthority({
         config: params.config,
         agentId,
-        confinedToolNames: FLOWBOARD_TOOL_NAMES,
-        requiredToolNames: FLOWBOARD_REQUIRED_WORKER_TOOLS,
+        confinedToolNames: TASKFOLD_TOOL_NAMES,
+        requiredToolNames: TASKFOLD_REQUIRED_WORKER_TOOLS,
         modelProvider: params.modelProvider,
         modelId: params.modelId,
         sessionKey: params.sessionKey,
@@ -162,15 +162,15 @@ export async function resolveAgentFlowboardWorkspaceRuntime(params: {
   };
 }
 
-export function resolveCommandFlowboardWorkspaceAccess(params: {
-  config: FlowboardConfig;
+export function resolveCommandTaskfoldWorkspaceAccess(params: {
+  config: TaskfoldConfig;
   agentId?: string;
   sessionKey?: string;
   gatewayClientScopes?: readonly string[];
   resolveSandboxWorkspaceAuthority?: ResolveSandboxWorkspaceAuthority;
-}): FlowboardWorkspaceAccess {
+}): TaskfoldWorkspaceAccess {
   if (params.gatewayClientScopes) {
-    return resolveConfiguredFlowboardWorkspaceAccess({
+    return resolveConfiguredTaskfoldWorkspaceAccess({
       config: params.config,
       unrestricted: params.gatewayClientScopes.includes("operator.admin"),
     });
@@ -203,10 +203,10 @@ export function resolveCommandFlowboardWorkspaceAccess(params: {
     : { unrestricted: true };
 }
 
-function resolveToolFlowboardWorkspaceAccess(
+function resolveToolTaskfoldWorkspaceAccess(
   context: OpenClawPluginToolContext | undefined,
   resolveSandboxWorkspaceAuthority?: ResolveSandboxWorkspaceAuthority,
-): FlowboardWorkspaceAccess {
+): TaskfoldWorkspaceAccess {
   if (!context?.sandboxed && context?.fsPolicy?.workspaceOnly !== true) {
     return { unrestricted: true };
   }
@@ -226,9 +226,9 @@ function resolveToolFlowboardWorkspaceAccess(
   };
 }
 
-export async function canonicalizeFlowboardWorkspaceAccess(
-  access: FlowboardWorkspaceAccess,
-): Promise<FlowboardWorkspaceAccess> {
+export async function canonicalizeTaskfoldWorkspaceAccess(
+  access: TaskfoldWorkspaceAccess,
+): Promise<TaskfoldWorkspaceAccess> {
   if (access.unrestricted) {
     return access;
   }
@@ -245,10 +245,10 @@ export async function canonicalizeFlowboardWorkspaceAccess(
   return { unrestricted: false, roots, writable: access.writable };
 }
 
-export function intersectFlowboardWorkspaceAccess(
-  left: FlowboardWorkspaceAccess,
-  right: FlowboardWorkspaceAccess,
-): FlowboardWorkspaceAccess {
+export function intersectTaskfoldWorkspaceAccess(
+  left: TaskfoldWorkspaceAccess,
+  right: TaskfoldWorkspaceAccess,
+): TaskfoldWorkspaceAccess {
   if (left.unrestricted) {
     return right;
   }
@@ -275,9 +275,9 @@ export function intersectFlowboardWorkspaceAccess(
   };
 }
 
-async function assertCanonicalFlowboardPathAccess(
+async function assertCanonicalTaskfoldPathAccess(
   candidate: string,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
 ): Promise<string> {
   if (access.unrestricted) {
     return candidate;
@@ -291,9 +291,9 @@ async function assertCanonicalFlowboardPathAccess(
   throw new Error("workspace path is outside the caller's allowed workspaces.");
 }
 
-export async function assertCanonicalFlowboardRootAccess(
+export async function assertCanonicalTaskfoldRootAccess(
   candidate: string,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
 ): Promise<string> {
   if (access.unrestricted) {
     return candidate;
@@ -309,18 +309,18 @@ export async function assertCanonicalFlowboardRootAccess(
 
 async function assertPathAllowed(
   value: unknown,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
 ): Promise<string | undefined> {
   if (typeof value !== "string" || !value.trim()) {
     return undefined;
   }
   const candidate = await canonicalPathFromExistingAncestor(value.trim());
-  return await assertCanonicalFlowboardPathAccess(candidate, access);
+  return await assertCanonicalTaskfoldPathAccess(candidate, access);
 }
 
 async function assertWorkspaceAllowed(
   value: unknown,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
   options?: { sourceOnly?: boolean },
 ): Promise<string | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -341,7 +341,7 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-export function containsFlowboardWorkspaceMutation(value: unknown): boolean {
+export function containsTaskfoldWorkspaceMutation(value: unknown): boolean {
   const record = readRecord(value);
   if (!record) {
     return false;
@@ -350,44 +350,44 @@ export function containsFlowboardWorkspaceMutation(value: unknown): boolean {
     return true;
   }
   return (
-    containsFlowboardWorkspaceMutation(record.patch) ||
-    containsFlowboardWorkspaceMutation(readRecord(record.metadata)?.automation) ||
+    containsTaskfoldWorkspaceMutation(record.patch) ||
+    containsTaskfoldWorkspaceMutation(readRecord(record.metadata)?.automation) ||
     (Array.isArray(record.children) &&
-      record.children.some((child) => containsFlowboardWorkspaceMutation(child)))
+      record.children.some((child) => containsTaskfoldWorkspaceMutation(child)))
   );
 }
 
-export function withFlowboardWorkspaceAccess(
+export function withTaskfoldWorkspaceAccess(
   value: unknown,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
 ): Record<string, unknown> {
-  return { ...withoutFlowboardWorkspaceAccess(value), workspaceAccess: access };
+  return { ...withoutTaskfoldWorkspaceAccess(value), workspaceAccess: access };
 }
 
-export function withoutFlowboardWorkspaceAccess(value: unknown): Record<string, unknown> {
+export function withoutTaskfoldWorkspaceAccess(value: unknown): Record<string, unknown> {
   const record = readRecord(value) ?? {};
   const { workspaceAccess: _untrustedWorkspaceAccess, ...rest } = record;
   return rest;
 }
 
-export function withFlowboardDecomposeWorkspaceAccess(
+export function withTaskfoldDecomposeWorkspaceAccess(
   value: unknown,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
 ): Record<string, unknown> {
-  const record = withoutFlowboardWorkspaceAccess(value);
+  const record = withoutTaskfoldWorkspaceAccess(value);
   return {
     ...record,
     ...(Array.isArray(record.children)
       ? {
-          children: record.children.map((child) => withFlowboardWorkspaceAccess(child, access)),
+          children: record.children.map((child) => withTaskfoldWorkspaceAccess(child, access)),
         }
       : {}),
   };
 }
 
-export async function assertFlowboardWorkspaceMutationAccess(
+export async function assertTaskfoldWorkspaceMutationAccess(
   value: unknown,
-  access: FlowboardWorkspaceAccess,
+  access: TaskfoldWorkspaceAccess,
 ): Promise<void> {
   if (access.unrestricted) {
     return;
@@ -403,50 +403,50 @@ export async function assertFlowboardWorkspaceMutationAccess(
 
   const patch = readRecord(record.patch);
   if (patch) {
-    await assertFlowboardWorkspaceMutationAccess(patch, access);
+    await assertTaskfoldWorkspaceMutationAccess(patch, access);
   }
   const metadata = readRecord(record.metadata);
   const automation = readRecord(metadata?.automation);
   if (automation) {
-    await assertFlowboardWorkspaceMutationAccess(automation, access);
+    await assertTaskfoldWorkspaceMutationAccess(automation, access);
   }
   if (Array.isArray(record.children)) {
     for (const child of record.children) {
-      await assertFlowboardWorkspaceMutationAccess(child, access);
+      await assertTaskfoldWorkspaceMutationAccess(child, access);
     }
   }
 }
 
-export async function assertFlowboardWorkspaceSourceAccess(
-  workspace: FlowboardWorkspace | undefined,
-  access: FlowboardWorkspaceAccess,
+export async function assertTaskfoldWorkspaceSourceAccess(
+  workspace: TaskfoldWorkspace | undefined,
+  access: TaskfoldWorkspaceAccess,
 ): Promise<string | undefined> {
   return await assertWorkspaceAllowed(workspace, access, { sourceOnly: true });
 }
 
-export function guardFlowboardToolsForWorkspaceAccess(
+export function guardTaskfoldToolsForWorkspaceAccess(
   tools: AnyAgentTool[],
   context: OpenClawPluginToolContext | undefined,
   resolveSandboxWorkspaceAuthority?: ResolveSandboxWorkspaceAuthority,
 ): AnyAgentTool[] {
-  const workspaceAccess = resolveToolFlowboardWorkspaceAccess(
+  const workspaceAccess = resolveToolTaskfoldWorkspaceAccess(
     context,
     resolveSandboxWorkspaceAuthority,
   );
   return tools.map((tool) => ({
     ...tool,
     execute: async (toolCallId, rawParams, signal, onUpdate) => {
-      const canonicalAccess = await canonicalizeFlowboardWorkspaceAccess(workspaceAccess);
-      await assertFlowboardWorkspaceMutationAccess(rawParams, canonicalAccess);
-      const sanitizedParams = withoutFlowboardWorkspaceAccess(rawParams);
+      const canonicalAccess = await canonicalizeTaskfoldWorkspaceAccess(workspaceAccess);
+      await assertTaskfoldWorkspaceMutationAccess(rawParams, canonicalAccess);
+      const sanitizedParams = withoutTaskfoldWorkspaceAccess(rawParams);
       const constrainedParams =
-        tool.name === "flowboard_create"
-          ? withFlowboardWorkspaceAccess(sanitizedParams, canonicalAccess)
-          : tool.name === "flowboard_decompose"
-            ? withFlowboardDecomposeWorkspaceAccess(sanitizedParams, canonicalAccess)
-            : tool.name === "flowboard_specify" &&
-                containsFlowboardWorkspaceMutation(sanitizedParams)
-              ? withFlowboardWorkspaceAccess(sanitizedParams, canonicalAccess)
+        tool.name === "taskfold_create"
+          ? withTaskfoldWorkspaceAccess(sanitizedParams, canonicalAccess)
+          : tool.name === "taskfold_decompose"
+            ? withTaskfoldDecomposeWorkspaceAccess(sanitizedParams, canonicalAccess)
+            : tool.name === "taskfold_specify" &&
+                containsTaskfoldWorkspaceMutation(sanitizedParams)
+              ? withTaskfoldWorkspaceAccess(sanitizedParams, canonicalAccess)
               : sanitizedParams;
       return await tool.execute(toolCallId, constrainedParams, signal, onUpdate);
     },

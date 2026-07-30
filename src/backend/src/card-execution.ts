@@ -1,27 +1,27 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { FlowboardCard, FlowboardWorkspace } from "../../contract/index.js";
+import type { TaskfoldCard, TaskfoldWorkspace } from "../../contract/index.js";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
 import { canonicalPathFromExistingAncestor } from "openclaw/plugin-sdk/security-runtime";
 import {
-  assertRestrictedFlowboardTarget,
+  assertRestrictedTaskfoldTarget,
   managedWorktreeName,
   type ResolveAgentWorkspaceRuntime,
 } from "./dispatcher-workspace.js";
 import {
   buildExecution,
   buildSessionKey,
-  createManagedFlowboardWorktree,
+  createManagedTaskfoldWorktree,
 } from "./dispatcher.js";
 import { buildWorkerPrompt } from "./worker-prompt.js";
 import { cardBoardId } from "./store-card-helpers.js";
-import { FlowboardStore } from "./store.js";
+import { TaskfoldStore } from "./store.js";
 import {
-  assertFlowboardWorkspaceSourceAccess,
-  canonicalizeFlowboardWorkspaceAccess,
-  intersectFlowboardWorkspaceAccess,
-  type FlowboardWorkspaceAccess,
+  assertTaskfoldWorkspaceSourceAccess,
+  canonicalizeTaskfoldWorkspaceAccess,
+  intersectTaskfoldWorkspaceAccess,
+  type TaskfoldWorkspaceAccess,
 } from "./workspace-access.js";
 
 const execFileAsync = promisify(execFile);
@@ -29,11 +29,11 @@ const PREVIEW_LIMIT = 6;
 const PREVIEW_MAX_CHARS = 600;
 const CLAIM_TOKEN_PLACEHOLDER = "[generated after confirmation]";
 
-type FlowboardExecutionRuntime = Pick<PluginRuntime, "agent" | "subagent" | "worktrees">;
+type TaskfoldExecutionRuntime = Pick<PluginRuntime, "agent" | "subagent" | "worktrees">;
 
-export type FlowboardCardExecutionOptions = {
-  runtime: FlowboardExecutionRuntime;
-  workspaceAccess: FlowboardWorkspaceAccess;
+export type TaskfoldCardExecutionOptions = {
+  runtime: TaskfoldExecutionRuntime;
+  workspaceAccess: TaskfoldWorkspaceAccess;
   defaultAgentId: string;
   resolveAgentWorkspaceRuntime?: ResolveAgentWorkspaceRuntime;
 };
@@ -41,8 +41,8 @@ export type FlowboardCardExecutionOptions = {
 type ExecutionSource = {
   sourceCheckout: string;
   baseBranch?: string;
-  sourceWorkspace: FlowboardWorkspace;
-  workspaceAccess: FlowboardWorkspaceAccess;
+  sourceWorkspace: TaskfoldWorkspace;
+  workspaceAccess: TaskfoldWorkspaceAccess;
 };
 
 type GitCheckout = {
@@ -58,7 +58,7 @@ function readOptionalString(value: unknown, maxLength = 4_000): string | undefin
   return normalized && normalized.length <= maxLength ? normalized : undefined;
 }
 
-function activeExecution(card: FlowboardCard): boolean {
+function activeExecution(card: TaskfoldCard): boolean {
   return (
     card.execution?.status === "running" ||
     Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"))
@@ -92,14 +92,14 @@ async function gitCheckout(path: string): Promise<GitCheckout> {
 }
 
 async function resolveWorkspaceAccess(
-  card: FlowboardCard,
-  currentAccess: FlowboardWorkspaceAccess,
-): Promise<FlowboardWorkspaceAccess> {
-  const callerAccess = await canonicalizeFlowboardWorkspaceAccess(currentAccess);
+  card: TaskfoldCard,
+  currentAccess: TaskfoldWorkspaceAccess,
+): Promise<TaskfoldWorkspaceAccess> {
+  const callerAccess = await canonicalizeTaskfoldWorkspaceAccess(currentAccess);
   const persisted = card.metadata?.automation?.workspaceAccess;
   const workspaceAccess = persisted
-    ? intersectFlowboardWorkspaceAccess(
-        await canonicalizeFlowboardWorkspaceAccess(persisted),
+    ? intersectTaskfoldWorkspaceAccess(
+        await canonicalizeTaskfoldWorkspaceAccess(persisted),
         callerAccess,
       )
     : callerAccess;
@@ -110,9 +110,9 @@ async function resolveWorkspaceAccess(
 }
 
 async function resolveExecutionSource(
-  store: FlowboardStore,
-  card: FlowboardCard,
-  currentAccess: FlowboardWorkspaceAccess,
+  store: TaskfoldStore,
+  card: TaskfoldCard,
+  currentAccess: TaskfoldWorkspaceAccess,
 ): Promise<ExecutionSource> {
   const workspaceAccess = await resolveWorkspaceAccess(card, currentAccess);
   const cardWorkspace = card.metadata?.automation?.workspace;
@@ -125,12 +125,12 @@ async function resolveExecutionSource(
   if (!sourceWorkspace || sourceWorkspace.kind === "scratch") {
     throw new Error("card has no local Git checkout; set a card or project workspace first.");
   }
-  const sourcePath = await assertFlowboardWorkspaceSourceAccess(sourceWorkspace, workspaceAccess);
+  const sourcePath = await assertTaskfoldWorkspaceSourceAccess(sourceWorkspace, workspaceAccess);
   if (!sourcePath) {
     throw new Error("card workspace path is required.");
   }
   const checkout = await gitCheckout(sourcePath);
-  const checkedRoot = await assertFlowboardWorkspaceSourceAccess(
+  const checkedRoot = await assertTaskfoldWorkspaceSourceAccess(
     { kind: "dir", path: checkout.root },
     workspaceAccess,
   );
@@ -148,15 +148,15 @@ async function resolveExecutionSource(
 }
 
 async function ensureTargetCanRun(params: {
-  card: FlowboardCard;
+  card: TaskfoldCard;
   source: ExecutionSource;
-  options: FlowboardCardExecutionOptions;
+  options: TaskfoldCardExecutionOptions;
   sessionKey: string;
 }): Promise<void> {
   if (params.source.workspaceAccess.unrestricted) {
     return;
   }
-  await assertRestrictedFlowboardTarget({
+  await assertRestrictedTaskfoldTarget({
     root: params.source.sourceCheckout,
     agentId: params.card.agentId ?? params.options.defaultAgentId,
     sessionKey: params.sessionKey,
@@ -167,7 +167,7 @@ async function ensureTargetCanRun(params: {
 }
 
 function promptPreview(params: {
-  card: FlowboardCard;
+  card: TaskfoldCard;
   context: string;
   ownerId: string;
 }): string {
@@ -227,7 +227,7 @@ function boundExecutionPreview(value: unknown, depth = 0): unknown {
   return value;
 }
 
-async function resolveCard(store: FlowboardStore, id: unknown): Promise<FlowboardCard> {
+async function resolveCard(store: TaskfoldStore, id: unknown): Promise<TaskfoldCard> {
   const cardId = readOptionalString(id, 200);
   if (!cardId) {
     throw new Error("id is required.");
@@ -239,10 +239,10 @@ async function resolveCard(store: FlowboardStore, id: unknown): Promise<Flowboar
   return card;
 }
 
-export async function prepareFlowboardCardExecution(params: {
-  store: FlowboardStore;
+export async function prepareTaskfoldCardExecution(params: {
+  store: TaskfoldStore;
   id: unknown;
-  options: FlowboardCardExecutionOptions;
+  options: TaskfoldCardExecutionOptions;
 }) {
   const card = await resolveCard(params.store, params.id);
   if (card.metadata?.archivedAt) {
@@ -271,11 +271,11 @@ export async function prepareFlowboardCardExecution(params: {
   };
 }
 
-export async function startFlowboardCardExecution(params: {
-  store: FlowboardStore;
+export async function startTaskfoldCardExecution(params: {
+  store: TaskfoldStore;
   id: unknown;
   expectedRevision: unknown;
-  options: FlowboardCardExecutionOptions;
+  options: TaskfoldCardExecutionOptions;
 }) {
   const card = await resolveCard(params.store, params.id);
   {
@@ -294,7 +294,7 @@ export async function startFlowboardCardExecution(params: {
     const expectedRevision =
       typeof params.expectedRevision === "number" ? params.expectedRevision : latest.revision;
     let claimToken: string | undefined;
-    let materializedWorkspace: FlowboardWorkspace | undefined;
+    let materializedWorkspace: TaskfoldWorkspace | undefined;
     let runStarted = false;
     const previousWorkspace = latest.metadata?.automation?.workspace;
     try {
@@ -304,7 +304,7 @@ export async function startFlowboardCardExecution(params: {
         ttlSeconds: latest.metadata?.automation?.maxRuntimeSeconds,
       });
       claimToken = claimed.token;
-      const worktree = await createManagedFlowboardWorktree({
+      const worktree = await createManagedTaskfoldWorktree({
         worktrees: params.options.runtime.worktrees,
         repoRoot: source.sourceCheckout,
         name: managedWorktreeName(latest.id),
@@ -352,11 +352,11 @@ export async function startFlowboardCardExecution(params: {
           ownerId,
           token: claimToken,
         }),
-        lane: `flowboard:${cardBoardId(current)}:${current.id}`,
+        lane: `taskfold:${cardBoardId(current)}:${current.id}`,
         // The claim token is minted fresh per winning claim, so it identifies
         // exactly this start attempt. A timestamp could collide inside one
         // millisecond and changed on writes unrelated to starting a run.
-        idempotencyKey: `flowboard:execution:${current.id}:${claimed.token}`,
+        idempotencyKey: `taskfold:execution:${current.id}:${claimed.token}`,
         lightContext: true,
         deliver: false,
         cwd: worktreePath,
@@ -413,8 +413,8 @@ export async function startFlowboardCardExecution(params: {
   }
 }
 
-export async function inspectFlowboardCardExecution(params: {
-  store: FlowboardStore;
+export async function inspectTaskfoldCardExecution(params: {
+  store: TaskfoldStore;
   id: unknown;
   runtime: Pick<PluginRuntime, "subagent">;
 }) {
@@ -440,14 +440,14 @@ export async function inspectFlowboardCardExecution(params: {
   };
 }
 
-export async function steerFlowboardCardExecution(params: {
-  store: FlowboardStore;
+export async function steerTaskfoldCardExecution(params: {
+  store: TaskfoldStore;
   id: unknown;
   nextRunId?: unknown;
 }) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
-    throw new Error("card has no active Flowboard execution.");
+    throw new Error("card has no active Taskfold execution.");
   }
   const sessionKey = card.execution.sessionKey ?? card.sessionKey;
   if (!sessionKey) {
@@ -464,22 +464,22 @@ export async function steerFlowboardCardExecution(params: {
   return { card: updated };
 }
 
-export async function abortFlowboardCardExecution(params: {
-  store: FlowboardStore;
+export async function abortTaskfoldCardExecution(params: {
+  store: TaskfoldStore;
   id: unknown;
   reason?: unknown;
   expectedRunId?: unknown;
 }) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
-    throw new Error("card has no active Flowboard execution.");
+    throw new Error("card has no active Taskfold execution.");
   }
   const expectedRunId = readOptionalString(params.expectedRunId, 200);
   const runId = card.execution.runId ?? card.runId;
   if (expectedRunId && runId && expectedRunId !== runId) {
     throw new Error("card execution changed before it could be stopped.");
   }
-  const reason = readOptionalString(params.reason, 1_000) ?? "Flowboard execution stopped by operator.";
+  const reason = readOptionalString(params.reason, 1_000) ?? "Taskfold execution stopped by operator.";
   const stopped = await params.store.stopExecution(card.id, {
     ...(runId ? { expectedRunId: runId } : {}),
     reason,
@@ -504,8 +504,8 @@ function terminalExecutionOutcome(value: unknown): "ok" | "error" | "timeout" | 
   throw new Error("outcome must be a terminal OpenClaw subagent outcome.");
 }
 
-export async function reconcileFlowboardCardExecution(params: {
-  store: FlowboardStore;
+export async function reconcileTaskfoldCardExecution(params: {
+  store: TaskfoldStore;
   id: unknown;
   expectedRunId?: unknown;
   outcome?: unknown;

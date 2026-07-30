@@ -1,4 +1,4 @@
-// Flowboard plugin module reconciles card state against the evidence a run leaves
+// Taskfold plugin module reconciles card state against the evidence a run leaves
 // behind.
 //
 // This is the control loop. It runs in the Gateway process, on a timer plus once at
@@ -11,34 +11,34 @@
 // `index.ts`. This loop exists for the case that hook cannot cover: the process died
 // before the event was delivered. See `lifecycle.ts` for why that judgement is made
 // from local evidence instead of asking the host.
-import type { FlowboardCard } from "../../contract/index.js";
+import type { TaskfoldCard } from "../../contract/index.js";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
 import type { OpenClawPluginService } from "../api.js";
-import { cleanupFlowboardRunWorktree } from "./dispatcher-workspace.js";
+import { cleanupTaskfoldRunWorktree } from "./dispatcher-workspace.js";
 import {
   executionStatusForLifecycle,
-  getFlowboardLifecycle,
+  getTaskfoldLifecycle,
   shouldCloseOrphanedRun,
   shouldSyncCardStatus,
   shouldSyncExecutionStatus,
   staleRunState,
 } from "./lifecycle.js";
 import { cardRunId } from "./store-card-helpers.js";
-import { isFlowboardClaimReclaimable } from "./store-constants.js";
-import { FlowboardRevisionConflictError } from "./store-core.js";
-import type { FlowboardStore } from "./store.js";
+import { isTaskfoldClaimReclaimable } from "./store-constants.js";
+import { TaskfoldRevisionConflictError } from "./store-core.js";
+import type { TaskfoldStore } from "./store.js";
 
 const RECONCILE_INTERVAL_MS = 15_000;
 
-export type FlowboardReconcilerRuntime = Pick<PluginRuntime, "worktrees">;
+export type TaskfoldReconcilerRuntime = Pick<PluginRuntime, "worktrees">;
 
-function hasRunningAttempt(card: FlowboardCard): boolean {
+function hasRunningAttempt(card: TaskfoldCard): boolean {
   return Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"));
 }
 
 /** Cards whose recorded state claims work is in flight, so it can be checked. */
-function activeCards(cards: readonly FlowboardCard[]): FlowboardCard[] {
+function activeCards(cards: readonly TaskfoldCard[]): TaskfoldCard[] {
   return cards.filter(
     (card) =>
       !card.metadata?.archivedAt &&
@@ -64,12 +64,12 @@ type ReconcileOutcome = {
  * compare-and-swap so a worker reporting in mid-pass wins over this pass.
  */
 async function applyLifecycle(params: {
-  store: FlowboardStore;
-  card: FlowboardCard;
+  store: TaskfoldStore;
+  card: TaskfoldCard;
   now: number;
 }): Promise<boolean> {
   const { store, card, now } = params;
-  const lifecycle = getFlowboardLifecycle({ card, now });
+  const lifecycle = getTaskfoldLifecycle({ card, now });
   const executionStatus = executionStatusForLifecycle(lifecycle);
   const patch: Record<string, unknown> = {};
   const metadataPatch: Record<string, unknown> = {};
@@ -117,9 +117,9 @@ async function applyLifecycle(params: {
  * attempt, so this is the whole of the cleanup.
  */
 async function finishOrphanedRun(params: {
-  store: FlowboardStore;
-  card: FlowboardCard;
-  runtime: FlowboardReconcilerRuntime;
+  store: TaskfoldStore;
+  card: TaskfoldCard;
+  runtime: TaskfoldReconcilerRuntime;
   now: number;
 }): Promise<boolean> {
   const { store, card, runtime, now } = params;
@@ -132,15 +132,15 @@ async function finishOrphanedRun(params: {
     endedAt: now,
     reason: "Run stopped reporting and did not survive to report an outcome.",
   });
-  await cleanupFlowboardRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
+  await cleanupTaskfoldRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
     () => undefined,
   );
   return true;
 }
 
-export async function reconcileFlowboardCards(params: {
-  store: FlowboardStore;
-  runtime: FlowboardReconcilerRuntime;
+export async function reconcileTaskfoldCards(params: {
+  store: TaskfoldStore;
+  runtime: TaskfoldReconcilerRuntime;
   now?: number;
   onCardError?: (cardId: string, error: unknown) => void;
 }): Promise<ReconcileOutcome> {
@@ -166,9 +166,9 @@ export async function reconcileFlowboardCards(params: {
       }
       // A claim whose lease lapsed past the grace window belongs to a worker that is
       // not coming back; releasing it frees the card and the owner's slot.
-      if (isFlowboardClaimReclaimable(card.metadata?.claim, now)) {
+      if (isTaskfoldClaimReclaimable(card.metadata?.claim, now)) {
         const latest = await params.store.get(card.id);
-        if (latest && isFlowboardClaimReclaimable(latest.metadata?.claim, now)) {
+        if (latest && isTaskfoldClaimReclaimable(latest.metadata?.claim, now)) {
           await params.store.update(latest.id, {
             metadata: { ...latest.metadata, claim: undefined },
           });
@@ -181,7 +181,7 @@ export async function reconcileFlowboardCards(params: {
       // after it unreconciled. Losing a compare-and-swap is the expected case — a
       // worker reported in mid-pass and its write is the newer one.
       outcome.skipped += 1;
-      if (!(error instanceof FlowboardRevisionConflictError)) {
+      if (!(error instanceof TaskfoldRevisionConflictError)) {
         params.onCardError?.(card.id, error);
       }
     }
@@ -189,16 +189,16 @@ export async function reconcileFlowboardCards(params: {
   return outcome;
 }
 
-export function createFlowboardReconcilerService(params: {
-  store: FlowboardStore;
-  runtime: FlowboardReconcilerRuntime;
+export function createTaskfoldReconcilerService(params: {
+  store: TaskfoldStore;
+  runtime: TaskfoldReconcilerRuntime;
 }): OpenClawPluginService {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
   let lastFailure = "";
 
   return {
-    id: "flowboard-reconciler",
+    id: "taskfold-reconciler",
     start(ctx) {
       if (timer) {
         return;
@@ -209,17 +209,17 @@ export function createFlowboardReconcilerService(params: {
         }
         running = true;
         try {
-          const outcome = await reconcileFlowboardCards({
+          const outcome = await reconcileTaskfoldCards({
             ...params,
             onCardError: (cardId, error) =>
               ctx.logger.warn(
-                `flowboard could not reconcile card ${cardId}: ${formatErrorMessage(error)}`,
+                `taskfold could not reconcile card ${cardId}: ${formatErrorMessage(error)}`,
               ),
           });
           lastFailure = "";
           if (outcome.updated || outcome.finished || outcome.reclaimed) {
             ctx.logger.info(
-              `flowboard reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`,
+              `taskfold reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`,
             );
           }
         } catch (error) {
@@ -228,7 +228,7 @@ export function createFlowboardReconcilerService(params: {
           const message = formatErrorMessage(error);
           if (message !== lastFailure) {
             lastFailure = message;
-            ctx.logger.warn(`flowboard reconcile failed: ${message}`);
+            ctx.logger.warn(`taskfold reconcile failed: ${message}`);
           }
         } finally {
           running = false;

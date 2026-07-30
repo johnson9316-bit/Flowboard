@@ -1,13 +1,13 @@
-import type { FlowboardAutomation, FlowboardWorkspaceAccess } from "../../contract/index.js";
-// Flowboard automation helpers normalize trusted host-issued workspace provenance.
-import type { FlowboardLinkedCreateInput } from "./store-inputs.js";
+import type { TaskfoldAutomation, TaskfoldWorkspaceAccess } from "../../contract/index.js";
+// Taskfold automation helpers normalize trusted host-issued workspace provenance.
+import type { TaskfoldLinkedCreateInput } from "./store-inputs.js";
 import { normalizeAutomation, normalizeBoundedString } from "./store-normalizers.js";
 import { isAbsoluteWorkspacePath } from "./workspace-path.js";
 
 function normalizeTrustedWorkspaceAccess(
   value: unknown,
-  fallback?: FlowboardWorkspaceAccess,
-): FlowboardWorkspaceAccess | undefined {
+  fallback?: TaskfoldWorkspaceAccess,
+): TaskfoldWorkspaceAccess | undefined {
   if (value === undefined) {
     return fallback;
   }
@@ -41,7 +41,7 @@ function normalizeTrustedWorkspaceAccess(
   return { unrestricted: false, roots, writable: record.writable };
 }
 
-export function normalizeCardAutomation(input: FlowboardLinkedCreateInput) {
+export function normalizeCardAutomation(input: TaskfoldLinkedCreateInput) {
   const workspaceAccess = normalizeTrustedWorkspaceAccess(input.workspaceAccess);
   return normalizeAutomation(
     {
@@ -61,7 +61,7 @@ export function normalizeCardAutomation(input: FlowboardLinkedCreateInput) {
 
 export function normalizeAutomationPatch(
   patch: Record<string, unknown>,
-  current?: FlowboardAutomation,
+  current?: TaskfoldAutomation,
 ) {
   const workspaceAccess = Object.hasOwn(patch, "workspaceAccess")
     ? normalizeTrustedWorkspaceAccess(patch.workspaceAccess, current?.workspaceAccess)

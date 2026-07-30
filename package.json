@@ -1,18 +1,18 @@
 {
-  "name": "@johnson9316-bit/flowboard",
-  "version": "0.1.1",
+  "name": "@johnson9316-bit/taskfold",
+  "version": "0.2.0",
   "description": "Project, milestone, documentation, and execution boards for OpenClaw.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/johnson9316-bit/Flowboard.git"
+    "url": "git+https://github.com/johnson9316-bit/Taskfold.git"
   },
   "bugs": {
-    "url": "https://github.com/johnson9316-bit/Flowboard/issues"
+    "url": "https://github.com/johnson9316-bit/Taskfold/issues"
   },
-  "homepage": "https://github.com/johnson9316-bit/Flowboard#readme",
+  "homepage": "https://github.com/johnson9316-bit/Taskfold#readme",
   "keywords": [
     "openclaw",
     "plugin",

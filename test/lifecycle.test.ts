@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { FlowboardCard, FlowboardClaim } from "../src/contract/index.js";
+import type { TaskfoldCard, TaskfoldClaim } from "../src/contract/index.js";
 import {
   executionStatusForLifecycle,
-  flowboardRunEvidence,
-  getFlowboardLifecycle,
+  taskfoldRunEvidence,
+  getTaskfoldLifecycle,
   shouldCloseOrphanedRun,
   shouldSyncCardStatus,
   shouldSyncExecutionStatus,
@@ -13,7 +13,7 @@ import {
 const NOW = 1_800_000_000_000;
 const MINUTE = 60_000;
 
-function claim(lastHeartbeatAt: number): FlowboardClaim {
+function claim(lastHeartbeatAt: number): TaskfoldClaim {
   return {
     ownerId: "owner-a",
     token: "token-a",
@@ -22,7 +22,7 @@ function claim(lastHeartbeatAt: number): FlowboardClaim {
   };
 }
 
-function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
+function card(overrides: Partial<TaskfoldCard> = {}): TaskfoldCard {
   return {
     id: "card-1",
     title: "Card",
@@ -33,14 +33,14 @@ function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
     createdAt: NOW - MINUTE,
     updatedAt: NOW - MINUTE,
     revision: 1,
-    sessionKey: "subagent:flowboard-default-card-1",
+    sessionKey: "subagent:taskfold-default-card-1",
     metadata: { claim: claim(NOW - MINUTE) },
     ...overrides,
   };
 }
 
 /** A running card whose last sign of life was `minutesAgo` minutes back. */
-function quietFor(minutesAgo: number, overrides: Partial<FlowboardCard> = {}): FlowboardCard {
+function quietFor(minutesAgo: number, overrides: Partial<TaskfoldCard> = {}): TaskfoldCard {
   return card({
     updatedAt: NOW - minutesAgo * MINUTE,
     metadata: { claim: claim(NOW - minutesAgo * MINUTE) },
@@ -48,27 +48,27 @@ function quietFor(minutesAgo: number, overrides: Partial<FlowboardCard> = {}): F
   });
 }
 
-describe("Flowboard lifecycle", () => {
+describe("Taskfold lifecycle", () => {
   describe("run evidence", () => {
     it("reads a recent heartbeat as live", () => {
-      expect(flowboardRunEvidence({ card: quietFor(1), now: NOW })).toBe("live");
+      expect(taskfoldRunEvidence({ card: quietFor(1), now: NOW })).toBe("live");
       // Right at the heartbeat-stale threshold is still live, not yet suspicious.
-      expect(flowboardRunEvidence({ card: quietFor(20), now: NOW })).toBe("live");
+      expect(taskfoldRunEvidence({ card: quietFor(20), now: NOW })).toBe("live");
     });
 
     it("reads a lapsed heartbeat as stale, then abandoned past the grace window", () => {
-      expect(flowboardRunEvidence({ card: quietFor(21), now: NOW })).toBe("stale");
-      expect(flowboardRunEvidence({ card: quietFor(30), now: NOW })).toBe("stale");
-      expect(flowboardRunEvidence({ card: quietFor(31), now: NOW })).toBe("abandoned");
+      expect(taskfoldRunEvidence({ card: quietFor(21), now: NOW })).toBe("stale");
+      expect(taskfoldRunEvidence({ card: quietFor(30), now: NOW })).toBe("stale");
+      expect(taskfoldRunEvidence({ card: quietFor(31), now: NOW })).toBe("abandoned");
     });
 
     it("has nothing to judge on a card with no run", () => {
       expect(
-        flowboardRunEvidence({ card: card({ status: "todo", metadata: {} }), now: NOW }),
+        taskfoldRunEvidence({ card: card({ status: "todo", metadata: {} }), now: NOW }),
       ).toBe("unlinked");
       // A card with no session key names no run, however old it is.
       expect(
-        flowboardRunEvidence({ card: quietFor(90, { sessionKey: undefined }), now: NOW }),
+        taskfoldRunEvidence({ card: quietFor(90, { sessionKey: undefined }), now: NOW }),
       ).toBe("unlinked");
     });
 
@@ -83,19 +83,19 @@ describe("Flowboard lifecycle", () => {
             kind: "agent-session",
             mode: "autonomous",
             status,
-            sessionKey: "subagent:flowboard-default-card-1",
+            sessionKey: "subagent:taskfold-default-card-1",
             startedAt: NOW - 30 * MINUTE,
             updatedAt: NOW,
           },
         });
-        expect(flowboardRunEvidence({ card: finished, now: NOW })).toBe("finished");
+        expect(taskfoldRunEvidence({ card: finished, now: NOW })).toBe("finished");
         expect(shouldCloseOrphanedRun({ card: finished, now: NOW })).toBe(false);
       }
     });
 
     it("lets a card catch up to the outcome its execution recorded", () => {
       const withStatus = (status: "done" | "review" | "blocked") =>
-        getFlowboardLifecycle({
+        getTaskfoldLifecycle({
           card: card({
             metadata: {},
             execution: {
@@ -125,15 +125,15 @@ describe("Flowboard lifecycle", () => {
           kind: "agent-session",
           mode: "autonomous",
           status: "running",
-          sessionKey: "subagent:flowboard-default-card-1",
+          sessionKey: "subagent:taskfold-default-card-1",
           startedAt: NOW - 90 * MINUTE,
           updatedAt: NOW - 90 * MINUTE,
         },
       });
-      expect(flowboardRunEvidence({ card: viaExecution, now: NOW })).toBe("abandoned");
+      expect(taskfoldRunEvidence({ card: viaExecution, now: NOW })).toBe("abandoned");
       // A claim, when present, wins over an older execution timestamp.
       expect(
-        flowboardRunEvidence({
+        taskfoldRunEvidence({
           card: { ...viaExecution, metadata: { claim: claim(NOW - MINUTE) } },
           now: NOW,
         }),
@@ -143,7 +143,7 @@ describe("Flowboard lifecycle", () => {
 
   describe("verdicts", () => {
     it("keeps a live run running and reports its evidence timestamp", () => {
-      expect(getFlowboardLifecycle({ card: quietFor(1), now: NOW })).toMatchObject({
+      expect(getTaskfoldLifecycle({ card: quietFor(1), now: NOW })).toMatchObject({
         state: "live",
         targetStatus: "running",
         sourceUpdatedAt: NOW - MINUTE,
@@ -151,7 +151,7 @@ describe("Flowboard lifecycle", () => {
     });
 
     it("keeps a stale run reading as running so a stuck card looks stuck", () => {
-      expect(getFlowboardLifecycle({ card: quietFor(25), now: NOW })).toMatchObject({
+      expect(getTaskfoldLifecycle({ card: quietFor(25), now: NOW })).toMatchObject({
         state: "stale",
         targetStatus: "running",
       });
@@ -162,7 +162,7 @@ describe("Flowboard lifecycle", () => {
     });
 
     it("blocks an abandoned run and marks it for closing", () => {
-      expect(getFlowboardLifecycle({ card: quietFor(31), now: NOW })).toMatchObject({
+      expect(getTaskfoldLifecycle({ card: quietFor(31), now: NOW })).toMatchObject({
         state: "abandoned",
         targetStatus: "blocked",
       });

@@ -1,14 +1,14 @@
-// Flowboard plugin module implements card lookup behavior.
-import type { FlowboardCard } from "../../contract/index.js";
+// Taskfold plugin module implements card lookup behavior.
+import type { TaskfoldCard } from "../../contract/index.js";
 
-type FlowboardCardLookupResult =
-  | { card: FlowboardCard; error?: undefined }
+type TaskfoldCardLookupResult =
+  | { card: TaskfoldCard; error?: undefined }
   | { card?: undefined; error: string };
 
-export function resolveFlowboardCardByIdOrPrefix(
-  cards: readonly FlowboardCard[],
+export function resolveTaskfoldCardByIdOrPrefix(
+  cards: readonly TaskfoldCard[],
   id: string,
-): FlowboardCardLookupResult {
+): TaskfoldCardLookupResult {
   const exact = cards.find((card) => card.id === id);
   if (exact) {
     return { card: exact };

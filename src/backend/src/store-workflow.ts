@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import type {
-  FlowboardArtifact,
-  FlowboardCard,
-  FlowboardClaim,
-  FlowboardNotification,
-  FlowboardRunAttempt,
+  TaskfoldArtifact,
+  TaskfoldCard,
+  TaskfoldClaim,
+  TaskfoldNotification,
+  TaskfoldRunAttempt,
 } from "../../contract/index.js";
 import { isFutureDateTimestampMs } from "openclaw/plugin-sdk/number-runtime";
 import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
@@ -22,27 +22,27 @@ import {
   retryBudgetExhausted,
 } from "./store-card-helpers.js";
 import {
-  addFlowboardDurationMs,
+  addTaskfoldDurationMs,
   DEFAULT_CLAIM_TTL_MS,
-  isFlowboardClaimReclaimable,
+  isTaskfoldClaimReclaimable,
   MAX_CARD_ARTIFACTS,
   MAX_CARD_COMMENTS,
   MAX_CARD_NOTIFICATIONS,
   secondsToDurationMs,
 } from "./store-constants.js";
 import type {
-  FlowboardBlockInput,
-  FlowboardClaimInput,
-  FlowboardClaimOptions,
-  FlowboardCompleteInput,
-  FlowboardDecomposeChildInput,
-  FlowboardDecomposeInput,
-  FlowboardHeartbeatInput,
-  FlowboardMutationScope,
-  FlowboardProofInput,
-  FlowboardReassignInput,
-  FlowboardReclaimInput,
-  FlowboardSpecifyInput,
+  TaskfoldBlockInput,
+  TaskfoldClaimInput,
+  TaskfoldClaimOptions,
+  TaskfoldCompleteInput,
+  TaskfoldDecomposeChildInput,
+  TaskfoldDecomposeInput,
+  TaskfoldHeartbeatInput,
+  TaskfoldMutationScope,
+  TaskfoldProofInput,
+  TaskfoldReassignInput,
+  TaskfoldReclaimInput,
+  TaskfoldSpecifyInput,
 } from "./store-inputs.js";
 import {
   appendCompletionProof,
@@ -57,10 +57,10 @@ import {
   normalizeStringList,
   removeUndefinedMetadataFields,
 } from "./store-normalizers.js";
-import { FlowboardRevisionConflictError } from "./store-core.js";
-import { FlowboardPromoteStore } from "./store-promote.js";
+import { TaskfoldRevisionConflictError } from "./store-core.js";
+import { TaskfoldPromoteStore } from "./store-promote.js";
 
-function assertClaimIdentity(claim: FlowboardClaim, input: FlowboardHeartbeatInput): void {
+function assertClaimIdentity(claim: TaskfoldClaim, input: TaskfoldHeartbeatInput): void {
   const token = normalizeOptionalString(input.token);
   const ownerId = normalizeOptionalString(input.ownerId);
   if (token && !safeEqualSecret(token, claim.token)) {
@@ -71,11 +71,11 @@ function assertClaimIdentity(claim: FlowboardClaim, input: FlowboardHeartbeatInp
   }
 }
 
-export class FlowboardWorkflowStore extends FlowboardPromoteStore {
+export class TaskfoldWorkflowStore extends TaskfoldPromoteStore {
   async claimExecution(
     id: string,
     input: { ownerId?: unknown; expectedRevision?: unknown; ttlSeconds?: unknown },
-  ): Promise<{ card: FlowboardCard; token: string }> {
+  ): Promise<{ card: TaskfoldCard; token: string }> {
     const ownerId = normalizeBoundedString(input.ownerId, undefined, 120, "claim owner");
     if (!ownerId) {
       throw new Error("claim ownerId is required.");
@@ -98,7 +98,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
         throw new Error(`card not found: ${id}`);
       }
       if (existing.revision !== expectedRevision) {
-        throw new FlowboardRevisionConflictError(id, expectedRevision);
+        throw new TaskfoldRevisionConflictError(id, expectedRevision);
       }
       if (existing.metadata?.archivedAt) {
         throw new Error("card is archived.");
@@ -117,12 +117,12 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       if (
         existingClaim &&
         (isFutureDateTimestampMs(existingClaim.expiresAt, { nowMs: now }) ||
-          !isFlowboardClaimReclaimable(existingClaim, now))
+          !isTaskfoldClaimReclaimable(existingClaim, now))
       ) {
         throw new Error(`card already claimed by ${existingClaim.ownerId}.`);
       }
       const token = randomUUID();
-      const expiresAt = addFlowboardDurationMs(
+      const expiresAt = addTaskfoldDurationMs(
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS,
       );
@@ -144,7 +144,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
   async stopExecution(
     id: string,
     input: { expectedRunId?: unknown; reason?: unknown } = {},
-  ): Promise<FlowboardCard> {
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -161,7 +161,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       const now = Date.now();
       const reason =
         normalizeBoundedString(input.reason, undefined, 1000, "stop reason") ??
-        "Flowboard execution stopped by operator.";
+        "Taskfold execution stopped by operator.";
       return await this.updateCard(id, {
         execution: { ...existing.execution, status: "blocked", updatedAt: now },
         metadata: {
@@ -180,7 +180,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
   async finishExecutionForRun(
     runId: string,
     input: { outcome?: unknown; endedAt?: unknown; reason?: unknown } = {},
-  ): Promise<FlowboardCard | undefined> {
+  ): Promise<TaskfoldCard | undefined> {
     const normalizedRunId = normalizeOptionalString(runId);
     if (!normalizedRunId) {
       throw new Error("runId is required.");
@@ -208,7 +208,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
         normalizeBoundedString(input.reason, undefined, 1_000, "execution end reason") ??
         (succeeded
           ? undefined
-          : `Flowboard execution ended with ${outcome || "an unknown"} outcome.`);
+          : `Taskfold execution ended with ${outcome || "an unknown"} outcome.`);
       return await this.updateCard(existing.id, {
         execution: {
           ...existing.execution,
@@ -231,9 +231,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async claim(
     id: string,
-    input: FlowboardClaimInput,
-    options: FlowboardClaimOptions = {},
-  ): Promise<{ card: FlowboardCard; token: string }> {
+    input: TaskfoldClaimInput,
+    options: TaskfoldClaimOptions = {},
+  ): Promise<{ card: TaskfoldCard; token: string }> {
     const ownerId = normalizeBoundedString(input.ownerId, undefined, 120, "claim owner");
     if (!ownerId) {
       throw new Error("claim ownerId is required.");
@@ -255,12 +255,12 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
   private async claimOnce(
     id: string,
     input: { ownerId: string; ttlSeconds: number | undefined; token: string },
-    options: FlowboardClaimOptions,
-  ): Promise<{ card: FlowboardCard; token: string }> {
+    options: TaskfoldClaimOptions,
+  ): Promise<{ card: TaskfoldCard; token: string }> {
     const { ownerId, ttlSeconds, token } = input;
     return await this.enqueueMutation(async () => {
       const now = Date.now();
-      const expiresAt = addFlowboardDurationMs(
+      const expiresAt = addTaskfoldDurationMs(
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS,
       );
@@ -294,7 +294,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
         (isFutureDateTimestampMs(existingClaim.expiresAt, { nowMs: now }) ||
           // Direct claims must honor the same running-worker heartbeat grace
           // as dispatcher recovery; otherwise they silently steal live tokens.
-          (guarded.status === "running" && !isFlowboardClaimReclaimable(existingClaim, now)))
+          (guarded.status === "running" && !isTaskfoldClaimReclaimable(existingClaim, now)))
           ? existingClaim
           : undefined;
       if (cardParentIds(guarded).length > 0 && guarded.status !== "ready" && !activeClaim) {
@@ -338,7 +338,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
     });
   }
 
-  async heartbeat(id: string, input: FlowboardHeartbeatInput): Promise<FlowboardCard> {
+  async heartbeat(id: string, input: TaskfoldHeartbeatInput): Promise<TaskfoldCard> {
     const note = normalizeBoundedString(input.note, undefined, 400, "heartbeat note");
     const card = await this.updateMetadata(id, (existing) => {
       const claim = existing.metadata?.claim;
@@ -351,7 +351,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
         ...claim,
         lastHeartbeatAt: now,
         expiresAt: claim.expiresAt
-          ? addFlowboardDurationMs(
+          ? addTaskfoldDurationMs(
               now,
               Math.max(
                 1,
@@ -378,8 +378,8 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async releaseClaim(
     id: string,
-    input: FlowboardHeartbeatInput & { status?: unknown } = {},
-  ): Promise<FlowboardCard> {
+    input: TaskfoldHeartbeatInput & { status?: unknown } = {},
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -406,17 +406,17 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async complete(
     id: string,
-    input: FlowboardCompleteInput = {},
-    scope: FlowboardMutationScope | null | undefined = input,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldCompleteInput = {},
+    scope: TaskfoldMutationScope | null | undefined = input,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => await this.completeDirect(id, input, scope));
   }
 
   private async completeDirect(
     id: string,
-    input: FlowboardCompleteInput = {},
-    scope: FlowboardMutationScope | null | undefined = input,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldCompleteInput = {},
+    scope: TaskfoldMutationScope | null | undefined = input,
+  ): Promise<TaskfoldCard> {
     const existing = await this.get(id);
     if (!existing) {
       throw new Error(`card not found: ${id}`);
@@ -439,7 +439,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
     const summary = normalizeBoundedString(input.summary, undefined, 2000, "summary");
     const proofInput =
       input.proof && typeof input.proof === "object" && !Array.isArray(input.proof)
-        ? (input.proof as FlowboardProofInput)
+        ? (input.proof as TaskfoldProofInput)
         : undefined;
     const proofId = normalizeBoundedString(input.proofId, undefined, 120, "proof id");
     if (input.proofId !== undefined && !proofId) {
@@ -452,16 +452,16 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
     const artifacts = Array.isArray(input.artifacts)
       ? input.artifacts
           .map((artifact) => normalizeArtifact({ ...artifact, createdAt: now }))
-          .filter((artifact): artifact is FlowboardArtifact => artifact !== null)
+          .filter((artifact): artifact is TaskfoldArtifact => artifact !== null)
           .slice(-MAX_CARD_ARTIFACTS)
       : [];
     const metadata = clearDiagnostics(existing.metadata, ["missing_proof"]);
-    const notification: FlowboardNotification = {
+    const notification: TaskfoldNotification = {
       id: randomUUID(),
       kind: "completed",
       createdAt: now,
       sequence: this.nextNotificationSequence(now),
-      message: capText(summary, 240) ?? "Flowboard card completed.",
+      message: capText(summary, 240) ?? "Taskfold card completed.",
       ...(cardSessionKey(existing) ? { sessionKey: cardSessionKey(existing) } : {}),
       ...(cardRunId(existing) ? { runId: cardRunId(existing) } : {}),
     };
@@ -511,9 +511,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async block(
     id: string,
-    input: FlowboardBlockInput = {},
-    scope: FlowboardMutationScope | null | undefined = input,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldBlockInput = {},
+    scope: TaskfoldMutationScope | null | undefined = input,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -523,14 +523,14 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       const now = Date.now();
       const reason =
         normalizeBoundedString(input.reason, undefined, 2000, "block reason") ??
-        "Flowboard card blocked.";
+        "Taskfold card blocked.";
       const metadata = existing.metadata ?? {};
-      const notification: FlowboardNotification = {
+      const notification: TaskfoldNotification = {
         id: randomUUID(),
         kind: "failed",
         createdAt: now,
         sequence: this.nextNotificationSequence(now),
-        message: capText(reason, 240) ?? "Flowboard card blocked.",
+        message: capText(reason, 240) ?? "Taskfold card blocked.",
         ...(cardSessionKey(existing) ? { sessionKey: cardSessionKey(existing) } : {}),
         ...(cardRunId(existing) ? { runId: cardRunId(existing) } : {}),
       };
@@ -558,7 +558,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
     });
   }
 
-  async unblock(id: string, scope?: FlowboardMutationScope): Promise<FlowboardCard> {
+  async unblock(id: string, scope?: TaskfoldMutationScope): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -572,9 +572,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async reassign(
     id: string,
-    input: FlowboardReassignInput = {},
-    scope?: FlowboardMutationScope | null,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldReassignInput = {},
+    scope?: TaskfoldMutationScope | null,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -608,9 +608,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async reclaim(
     id: string,
-    input: FlowboardReclaimInput = {},
-    scope?: FlowboardMutationScope | null,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldReclaimInput = {},
+    scope?: TaskfoldMutationScope | null,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -620,7 +620,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       const now = Date.now();
       const reason =
         normalizeBoundedString(input.reason, undefined, 1000, "reclaim reason") ??
-        "Flowboard claim reclaimed.";
+        "Taskfold claim reclaimed.";
       const targetStatus =
         input.status === undefined
           ? existing.status === "running"
@@ -649,7 +649,7 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
     });
   }
 
-  async runs(id: string): Promise<{ card: FlowboardCard; attempts: FlowboardRunAttempt[] }> {
+  async runs(id: string): Promise<{ card: TaskfoldCard; attempts: TaskfoldRunAttempt[] }> {
     const card = await this.get(id);
     if (!card) {
       throw new Error(`card not found: ${id}`);
@@ -659,9 +659,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async specify(
     id: string,
-    input: FlowboardSpecifyInput = {},
-    scope?: FlowboardMutationScope | null,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldSpecifyInput = {},
+    scope?: TaskfoldMutationScope | null,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -718,9 +718,9 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
 
   async decompose(
     id: string,
-    input: FlowboardDecomposeInput = {},
-    scope?: FlowboardMutationScope | null,
-  ): Promise<{ parent: FlowboardCard; children: FlowboardCard[] }> {
+    input: TaskfoldDecomposeInput = {},
+    scope?: TaskfoldMutationScope | null,
+  ): Promise<{ parent: TaskfoldCard; children: TaskfoldCard[] }> {
     return await this.enqueueMutation(async () => {
       const parent = await this.get(id);
       if (!parent) {
@@ -736,14 +736,14 @@ export class FlowboardWorkflowStore extends FlowboardPromoteStore {
       }
       const parentAutomation = parent.metadata?.automation;
       const existingCardIds = new Set((await this.list()).map((card) => card.id));
-      const children: FlowboardCard[] = [];
-      const reusedChildSnapshots = new Map<string, FlowboardCard>();
+      const children: TaskfoldCard[] = [];
+      const reusedChildSnapshots = new Map<string, TaskfoldCard>();
       try {
         for (const rawChild of childrenInput) {
           if (!rawChild || typeof rawChild !== "object" || Array.isArray(rawChild)) {
             throw new Error("children must be objects.");
           }
-          const child = rawChild as FlowboardDecomposeChildInput;
+          const child = rawChild as TaskfoldDecomposeChildInput;
           const created = await this.createDirect(
             {
               ...child,

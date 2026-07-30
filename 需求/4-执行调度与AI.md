@@ -2,9 +2,9 @@
 
 > 跨主题请从 [[README]] 进入；发现矛盾时以 [[1-规划评审]] 为准。
 
-AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报）与**AI 执行开发调度**（v0.8 新增，模块⑥）。前者是辅助功能；后者将 GSD 的 Execute 阶段变成可排队、可观察、可接管的流程，是 flowboard 的核心差异化。
+AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报）与**AI 执行开发调度**（v0.8 新增，模块⑥）。前者是辅助功能；后者将 GSD 的 Execute 阶段变成可排队、可观察、可接管的流程，是 taskfold 的核心差异化。
 
-> **2026-07-28 架构修正：flowboard 是 OpenClaw 插件。** M1 只复制 Workboard；M2 起才在插件中增加 `AgentRunner`、工作项、run 账本、GSD 映射和人机交接状态。分工见 [[14-OpenClaw技能策略]]。
+> **2026-07-28 架构修正：taskfold 是 OpenClaw 插件。** M1 只复制 Workboard；M2 起才在插件中增加 `AgentRunner`、工作项、run 账本、GSD 映射和人机交接状态。分工见 [[14-OpenClaw技能策略]]。
 
 ### Agent Tools（**以 MCP 为主契约**）
 
@@ -18,21 +18,21 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 
 | 工具 | 用途 |
 |------|------|
-| `flowboard_search` | 按条件检索工作项（状态/phase/当前重点/标签/全文） |
-| `flowboard_get` | 读单个工作项（含 MD 正文与 AC） |
-| `flowboard_create` | 建工作项 |
-| `flowboard_update` | 改字段 / 移状态（走流程校验） |
-| `flowboard_link` | 建立关联 |
-| `flowboard_comment` | 追加 SQLite 评论记录 |
-| `flowboard_plan_focus` | 当前重点规划：给候选集、依赖与历史记录，返回建议顺序 |
-| `flowboard_report` | 生成日报 / 周报 / 当前重点总结 |
-| `flowboard_metrics` | 取度量数据 |
+| `taskfold_search` | 按条件检索工作项（状态/phase/当前重点/标签/全文） |
+| `taskfold_get` | 读单个工作项（含 MD 正文与 AC） |
+| `taskfold_create` | 建工作项 |
+| `taskfold_update` | 改字段 / 移状态（走流程校验） |
+| `taskfold_link` | 建立关联 |
+| `taskfold_comment` | 追加 SQLite 评论记录 |
+| `taskfold_plan_focus` | 当前重点规划：给候选集、依赖与历史记录，返回建议顺序 |
+| `taskfold_report` | 生成日报 / 周报 / 当前重点总结 |
+| `taskfold_metrics` | 取度量数据 |
 
 > 写操作工具需带 `dry_run` 参数，agent 默认先预演再执行。
 
 ### 自动化规则
 
-轻量三段式（**触发器 → 条件 → 动作**），YAML 配置于 `<FLOWBOARD_HOME>/automations.yaml`。规则模型参考 n8n，**但不引入 n8n，也不做画布**（[[2-产品定位与范围]]）：
+轻量三段式（**触发器 → 条件 → 动作**），YAML 配置于 `<TASKFOLD_HOME>/automations.yaml`。规则模型参考 n8n，**但不引入 n8n，也不做画布**（[[2-产品定位与范围]]）：
 
 ```yaml
 - name: 阻塞超时预警
@@ -72,12 +72,12 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 
 **一句话定位：**
 
-> **flowboard 是独立调度层，不是开发执行者。真实执行者是 OpenClaw `coding-agent`、Claude CLI / codex / opencode 等专业开发 agent。**
+> **taskfold 是独立调度层，不是开发执行者。真实执行者是 OpenClaw `coding-agent`、Claude CLI / codex / opencode 等专业开发 agent。**
 > 目标不是让 AI 自主完成所有开发，而是把开发执行变成**可排队、可观察、可验证、可接管**的异步流程。
 
 #### 职责红线
 
-| flowboard 做 | flowboard 不做 |
+| taskfold 做 | taskfold 不做 |
 |-----------|-------------|
 | 决定**哪个工作项该开工**（按 GSD 阶段 + 依赖 + WIP） | ❌ 自己写代码、自己改文件 |
 | 组装会话的**上下文包**（workspace、phase、要读的产物、skills、MCP） | ❌ 自带 LLM 调用层、自己跑 agent loop |
@@ -94,7 +94,7 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 
 对应到 GSD 循环（[[3-需求与工作管理]]）：
 
-| GSD 阶段 | 谁主导 | flowboard 的角色 |
+| GSD 阶段 | 谁主导 | taskfold 的角色 |
 |---------|-------|--------------|
 | Discuss | **人**（agent 辅助提问） | 提供上下文、记录决策入 `XX-CONTEXT.md` |
 | Plan | 机器起草 → **人过目** | 起会话；`plan-checker` 未过则不放行 Execute |
@@ -102,7 +102,7 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 | Verify | 机器跑 → **人验收** | 把 `XX-VERIFICATION.md` / `XX-UAT.md` 推成待办卡 |
 | Ship | **人** | 归档、更新 `STATE.md`、度量落账 |
 
-⇒ **只有 Execute 是可以放手的**。其余四个阶段 flowboard 只做「把材料准备好、把人叫来」。
+⇒ **只有 Execute 是可以放手的**。其余四个阶段 taskfold 只做「把材料准备好、把人叫来」。
 
 #### ⚠️ 关键发现：OpenClaw 已内建 CLI backend，执行层大半可复用
 
@@ -125,7 +125,7 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
 | 会话历史存储 | `~/.openclaw/agents/<agentId>/agent/openclaw-agent.sqlite` + 归档 transcripts 于 `sessions/` | `concepts/session` |
 | 多 agent 编排 | `sessions_spawn`（非阻塞，返回 `runId` + `childSessionKey`）/ `sessions_yield` / subagents 树视图 | `concepts/session-tool` |
 
-**⇒ 结论：flowboard 不该自己写会话管理器。** PTY、流式解析、session resume、MCP 注入、skills 挂载、历史落库——这些全是已解决问题。flowboard 该做的是**上面那一层：账本 + 排队 + GSD 状态机 + 人机交接点**。
+**⇒ 结论：taskfold 不该自己写会话管理器。** PTY、流式解析、session resume、MCP 注入、skills 挂载、历史落库——这些全是已解决问题。taskfold 该做的是**上面那一层：账本 + 排队 + GSD 状态机 + 人机交接点**。
 
 **你的两条指示在这里冲突了，必须拍板**（→ [[11-交接与待决]] 决策 B）：
 
@@ -154,7 +154,7 @@ AI 能力分为两类：**AI 辅助管理**（澄清、拆解、排序、播报�
           └─ 代价：不能实时打断，权限须预设 permission-mode
                     ↓ 人要介入时
 接管路径：人在真终端跑  claude --resume <session-id>
-          └─ 会话 id 就在 flowboard 的账本里，几乎零成本 ★
+          └─ 会话 id 就在 taskfold 的账本里，几乎零成本 ★
                     ↓ 只有需要「跑着的时候插话」时才上
 增强路径：Agent SDK 长驻会话（自建，M4+）
           └─ 仅对少数需要边跑边引导的场景开
@@ -195,7 +195,7 @@ run（一次会话）  status: queued → running → awaiting_human → done / 
 
 **并行度控制**：GSD 的 wave 模型（[[3-需求与工作管理]]）给出逻辑并行边界，但不能替代文件系统隔离。M2 默认每 repo 只允许一个 active run，并且必须在独立 worktree 中执行；不得让 agent 直接改用户当前工作区。M3 才评估同 repo 多 worktree 并行与合并策略。
 
-> ⚠️ **同一 repo 并发写会互相踩**。GSD 的 wave 假设了并行 executor，但那是靠 fresh context 隔离**上下文**，没隔离**文件系统**。flowboard 必须做出选择（→ [[11-交接与待决]] 决策 C）：
+> ⚠️ **同一 repo 并发写会互相踩**。GSD 的 wave 假设了并行 executor，但那是靠 fresh context 隔离**上下文**，没隔离**文件系统**。taskfold 必须做出选择（→ [[11-交接与待决]] 决策 C）：
 > - **C1 串行化同 repo**：简单可靠，牺牲并行度
 > - **C2 git worktree 隔离**：每个 run 一个 worktree，跑完合并。成本中等，收益是真并行
 > - **C3 信任 wave 划分**：假定同 wave 的 plan 不碰同一批文件（gsd-core 的 planner 本就按依赖分组）
@@ -207,12 +207,12 @@ run（一次会话）  status: queued → running → awaiting_human → done / 
 | 数据 | 存哪 | 理由 |
 |------|------|------|
 | 会话原始 transcript | **OpenClaw**（`~/.openclaw/agents/<id>/…sqlite` + `sessions/`）与 **Claude Code**（project transcripts） | 已经有两份了，再存第三份是纯负债 |
-| `runs` 表：run_id ↔ session_id ↔ work_item ↔ phase ↔ 起止时间 ↔ 结果 ↔ 成本 | **flowboard SQLite** | 宿主不知道「工作项」这个概念，这是 flowboard 独有实体（[[7-数据与接口]]） |
-| `run_events`：里程碑事件（阶段切换、tool 使用摘要、awaiting_human 原因、错误） | **flowboard SQLite** | 度量（[[7-数据与接口]]）与看板实时展示需要；**只存摘要不存全文** |
+| `runs` 表：run_id ↔ session_id ↔ work_item ↔ phase ↔ 起止时间 ↔ 结果 ↔ 成本 | **taskfold SQLite** | 宿主不知道「工作项」这个概念，这是 taskfold 独有实体（[[7-数据与接口]]） |
+| `run_events`：里程碑事件（阶段切换、tool 使用摘要、awaiting_human 原因、错误） | **taskfold SQLite** | 度量（[[7-数据与接口]]）与看板实时展示需要；**只存摘要不存全文** |
 | 会话产出的 GSD 产物 | **文件**（`.planning/`） | 铁律不变（[[7-数据与接口]]） |
 | 复盘档 | **文件**（[[4-执行调度与AI]]） | 要能 Git 版本化、要能被 agent 读 |
 
-> **「全过程需保存」= 保存指针 + 摘要 + 产物，不是保存全文副本。** 全文在宿主那儿，flowboard 存 `session_id` 就能随时调出（也能 `claude --resume` 直接进去）。真正需要自己存的是**跨会话、跨项目才能算出来的东西**：谁在什么时候因为什么卡住了、返工了几次、花了多少。
+> **「全过程需保存」= 保存指针 + 摘要 + 产物，不是保存全文副本。** 全文在宿主那儿，taskfold 存 `session_id` 就能随时调出（也能 `claude --resume` 直接进去）。真正需要自己存的是**跨会话、跨项目才能算出来的东西**：谁在什么时候因为什么卡住了、返工了几次、花了多少。
 
 #### skills 与 MCP 的透传
 
@@ -226,7 +226,7 @@ OpenClaw 侧已提供机制，但有两个坑必须实测：
 | **MCP** | `bundleMcp: true` → loopback HTTP MCP server 暴露 **gateway tools** | 暴露的是**网关工具**，不是项目 `.mcp.json` 里的 MCP。**两者能否并存，待实测** |
 | **原生工具** | `nativeToolMode: "always-on" \| "selectable" \| "disabled"` | ⚠️ 文档说 restricted run 下「Claude's native tools are disabled」。**开发场景必须 `always-on`**——没有 Read/Edit/Bash 就不用谈写代码了 |
 
-> 若实测发现 OpenClaw 的 bundleMcp 会挤掉项目自己的 MCP 配置，退路是**不走 OpenClaw 的 MCP 桥**：`bundleMcp: false`，让 flowboard 直接把项目该用的 MCP 写进会话的 `--mcp-config`，把 flowboard 自己的工具也作为一个 MCP server 暴露（[[4-执行调度与AI]] 本来就要做 MCP server，正好复用）。
+> 若实测发现 OpenClaw 的 bundleMcp 会挤掉项目自己的 MCP 配置，退路是**不走 OpenClaw 的 MCP 桥**：`bundleMcp: false`，让 taskfold 直接把项目该用的 MCP 写进会话的 `--mcp-config`，把 taskfold 自己的工具也作为一个 MCP server 暴露（[[4-执行调度与AI]] 本来就要做 MCP server，正好复用）。
 > 这条退路值得优先验证，因为它同时更符合「项目该用什么就用什么」的语义。
 
 ### 每日巡检（辅助通道）
@@ -244,7 +244,7 @@ OpenClaw 侧已提供机制，但有两个坑必须实测：
 
 | 检查 | 输出 |
 |------|------|
-| `.planning/` 与看板索引是否一致 | 不一致 → 建议 `flowboard reindex` |
+| `.planning/` 与看板索引是否一致 | 不一致 → 建议 `taskfold reindex` |
 | 有无 `awaiting_human` 挂了超过 N 小时 | 汇总提醒（这是最有价值的一项） |
 | 有无 phase 停在某阶段超阈值 | 阻塞预警（[[7-数据与接口]] 阶段停留分布） |
 | 有无 Verify 失败未处理 | 返工待决 |
@@ -261,7 +261,7 @@ OpenClaw 侧已提供机制，但有两个坑必须实测：
 
 ```
 <项目仓库>/.planning/phases/XX-phase-name/
-└── runs/                          ← flowboard 新增，但放在 GSD 布局内
+└── runs/                          ← taskfold 新增，但放在 GSD 布局内
     └── <run_id>/
         ├── META.json              # session_id / 起止 / 模型 / 成本 / 结果
         ├── TIMELINE.md            # 里程碑时间线（人可读）
@@ -269,7 +269,7 @@ OpenClaw 侧已提供机制，但有两个坑必须实测：
 ```
 
 > ⚠️ 这里与 [[7-数据与接口]] 铁律「不往 `.planning/` 写自有字段」有张力。**分辨方式：不改上游既有文件的格式，只在 phase 目录下加一个上游没有的 `runs/` 子目录。** 上游 gsd-core 不认识它，但也不会被它破坏；用户 Git 里能看到、能 diff、能跟着 phase 一起归档。
-> 若后续发现 gsd-core 的归档逻辑会清理未知目录，退路是移到 `<FLOWBOARD_HOME>/runs/<project>/<phase>/`，代价是失去「跟着代码一起版本化」。**待实测（[[6-OpenClaw集成]]）。**
+> 若后续发现 gsd-core 的归档逻辑会清理未知目录，退路是移到 `<TASKFOLD_HOME>/runs/<project>/<phase>/`，代价是失去「跟着代码一起版本化」。**待实测（[[6-OpenClaw集成]]）。**
 
 **`HANDOFF.md` 是复盘里最值钱的文件**——它记录的是「机器在哪儿卡住、人怎么决定的」。这正是 [[7-数据与接口]]「Verify 返工率」「人机操作比」两个指标的原始素材，也是将来沉淀成 skills / CONTEXT 模板的来源。
 

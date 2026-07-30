@@ -5,13 +5,17 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
-var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
+var TASKFOLD_DB_RELATIVE_PATH = ["plugins", "taskfold", "taskfold.sqlite"];
+var LEGACY_FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
 var SCHEMA_VERSION = 7;
-var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
-var FLOWBOARD_SQLITE_DIR_MODE = 448;
-var FLOWBOARD_SQLITE_FILE_MODE = 384;
-function resolveFlowboardSqlitePath(env = process.env) {
-  return path.join(resolveStateDir(env), ...FLOWBOARD_DB_RELATIVE_PATH);
+var TASKFOLD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
+var TASKFOLD_SQLITE_DIR_MODE = 448;
+var TASKFOLD_SQLITE_FILE_MODE = 384;
+function resolveTaskfoldSqlitePath(env = process.env) {
+  return path.join(resolveStateDir(env), ...TASKFOLD_DB_RELATIVE_PATH);
+}
+function resolveLegacyFlowboardSqlitePath(env = process.env) {
+  return path.join(resolveStateDir(env), ...LEGACY_FLOWBOARD_DB_RELATIVE_PATH);
 }
 function jsonValue(value) {
   return value === void 0 ? null : JSON.stringify(value);
@@ -39,14 +43,14 @@ function numberValue(row, key) {
 function requiredString(row, key) {
   const value = stringValue(row, key);
   if (!value) {
-    throw new Error(`flowboard sqlite row missing ${key}`);
+    throw new Error(`taskfold sqlite row missing ${key}`);
   }
   return value;
 }
 function requiredNumber(row, key) {
   const value = numberValue(row, key);
   if (value === void 0) {
-    throw new Error(`flowboard sqlite row missing ${key}`);
+    throw new Error(`taskfold sqlite row missing ${key}`);
   }
   return value;
 }
@@ -76,6 +80,12 @@ function runTransaction(db, run) {
     throw error;
   }
 }
+function quoteIdentifier(value) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+function quoteSqlString(value) {
+  return `'${value.replaceAll("'", "''")}'`;
+}
 function tableColumns(db, tableName) {
   return new Set(
     db.prepare(`PRAGMA table_info(${tableName})`).all().flatMap(
@@ -89,17 +99,17 @@ function ensureColumn(db, tableName, columnName, definition) {
   }
   db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definition}`);
 }
-var FLOWBOARD_SCHEMA_SQL = `
-    CREATE TABLE IF NOT EXISTS flowboard_meta (
+var TASKFOLD_SCHEMA_SQL = `
+    CREATE TABLE IF NOT EXISTS taskfold_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     ) STRICT;
-    CREATE TABLE IF NOT EXISTS flowboard_schema_migrations (
+    CREATE TABLE IF NOT EXISTS taskfold_schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_boards (
+    CREATE TABLE IF NOT EXISTS taskfold_boards (
       id TEXT PRIMARY KEY,
       name TEXT,
       description TEXT,
@@ -120,7 +130,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       archived_at INTEGER
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_cards (
+    CREATE TABLE IF NOT EXISTS taskfold_cards (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -156,21 +166,21 @@ var FLOWBOARD_SCHEMA_SQL = `
       lifecycle_status_source_updated_at INTEGER,
       failure_count INTEGER
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_cards_board_status_idx
-      ON flowboard_cards(board_id, status, position);
-    CREATE INDEX IF NOT EXISTS flowboard_cards_session_idx
-      ON flowboard_cards(session_key, run_id);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_board_status_idx
+      ON taskfold_cards(board_id, status, position);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_session_idx
+      ON taskfold_cards(session_key, run_id);
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_labels (
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_card_labels (
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       label TEXT NOT NULL,
       PRIMARY KEY(card_id, ordinal)
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_events (
+    CREATE TABLE IF NOT EXISTS taskfold_card_events (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       kind TEXT NOT NULL,
       at INTEGER NOT NULL,
@@ -182,9 +192,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_attempts (
+    CREATE TABLE IF NOT EXISTS taskfold_card_attempts (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       status TEXT NOT NULL,
       started_at INTEGER NOT NULL,
@@ -197,18 +207,18 @@ var FLOWBOARD_SCHEMA_SQL = `
       error TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_comments (
+    CREATE TABLE IF NOT EXISTS taskfold_card_comments (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       body TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_links (
+    CREATE TABLE IF NOT EXISTS taskfold_card_links (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       type TEXT NOT NULL,
       target_card_id TEXT,
@@ -217,9 +227,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_proof (
+    CREATE TABLE IF NOT EXISTS taskfold_card_proof (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       status TEXT NOT NULL,
       label TEXT,
@@ -229,9 +239,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_artifacts (
+    CREATE TABLE IF NOT EXISTS taskfold_card_artifacts (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       label TEXT,
       url TEXT,
@@ -240,8 +250,8 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_delivery (
-      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_card_delivery (
+      card_id TEXT PRIMARY KEY REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       objective TEXT,
       delivery_summary TEXT,
       open_items TEXT,
@@ -251,9 +261,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       updated_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_source_references (
+    CREATE TABLE IF NOT EXISTS taskfold_card_source_references (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       label TEXT NOT NULL,
       target TEXT NOT NULL,
@@ -262,11 +272,11 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_card_source_references_card_position_idx
-      ON flowboard_card_source_references(card_id, position);
+    CREATE INDEX IF NOT EXISTS taskfold_card_source_references_card_position_idx
+      ON taskfold_card_source_references(card_id, position);
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_diagnostics (
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_card_diagnostics (
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       kind TEXT NOT NULL,
       severity TEXT NOT NULL,
@@ -279,9 +289,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       PRIMARY KEY(card_id, ordinal)
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_notifications (
+    CREATE TABLE IF NOT EXISTS taskfold_card_notifications (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       kind TEXT NOT NULL,
       message TEXT NOT NULL,
@@ -291,9 +301,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_worker_logs (
+    CREATE TABLE IF NOT EXISTS taskfold_worker_logs (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       level TEXT NOT NULL,
       message TEXT NOT NULL,
@@ -302,16 +312,16 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_worker_protocol (
-      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_worker_protocol (
+      card_id TEXT PRIMARY KEY REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       state TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       detail TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_attachments (
+    CREATE TABLE IF NOT EXISTS taskfold_card_attachments (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       file_name TEXT NOT NULL,
       byte_size INTEGER NOT NULL,
@@ -319,15 +329,15 @@ var FLOWBOARD_SCHEMA_SQL = `
       note TEXT,
       created_at INTEGER NOT NULL
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_card_attachments_card_idx
-      ON flowboard_card_attachments(card_id, ordinal);
+    CREATE INDEX IF NOT EXISTS taskfold_card_attachments_card_idx
+      ON taskfold_card_attachments(card_id, ordinal);
 
-    CREATE TABLE IF NOT EXISTS flowboard_attachment_blobs (
+    CREATE TABLE IF NOT EXISTS taskfold_attachment_blobs (
       attachment_id TEXT PRIMARY KEY,
       content BLOB NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_notification_subscriptions (
+    CREATE TABLE IF NOT EXISTS taskfold_notification_subscriptions (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       card_id TEXT,
@@ -343,7 +353,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       updated_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_milestones (
+    CREATE TABLE IF NOT EXISTS taskfold_milestones (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -356,10 +366,10 @@ var FLOWBOARD_SCHEMA_SQL = `
       completed_at INTEGER,
       archived_at INTEGER
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_milestones_board_position_idx
-      ON flowboard_milestones(board_id, position);
+    CREATE INDEX IF NOT EXISTS taskfold_milestones_board_position_idx
+      ON taskfold_milestones(board_id, position);
 
-    CREATE TABLE IF NOT EXISTS flowboard_project_documents (
+    CREATE TABLE IF NOT EXISTS taskfold_project_documents (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       document_key TEXT NOT NULL,
@@ -377,72 +387,72 @@ var FLOWBOARD_SCHEMA_SQL = `
       updated_at INTEGER NOT NULL,
       UNIQUE(board_id, document_key)
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_project_documents_board_section_position_idx
-      ON flowboard_project_documents(board_id, section, position);
+    CREATE INDEX IF NOT EXISTS taskfold_project_documents_board_section_position_idx
+      ON taskfold_project_documents(board_id, section, position);
   `;
-function ensureFlowboardSchema(db) {
-  db.exec(FLOWBOARD_SCHEMA_SQL);
+function ensureTaskfoldSchema(db) {
+  db.exec(TASKFOLD_SCHEMA_SQL);
   ensureColumn(
     db,
-    "flowboard_cards",
+    "taskfold_cards",
     "lifecycle_status_source_updated_at",
     "lifecycle_status_source_updated_at INTEGER"
   );
-  ensureColumn(db, "flowboard_cards", "milestone_id", "milestone_id TEXT");
-  ensureColumn(db, "flowboard_card_events", "from_milestone_id", "from_milestone_id TEXT");
-  ensureColumn(db, "flowboard_card_events", "to_milestone_id", "to_milestone_id TEXT");
-  ensureColumn(db, "flowboard_boards", "position", "position REAL");
-  ensureColumn(db, "flowboard_boards", "version", "version TEXT");
-  ensureColumn(db, "flowboard_boards", "current_objective", "current_objective TEXT");
-  ensureColumn(db, "flowboard_boards", "core_value", "core_value TEXT");
-  ensureColumn(db, "flowboard_boards", "source_of_truth", "source_of_truth TEXT");
-  ensureColumn(db, "flowboard_boards", "repository_url", "repository_url TEXT");
-  ensureColumn(db, "flowboard_boards", "planning_path", "planning_path TEXT");
-  ensureColumn(db, "flowboard_boards", "homepage_url", "homepage_url TEXT");
+  ensureColumn(db, "taskfold_cards", "milestone_id", "milestone_id TEXT");
+  ensureColumn(db, "taskfold_card_events", "from_milestone_id", "from_milestone_id TEXT");
+  ensureColumn(db, "taskfold_card_events", "to_milestone_id", "to_milestone_id TEXT");
+  ensureColumn(db, "taskfold_boards", "position", "position REAL");
+  ensureColumn(db, "taskfold_boards", "version", "version TEXT");
+  ensureColumn(db, "taskfold_boards", "current_objective", "current_objective TEXT");
+  ensureColumn(db, "taskfold_boards", "core_value", "core_value TEXT");
+  ensureColumn(db, "taskfold_boards", "source_of_truth", "source_of_truth TEXT");
+  ensureColumn(db, "taskfold_boards", "repository_url", "repository_url TEXT");
+  ensureColumn(db, "taskfold_boards", "planning_path", "planning_path TEXT");
+  ensureColumn(db, "taskfold_boards", "homepage_url", "homepage_url TEXT");
   ensureColumn(
     db,
-    "flowboard_project_documents",
+    "taskfold_project_documents",
     "source",
     "source TEXT NOT NULL DEFAULT 'project'"
   );
-  ensureColumn(db, "flowboard_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
-  ensureColumn(db, "flowboard_cards", "claim_owner_id", "claim_owner_id TEXT");
-  ensureColumn(db, "flowboard_card_attempts", "prompt_version", "prompt_version INTEGER");
+  ensureColumn(db, "taskfold_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "taskfold_cards", "claim_owner_id", "claim_owner_id TEXT");
+  ensureColumn(db, "taskfold_card_attempts", "prompt_version", "prompt_version INTEGER");
   db.exec(`
-    CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
-      ON flowboard_cards(board_id, milestone_id, position);
-    CREATE INDEX IF NOT EXISTS flowboard_cards_claim_owner_idx
-      ON flowboard_cards(claim_owner_id, status);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_board_milestone_position_idx
+      ON taskfold_cards(board_id, milestone_id, position);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_claim_owner_idx
+      ON taskfold_cards(claim_owner_id, status);
   `);
   const migrationId = `schema-${SCHEMA_VERSION}`;
-  const current = db.prepare("SELECT 1 AS found FROM flowboard_schema_migrations WHERE id = ?").get(migrationId);
+  const current = db.prepare("SELECT 1 AS found FROM taskfold_schema_migrations WHERE id = ?").get(migrationId);
   if (!current) {
     db.prepare(
-      "INSERT OR IGNORE INTO flowboard_schema_migrations (id, applied_at) VALUES (?, ?)"
+      "INSERT OR IGNORE INTO taskfold_schema_migrations (id, applied_at) VALUES (?, ?)"
     ).run(migrationId, Date.now());
   }
 }
 function ensureChangeEpoch(db) {
-  const existing = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'").get();
+  const existing = db.prepare("SELECT value FROM taskfold_meta WHERE key = 'change_epoch'").get();
   const current = existing ? stringValue(existing, "value") : void 0;
   if (current) {
     return current;
   }
   const epoch = randomUUID();
-  db.prepare("INSERT OR IGNORE INTO flowboard_meta (key, value) VALUES ('change_epoch', ?)").run(
+  db.prepare("INSERT OR IGNORE INTO taskfold_meta (key, value) VALUES ('change_epoch', ?)").run(
     epoch
   );
-  const stored = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'").get();
+  const stored = db.prepare("SELECT value FROM taskfold_meta WHERE key = 'change_epoch'").get();
   return (stored ? stringValue(stored, "value") : void 0) ?? epoch;
 }
 function reserveChangeRevisions(db, count) {
   return runTransaction(db, () => {
-    const row = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_revision'").get();
+    const row = db.prepare("SELECT value FROM taskfold_meta WHERE key = 'change_revision'").get();
     const stored = Number.parseInt(row ? stringValue(row, "value") ?? "" : "", 10);
     const base = Number.isSafeInteger(stored) && stored > 0 ? stored : 0;
     db.prepare(
       `
-        INSERT INTO flowboard_meta (key, value) VALUES ('change_revision', ?)
+        INSERT INTO taskfold_meta (key, value) VALUES ('change_revision', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
       `
     ).run(String(base + count));
@@ -458,32 +468,101 @@ function chmodIfExists(targetPath, mode) {
     }
   }
 }
-function hardenFlowboardDatabaseFiles(dbPath) {
-  fs.chmodSync(path.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
-  chmodIfExists(dbPath, FLOWBOARD_SQLITE_FILE_MODE);
-  chmodIfExists(`${dbPath}-wal`, FLOWBOARD_SQLITE_FILE_MODE);
-  chmodIfExists(`${dbPath}-shm`, FLOWBOARD_SQLITE_FILE_MODE);
-  chmodIfExists(`${dbPath}-journal`, FLOWBOARD_SQLITE_FILE_MODE);
+function copyLegacyFlowboardDatabase(dbPath, legacyDbPath) {
+  if (!legacyDbPath || path.resolve(legacyDbPath) === path.resolve(dbPath) || fs.existsSync(dbPath) || !fs.existsSync(legacyDbPath)) {
+    return;
+  }
+  const source = new DatabaseSync(legacyDbPath);
+  try {
+    source.exec(`VACUUM INTO ${quoteSqlString(dbPath)}`);
+  } finally {
+    source.close();
+  }
 }
-function createDatabase(dbPath) {
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: FLOWBOARD_SQLITE_DIR_MODE });
-  chmodIfExists(path.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
+function migrateLegacyFlowboardTables(db) {
+  const legacyTables = db.prepare(
+    `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table' AND name LIKE 'flowboard!_%' ESCAPE '!'
+          ORDER BY name ASC
+        `
+  ).all().flatMap((row) => {
+    const name = stringValue(row, "name");
+    return name ? [name] : [];
+  });
+  if (legacyTables.length === 0) {
+    return;
+  }
+  const taskfoldTables = new Set(
+    db.prepare(
+      `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name LIKE 'taskfold!_%' ESCAPE '!'
+          `
+    ).all().flatMap((row) => {
+      const name = stringValue(row, "name");
+      return name ? [name] : [];
+    })
+  );
+  const conflicts = legacyTables.map((name) => name.replace(/^flowboard_/, "taskfold_")).filter((name) => taskfoldTables.has(name));
+  if (conflicts.length > 0) {
+    throw new Error(
+      `cannot migrate legacy Flowboard database because Taskfold tables already exist: ${conflicts.join(", ")}`
+    );
+  }
+  runTransaction(db, () => {
+    for (const legacyTable of legacyTables) {
+      const taskfoldTable = legacyTable.replace(/^flowboard_/, "taskfold_");
+      db.exec(
+        `ALTER TABLE ${quoteIdentifier(legacyTable)} RENAME TO ${quoteIdentifier(taskfoldTable)}`
+      );
+    }
+    const legacyIndexes = db.prepare(
+      `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'index' AND name LIKE 'flowboard!_%' ESCAPE '!'
+            ORDER BY name ASC
+          `
+    ).all().flatMap((row) => {
+      const name = stringValue(row, "name");
+      return name ? [name] : [];
+    });
+    for (const legacyIndex of legacyIndexes) {
+      db.exec(`DROP INDEX ${quoteIdentifier(legacyIndex)}`);
+    }
+  });
+}
+function hardenTaskfoldDatabaseFiles(dbPath) {
+  fs.chmodSync(path.dirname(dbPath), TASKFOLD_SQLITE_DIR_MODE);
+  chmodIfExists(dbPath, TASKFOLD_SQLITE_FILE_MODE);
+  chmodIfExists(`${dbPath}-wal`, TASKFOLD_SQLITE_FILE_MODE);
+  chmodIfExists(`${dbPath}-shm`, TASKFOLD_SQLITE_FILE_MODE);
+  chmodIfExists(`${dbPath}-journal`, TASKFOLD_SQLITE_FILE_MODE);
+}
+function createDatabase(dbPath, legacyDbPath) {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: TASKFOLD_SQLITE_DIR_MODE });
+  chmodIfExists(path.dirname(dbPath), TASKFOLD_SQLITE_DIR_MODE);
+  copyLegacyFlowboardDatabase(dbPath, legacyDbPath);
   if (!fs.existsSync(dbPath)) {
-    fs.closeSync(fs.openSync(dbPath, "a", FLOWBOARD_SQLITE_FILE_MODE));
+    fs.closeSync(fs.openSync(dbPath, "a", TASKFOLD_SQLITE_FILE_MODE));
   }
   const db = new DatabaseSync(dbPath);
   let maintenance;
   try {
     maintenance = configureSqliteConnectionPragmas(db, {
-      busyTimeoutMs: FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS,
+      busyTimeoutMs: TASKFOLD_SQLITE_BUSY_TIMEOUT_MS,
       checkpointIntervalMs: 0,
-      databaseLabel: "flowboard database",
+      databaseLabel: "taskfold database",
       databasePath: dbPath,
       foreignKeys: true,
       synchronous: "NORMAL"
     });
-    ensureFlowboardSchema(db);
-    hardenFlowboardDatabaseFiles(dbPath);
+    migrateLegacyFlowboardTables(db);
+    ensureTaskfoldSchema(db);
+    hardenTaskfoldDatabaseFiles(dbPath);
     return { db, maintenance };
   } catch (error) {
     try {
@@ -498,13 +577,13 @@ function childRows(db, table, cardId) {
   return db.prepare(`SELECT * FROM ${table} WHERE card_id = ? ORDER BY ordinal ASC`).all(cardId);
 }
 function readLabels(db, cardId) {
-  return childRows(db, "flowboard_card_labels", cardId).flatMap((row) => {
+  return childRows(db, "taskfold_card_labels", cardId).flatMap((row) => {
     const label = stringValue(row, "label");
     return label ? [label] : [];
   });
 }
 function readEvents(db, cardId) {
-  const events = childRows(db, "flowboard_card_events", cardId).map((row) => {
+  const events = childRows(db, "taskfold_card_events", cardId).map((row) => {
     const event = {
       id: requiredString(row, "id"),
       kind: requiredString(row, "kind"),
@@ -558,7 +637,7 @@ function readExecution(row) {
 }
 function readMetadata(db, row) {
   const cardId = requiredString(row, "id");
-  const attempts = childRows(db, "flowboard_card_attempts", cardId).map((child) => {
+  const attempts = childRows(db, "taskfold_card_attempts", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       status: requiredString(child, "status"),
@@ -598,7 +677,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const comments = childRows(db, "flowboard_card_comments", cardId).map((child) => {
+  const comments = childRows(db, "taskfold_card_comments", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       body: requiredString(child, "body"),
@@ -610,7 +689,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const links = childRows(db, "flowboard_card_links", cardId).map((child) => {
+  const links = childRows(db, "taskfold_card_links", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       type: requiredString(child, "type"),
@@ -630,7 +709,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const proof = childRows(db, "flowboard_card_proof", cardId).map((child) => {
+  const proof = childRows(db, "taskfold_card_proof", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       status: requiredString(child, "status"),
@@ -654,7 +733,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const artifacts = childRows(db, "flowboard_card_artifacts", cardId).map((child) => {
+  const artifacts = childRows(db, "taskfold_card_artifacts", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       createdAt: requiredNumber(child, "created_at")
@@ -677,7 +756,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const attachments = childRows(db, "flowboard_card_attachments", cardId).map((child) => {
+  const attachments = childRows(db, "taskfold_card_attachments", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       cardId: requiredString(child, "card_id"),
@@ -695,7 +774,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const workerLogs = childRows(db, "flowboard_worker_logs", cardId).map((child) => {
+  const workerLogs = childRows(db, "taskfold_worker_logs", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       createdAt: requiredNumber(child, "created_at"),
@@ -712,7 +791,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const diagnostics = childRows(db, "flowboard_card_diagnostics", cardId).map((child) => ({
+  const diagnostics = childRows(db, "taskfold_card_diagnostics", cardId).map((child) => ({
     kind: requiredString(child, "kind"),
     severity: requiredString(child, "severity"),
     title: requiredString(child, "title"),
@@ -722,7 +801,7 @@ function readMetadata(db, row) {
     count: requiredNumber(child, "count"),
     actions: parseJson(child.actions_json) ?? []
   }));
-  const notifications = childRows(db, "flowboard_card_notifications", cardId).map((child) => {
+  const notifications = childRows(db, "taskfold_card_notifications", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       kind: requiredString(child, "kind"),
@@ -743,7 +822,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const protocol = db.prepare("SELECT * FROM flowboard_worker_protocol WHERE card_id = ?").get(cardId);
+  const protocol = db.prepare("SELECT * FROM taskfold_worker_protocol WHERE card_id = ?").get(cardId);
   const automation = parseJson(row.automation_json);
   const claim = parseJson(row.claim_json);
   const stale = parseJson(row.stale_json);
@@ -775,7 +854,7 @@ function readMetadata(db, row) {
   });
 }
 function readDelivery(db, cardId) {
-  const row = db.prepare("SELECT * FROM flowboard_card_delivery WHERE card_id = ?").get(cardId);
+  const row = db.prepare("SELECT * FROM taskfold_card_delivery WHERE card_id = ?").get(cardId);
   if (!row) {
     return void 0;
   }
@@ -809,7 +888,7 @@ function readDelivery(db, cardId) {
   return delivery;
 }
 function readSourceReferences(db, cardId) {
-  return childRows(db, "flowboard_card_source_references", cardId).map((child) => {
+  return childRows(db, "taskfold_card_source_references", cardId).map((child) => {
     const reference = {
       id: requiredString(child, "id"),
       label: requiredString(child, "label"),
@@ -876,7 +955,7 @@ function insertCard(db, card) {
   const metadata = card.metadata;
   db.prepare(
     `
-      INSERT INTO flowboard_cards (
+      INSERT INTO taskfold_cards (
         id, board_id, title, notes, status, priority, agent_id, session_key, run_id, task_id,
         source_url, milestone_id, position, created_at, updated_at, started_at, completed_at,
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
@@ -966,17 +1045,17 @@ function insertCard(db, card) {
     revision: card.revision,
     claim_owner_id: bindNull(metadata?.claim?.ownerId)
   });
-  insertChildren(db, "flowboard_card_labels", card.id, card.labels, (label, ordinal) => {
-    db.prepare("INSERT INTO flowboard_card_labels (card_id, ordinal, label) VALUES (?, ?, ?)").run(
+  insertChildren(db, "taskfold_card_labels", card.id, card.labels, (label, ordinal) => {
+    db.prepare("INSERT INTO taskfold_card_labels (card_id, ordinal, label) VALUES (?, ?, ?)").run(
       card.id,
       ordinal,
       label
     );
   });
-  insertChildren(db, "flowboard_card_events", card.id, card.events, (event, ordinal) => {
+  insertChildren(db, "taskfold_card_events", card.id, card.events, (event, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_events
+        INSERT INTO taskfold_card_events
           (id, card_id, ordinal, kind, at, from_status, to_status, from_milestone_id, to_milestone_id, session_key, run_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -994,10 +1073,10 @@ function insertCard(db, card) {
       bindNull(event.runId)
     );
   });
-  insertChildren(db, "flowboard_card_attempts", card.id, metadata?.attempts, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_attempts", card.id, metadata?.attempts, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_attempts
+        INSERT INTO taskfold_card_attempts
           (id, card_id, ordinal, status, started_at, ended_at, engine, mode, model, session_key, run_id, error, prompt_version)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -1017,18 +1096,18 @@ function insertCard(db, card) {
       bindNull(entry.promptVersion)
     );
   });
-  insertChildren(db, "flowboard_card_comments", card.id, metadata?.comments, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_comments", card.id, metadata?.comments, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_comments (id, card_id, ordinal, body, created_at, updated_at)
+        INSERT INTO taskfold_card_comments (id, card_id, ordinal, body, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `
     ).run(entry.id, card.id, ordinal, entry.body, entry.createdAt, bindNull(entry.updatedAt));
   });
-  insertChildren(db, "flowboard_card_links", card.id, metadata?.links, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_links", card.id, metadata?.links, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_links
+        INSERT INTO taskfold_card_links
           (id, card_id, ordinal, type, target_card_id, title, url, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -1043,10 +1122,10 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
-  insertChildren(db, "flowboard_card_proof", card.id, metadata?.proof, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_proof", card.id, metadata?.proof, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_proof
+        INSERT INTO taskfold_card_proof
           (id, card_id, ordinal, status, label, command, url, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -1062,10 +1141,10 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
-  insertChildren(db, "flowboard_card_artifacts", card.id, metadata?.artifacts, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_artifacts", card.id, metadata?.artifacts, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_artifacts
+        INSERT INTO taskfold_card_artifacts
           (id, card_id, ordinal, label, url, path, mime_type, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -1080,11 +1159,11 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
-  db.prepare("DELETE FROM flowboard_card_delivery WHERE card_id = ?").run(card.id);
+  db.prepare("DELETE FROM taskfold_card_delivery WHERE card_id = ?").run(card.id);
   if (card.delivery) {
     db.prepare(
       `
-        INSERT INTO flowboard_card_delivery
+        INSERT INTO taskfold_card_delivery
           (card_id, objective, delivery_summary, open_items, implementation_state,
            verification_state, release_state, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1102,13 +1181,13 @@ function insertCard(db, card) {
   }
   insertChildren(
     db,
-    "flowboard_card_source_references",
+    "taskfold_card_source_references",
     card.id,
     card.sourceReferences,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_source_references
+          INSERT INTO taskfold_card_source_references
             (id, card_id, ordinal, label, target, note, position, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -1127,13 +1206,13 @@ function insertCard(db, card) {
   );
   insertChildren(
     db,
-    "flowboard_card_attachments",
+    "taskfold_card_attachments",
     card.id,
     metadata?.attachments,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_attachments
+          INSERT INTO taskfold_card_attachments
             (id, card_id, ordinal, file_name, byte_size, mime_type, note, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -1151,13 +1230,13 @@ function insertCard(db, card) {
   );
   insertChildren(
     db,
-    "flowboard_card_diagnostics",
+    "taskfold_card_diagnostics",
     card.id,
     metadata?.diagnostics,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_diagnostics
+          INSERT INTO taskfold_card_diagnostics
             (card_id, ordinal, kind, severity, title, detail, first_seen_at, last_seen_at, count, actions_json)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -1177,13 +1256,13 @@ function insertCard(db, card) {
   );
   insertChildren(
     db,
-    "flowboard_card_notifications",
+    "taskfold_card_notifications",
     card.id,
     metadata?.notifications,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_notifications
+          INSERT INTO taskfold_card_notifications
             (id, card_id, ordinal, kind, message, created_at, sequence, session_key, run_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -1200,10 +1279,10 @@ function insertCard(db, card) {
       );
     }
   );
-  insertChildren(db, "flowboard_worker_logs", card.id, metadata?.workerLogs, (entry, ordinal) => {
+  insertChildren(db, "taskfold_worker_logs", card.id, metadata?.workerLogs, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_worker_logs
+        INSERT INTO taskfold_worker_logs
           (id, card_id, ordinal, level, message, created_at, session_key, run_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -1218,11 +1297,11 @@ function insertCard(db, card) {
       bindNull(entry.runId)
     );
   });
-  db.prepare("DELETE FROM flowboard_worker_protocol WHERE card_id = ?").run(card.id);
+  db.prepare("DELETE FROM taskfold_worker_protocol WHERE card_id = ?").run(card.id);
   if (metadata?.workerProtocol) {
     db.prepare(
       `
-        INSERT INTO flowboard_worker_protocol (card_id, state, updated_at, detail)
+        INSERT INTO taskfold_worker_protocol (card_id, state, updated_at, detail)
         VALUES (?, ?, ?, ?)
       `
     ).run(
@@ -1233,22 +1312,22 @@ function insertCard(db, card) {
     );
   }
 }
-var FlowboardSqliteCardStore = class {
+var TaskfoldSqliteCardStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.card.id !== key) {
-      throw new Error("invalid flowboard card payload");
+      throw new Error("invalid taskfold card payload");
     }
     runTransaction(this.db, () => insertCard(this.db, value.card));
   }
   async compareAndSwap(key, expectedRevision, value) {
     if (value.version !== 1 || value.card.id !== key) {
-      throw new Error("invalid flowboard card payload");
+      throw new Error("invalid taskfold card payload");
     }
     return runTransaction(this.db, () => {
-      const row = this.db.prepare("SELECT revision FROM flowboard_cards WHERE id = ?").get(key);
+      const row = this.db.prepare("SELECT revision FROM taskfold_cards WHERE id = ?").get(key);
       if (!row || (numberValue(row, "revision") ?? 0) !== expectedRevision) {
         return false;
       }
@@ -1257,42 +1336,42 @@ var FlowboardSqliteCardStore = class {
     });
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_cards WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_cards WHERE id = ?").get(key);
     return row ? { version: 1, card: readCard(this.db, row) } : void 0;
   }
   async delete(key) {
     const result = runTransaction(this.db, () => {
       this.db.prepare(
         `
-            DELETE FROM flowboard_attachment_blobs
+            DELETE FROM taskfold_attachment_blobs
             WHERE attachment_id IN (
-              SELECT id FROM flowboard_card_attachments WHERE card_id = ?
+              SELECT id FROM taskfold_card_attachments WHERE card_id = ?
             )
           `
       ).run(key);
-      return this.db.prepare("DELETE FROM flowboard_cards WHERE id = ?").run(key);
+      return this.db.prepare("DELETE FROM taskfold_cards WHERE id = ?").run(key);
     });
     return result.changes > 0;
   }
   async entries() {
-    return this.db.prepare("SELECT * FROM flowboard_cards ORDER BY created_at ASC, id ASC").all().map((row) => ({
+    return this.db.prepare("SELECT * FROM taskfold_cards ORDER BY created_at ASC, id ASC").all().map((row) => ({
       key: requiredString(row, "id"),
       value: { version: 1, card: readCard(this.db, row) }
     }));
   }
 };
-var FlowboardSqliteBoardStore = class {
+var TaskfoldSqliteBoardStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.board.id !== key) {
-      throw new Error("invalid flowboard board payload");
+      throw new Error("invalid taskfold board payload");
     }
     const board = value.board;
     this.db.prepare(
       `
-          INSERT INTO flowboard_boards (
+          INSERT INTO taskfold_boards (
             id, name, description, icon, color, position, version, current_objective, core_value,
             source_of_truth, repository_url, planning_path, homepage_url,
             default_workspace_json, orchestration_json,
@@ -1339,7 +1418,7 @@ var FlowboardSqliteBoardStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_boards WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_boards WHERE id = ?").get(key);
     if (!row) {
       return void 0;
     }
@@ -1370,11 +1449,11 @@ var FlowboardSqliteBoardStore = class {
     };
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_boards WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_boards WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
-    const rows = this.db.prepare("SELECT id FROM flowboard_boards ORDER BY id ASC").all();
+    const rows = this.db.prepare("SELECT id FROM taskfold_boards ORDER BY id ASC").all();
     const entries = [];
     for (const row of rows) {
       const key = requiredString(row, "id");
@@ -1401,18 +1480,18 @@ function readMilestone(row) {
     ...numberValue(row, "archived_at") !== void 0 ? { archivedAt: numberValue(row, "archived_at") } : {}
   };
 }
-var FlowboardSqliteMilestoneStore = class {
+var TaskfoldSqliteMilestoneStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.milestone.id !== key) {
-      throw new Error("invalid flowboard milestone payload");
+      throw new Error("invalid taskfold milestone payload");
     }
     const milestone = value.milestone;
     this.db.prepare(
       `
-          INSERT INTO flowboard_milestones (
+          INSERT INTO taskfold_milestones (
             id, board_id, title, description, color, position, state, created_at, updated_at,
             completed_at, archived_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1443,15 +1522,15 @@ var FlowboardSqliteMilestoneStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_milestones WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_milestones WHERE id = ?").get(key);
     return row ? { version: 1, milestone: readMilestone(row) } : void 0;
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_milestones WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_milestones WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
-    return this.db.prepare("SELECT * FROM flowboard_milestones ORDER BY board_id ASC, position ASC, id ASC").all().map((row) => ({
+    return this.db.prepare("SELECT * FROM taskfold_milestones ORDER BY board_id ASC, position ASC, id ASC").all().map((row) => ({
       key: requiredString(row, "id"),
       value: { version: 1, milestone: readMilestone(row) }
     }));
@@ -1476,18 +1555,18 @@ function readProjectDocument(row) {
     ...numberValue(row, "system") === 1 ? { system: true } : {}
   };
 }
-var FlowboardSqliteProjectDocumentStore = class {
+var TaskfoldSqliteProjectDocumentStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.document.id !== key) {
-      throw new Error("invalid flowboard project document payload");
+      throw new Error("invalid taskfold project document payload");
     }
     const document = value.document;
     this.db.prepare(
       `
-          INSERT INTO flowboard_project_documents (
+          INSERT INTO taskfold_project_documents (
             id, board_id, document_key, section, source, type, title, summary, target, content,
             position, hidden_at, system, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1526,34 +1605,34 @@ var FlowboardSqliteProjectDocumentStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_project_documents WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_project_documents WHERE id = ?").get(key);
     return row ? { version: 1, document: readProjectDocument(row) } : void 0;
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_project_documents WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_project_documents WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
     return this.db.prepare(
-      "SELECT * FROM flowboard_project_documents ORDER BY board_id ASC, section ASC, position ASC, id ASC"
+      "SELECT * FROM taskfold_project_documents ORDER BY board_id ASC, section ASC, position ASC, id ASC"
     ).all().map((row) => ({
       key: requiredString(row, "id"),
       value: { version: 1, document: readProjectDocument(row) }
     }));
   }
 };
-var FlowboardSqliteSubscriptionStore = class {
+var TaskfoldSqliteSubscriptionStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.subscription.id !== key) {
-      throw new Error("invalid flowboard notification subscription payload");
+      throw new Error("invalid taskfold notification subscription payload");
     }
     const subscription = value.subscription;
     this.db.prepare(
       `
-          INSERT INTO flowboard_notification_subscriptions (
+          INSERT INTO taskfold_notification_subscriptions (
             id, board_id, card_id, session_key, run_id, target, event_kinds_json,
             last_event_at, last_event_id, last_event_sequence, delivered_event_ids_json,
             created_at, updated_at
@@ -1589,7 +1668,7 @@ var FlowboardSqliteSubscriptionStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_notification_subscriptions WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_notification_subscriptions WHERE id = ?").get(key);
     if (!row) {
       return void 0;
     }
@@ -1615,12 +1694,12 @@ var FlowboardSqliteSubscriptionStore = class {
     };
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_notification_subscriptions WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_notification_subscriptions WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
     const rows = this.db.prepare(
-      "SELECT id FROM flowboard_notification_subscriptions ORDER BY created_at ASC, id ASC"
+      "SELECT id FROM taskfold_notification_subscriptions ORDER BY created_at ASC, id ASC"
     ).all();
     const entries = [];
     for (const row of rows) {
@@ -1633,18 +1712,18 @@ var FlowboardSqliteSubscriptionStore = class {
     return entries;
   }
 };
-var FlowboardSqliteAttachmentStore = class {
+var TaskfoldSqliteAttachmentStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.attachment.id !== key) {
-      throw new Error("invalid flowboard attachment payload");
+      throw new Error("invalid taskfold attachment payload");
     }
     const attachment = value.attachment;
     this.db.prepare(
       `
-          INSERT INTO flowboard_attachment_blobs (attachment_id, content)
+          INSERT INTO taskfold_attachment_blobs (attachment_id, content)
           VALUES (?, ?)
           ON CONFLICT(attachment_id) DO UPDATE SET content = excluded.content
         `
@@ -1654,8 +1733,8 @@ var FlowboardSqliteAttachmentStore = class {
     const row = this.db.prepare(
       `
           SELECT a.*, b.content
-          FROM flowboard_card_attachments a
-          JOIN flowboard_attachment_blobs b ON b.attachment_id = a.id
+          FROM taskfold_card_attachments a
+          JOIN taskfold_attachment_blobs b ON b.attachment_id = a.id
           WHERE a.id = ?
         `
     ).get(key);
@@ -1678,8 +1757,8 @@ var FlowboardSqliteAttachmentStore = class {
   }
   async delete(key) {
     const deleted = runTransaction(this.db, () => {
-      this.db.prepare("DELETE FROM flowboard_attachment_blobs WHERE attachment_id = ?").run(key);
-      return this.db.prepare("DELETE FROM flowboard_card_attachments WHERE id = ?").run(key);
+      this.db.prepare("DELETE FROM taskfold_attachment_blobs WHERE attachment_id = ?").run(key);
+      return this.db.prepare("DELETE FROM taskfold_card_attachments WHERE id = ?").run(key);
     });
     return deleted.changes > 0;
   }
@@ -1687,8 +1766,8 @@ var FlowboardSqliteAttachmentStore = class {
     const rows = this.db.prepare(
       `
           SELECT a.id
-          FROM flowboard_card_attachments a
-          JOIN flowboard_attachment_blobs b ON b.attachment_id = a.id
+          FROM taskfold_card_attachments a
+          JOIN taskfold_attachment_blobs b ON b.attachment_id = a.id
           ORDER BY a.created_at ASC, a.id ASC
         `
     ).all();
@@ -1703,17 +1782,19 @@ var FlowboardSqliteAttachmentStore = class {
     return entries;
   }
 };
-function createFlowboardSqliteStores(options = {}) {
+function createTaskfoldSqliteStores(options = {}) {
+  const dbPath = options.dbPath ?? resolveTaskfoldSqlitePath(options.env);
   const { db, maintenance } = createDatabase(
-    options.dbPath ?? resolveFlowboardSqlitePath(options.env)
+    dbPath,
+    options.legacyDbPath ?? (options.dbPath ? void 0 : resolveLegacyFlowboardSqlitePath(options.env))
   );
   return {
-    cards: new FlowboardSqliteCardStore(db),
-    boards: new FlowboardSqliteBoardStore(db),
-    milestones: new FlowboardSqliteMilestoneStore(db),
-    documents: new FlowboardSqliteProjectDocumentStore(db),
-    subscriptions: new FlowboardSqliteSubscriptionStore(db),
-    attachments: new FlowboardSqliteAttachmentStore(db),
+    cards: new TaskfoldSqliteCardStore(db),
+    boards: new TaskfoldSqliteBoardStore(db),
+    milestones: new TaskfoldSqliteMilestoneStore(db),
+    documents: new TaskfoldSqliteProjectDocumentStore(db),
+    subscriptions: new TaskfoldSqliteSubscriptionStore(db),
+    attachments: new TaskfoldSqliteAttachmentStore(db),
     // This connection-local primitive changes only after another connection commits.
     dataVersion: () => requiredNumber(db.prepare("PRAGMA data_version").get(), "data_version"),
     changeEpoch: ensureChangeEpoch(db),
@@ -1765,7 +1846,7 @@ async function migrateNamespace(params) {
   let imported = 0;
   for (const entry of await params.legacy.entries()) {
     if (!params.isValid(entry.value)) {
-      warnings.push(`Skipped malformed legacy Flowboard ${params.label} entry ${entry.key}`);
+      warnings.push(`Skipped malformed legacy Taskfold ${params.label} entry ${entry.key}`);
       continue;
     }
     try {
@@ -1777,7 +1858,7 @@ async function migrateNamespace(params) {
           continue;
         }
         warnings.push(
-          `Skipped legacy Flowboard ${params.label} entry ${entry.key} because the SQLite target already exists`
+          `Skipped legacy Taskfold ${params.label} entry ${entry.key} because the SQLite target already exists`
         );
         continue;
       }
@@ -1786,7 +1867,7 @@ async function migrateNamespace(params) {
       imported++;
     } catch (err) {
       warnings.push(
-        `Failed migrating legacy Flowboard ${params.label} entry ${entry.key}: ${String(err)}`
+        `Failed migrating legacy Taskfold ${params.label} entry ${entry.key}: ${String(err)}`
       );
     }
   }
@@ -1805,12 +1886,12 @@ async function migrateAttachments(params) {
   let imported = 0;
   for (const entry of await params.legacy.entries()) {
     if (!isPersistedAttachment(entry.value)) {
-      warnings.push(`Skipped malformed legacy Flowboard attachment entry ${entry.key}`);
+      warnings.push(`Skipped malformed legacy Taskfold attachment entry ${entry.key}`);
       continue;
     }
     if (!await targetCardReferencesAttachment(params.cards, entry.value)) {
       warnings.push(
-        `Skipped legacy Flowboard attachment entry ${entry.key} because its owning card was not migrated or does not reference the attachment`
+        `Skipped legacy Taskfold attachment entry ${entry.key} because its owning card was not migrated or does not reference the attachment`
       );
       continue;
     }
@@ -1822,7 +1903,7 @@ async function migrateAttachments(params) {
         continue;
       }
       warnings.push(
-        `Skipped legacy Flowboard attachment entry ${entry.key} because the SQLite target already exists`
+        `Skipped legacy Taskfold attachment entry ${entry.key} because the SQLite target already exists`
       );
       continue;
     }
@@ -1832,7 +1913,7 @@ async function migrateAttachments(params) {
       imported++;
     } catch (err) {
       warnings.push(
-        `Failed migrating legacy Flowboard attachment entry ${entry.key}: ${String(err)}`
+        `Failed migrating legacy Taskfold attachment entry ${entry.key}: ${String(err)}`
       );
     }
   }
@@ -1840,32 +1921,32 @@ async function migrateAttachments(params) {
 }
 var stateMigrations = [
   {
-    id: "flowboard-28-kv-to-sqlite",
-    label: "Flowboard .28 plugin-state KV",
+    id: "taskfold-28-kv-to-sqlite",
+    label: "Taskfold .28 plugin-state KV",
     async detectLegacyState(params) {
       const env = migrationEnv(params);
       const cards = await openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.cards",
+        namespace: "taskfold.cards",
         maxEntries: MAX_CARDS
       }).entries();
       const boards = await openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.boards",
+        namespace: "taskfold.boards",
         maxEntries: 200
       }).entries();
       const subscriptions = await openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.notify",
+        namespace: "taskfold.notify",
         maxEntries: 2e3
       }).entries();
       const attachments = await openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.attachments",
+        namespace: "taskfold.attachments",
         maxEntries: MAX_CARDS * 21
       }).entries();
       const count = cards.length + boards.length + subscriptions.length + attachments.length;
@@ -1874,7 +1955,7 @@ var stateMigrations = [
       }
       return {
         preview: [
-          `- Flowboard: ${count} legacy .28 plugin-state KV ${count === 1 ? "entry" : "entries"} \u2192 ${resolveFlowboardSqlitePath(env)}`
+          `- Taskfold: ${count} legacy .28 plugin-state KV ${count === 1 ? "entry" : "entries"} \u2192 ${resolveTaskfoldSqlitePath(env)}`
         ]
       };
     },
@@ -1883,28 +1964,28 @@ var stateMigrations = [
       const cards = openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.cards",
+        namespace: "taskfold.cards",
         maxEntries: MAX_CARDS
       });
       const boards = openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.boards",
+        namespace: "taskfold.boards",
         maxEntries: 200
       });
       const subscriptions = openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.notify",
+        namespace: "taskfold.notify",
         maxEntries: 2e3
       });
       const attachments = openLegacyStore({
         context: params.context,
         env,
-        namespace: "flowboard.attachments",
+        namespace: "taskfold.attachments",
         maxEntries: MAX_CARDS * 21
       });
-      const sqlite = createFlowboardSqliteStores({ env });
+      const sqlite = createTaskfoldSqliteStores({ env });
       try {
         const cardResult = await migrateNamespace({
           label: "card",
@@ -1932,7 +2013,7 @@ var stateMigrations = [
         const imported = cardResult.imported + boardResult.imported + subscriptionResult.imported + attachmentResult.imported;
         return {
           changes: imported > 0 ? [
-            `Migrated ${imported} Flowboard .28 plugin-state KV ${imported === 1 ? "entry" : "entries"} \u2192 relational SQLite`
+            `Migrated ${imported} Taskfold .28 plugin-state KV ${imported === 1 ? "entry" : "entries"} \u2192 relational SQLite`
           ] : [],
           warnings: [
             ...cardResult.warnings,

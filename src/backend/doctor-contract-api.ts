@@ -1,16 +1,16 @@
-// Flowboard API module exposes the plugin public contract.
+// Taskfold API module exposes the plugin public contract.
 import type {
   PluginDoctorStateMigration,
   PluginDoctorStateMigrationContext,
 } from "openclaw/plugin-sdk/runtime-doctor";
 import type {
-  PersistedFlowboardAttachment,
-  PersistedFlowboardBoard,
-  PersistedFlowboardCard,
-  PersistedFlowboardNotificationSubscription,
-  FlowboardKeyedStore,
+  PersistedTaskfoldAttachment,
+  PersistedTaskfoldBoard,
+  PersistedTaskfoldCard,
+  PersistedTaskfoldNotificationSubscription,
+  TaskfoldKeyedStore,
 } from "./src/persistence-types.js";
-import { createFlowboardSqliteStores, resolveFlowboardSqlitePath } from "./src/sqlite-store.js";
+import { createTaskfoldSqliteStores, resolveTaskfoldSqlitePath } from "./src/sqlite-store.js";
 
 const MAX_CARDS = 2000;
 
@@ -23,7 +23,7 @@ function openLegacyStore<T>(params: {
   env: NodeJS.ProcessEnv;
   namespace: string;
   maxEntries: number;
-}): FlowboardKeyedStore<T> {
+}): TaskfoldKeyedStore<T> {
   return params.context.openPluginStateKeyedStore<T>({
     namespace: params.namespace,
     maxEntries: params.maxEntries,
@@ -31,35 +31,35 @@ function openLegacyStore<T>(params: {
   });
 }
 
-function isPersistedCard(value: unknown): value is PersistedFlowboardCard {
+function isPersistedCard(value: unknown): value is PersistedTaskfoldCard {
   return Boolean(
-    value && typeof value === "object" && (value as PersistedFlowboardCard).version === 1,
+    value && typeof value === "object" && (value as PersistedTaskfoldCard).version === 1,
   );
 }
 
-function isPersistedBoard(value: unknown): value is PersistedFlowboardBoard {
+function isPersistedBoard(value: unknown): value is PersistedTaskfoldBoard {
   return Boolean(
-    value && typeof value === "object" && (value as PersistedFlowboardBoard).version === 1,
+    value && typeof value === "object" && (value as PersistedTaskfoldBoard).version === 1,
   );
 }
 
 function isPersistedSubscription(
   value: unknown,
-): value is PersistedFlowboardNotificationSubscription {
+): value is PersistedTaskfoldNotificationSubscription {
   return Boolean(
     value &&
     typeof value === "object" &&
-    (value as PersistedFlowboardNotificationSubscription).version === 1,
+    (value as PersistedTaskfoldNotificationSubscription).version === 1,
   );
 }
 
-function isPersistedAttachment(value: unknown): value is PersistedFlowboardAttachment {
+function isPersistedAttachment(value: unknown): value is PersistedTaskfoldAttachment {
   if (!value || typeof value !== "object") {
     return false;
   }
   const candidate = value as {
     version?: unknown;
-    attachment?: Partial<PersistedFlowboardAttachment["attachment"]>;
+    attachment?: Partial<PersistedTaskfoldAttachment["attachment"]>;
     contentBase64?: unknown;
   };
   const attachment = candidate.attachment;
@@ -78,15 +78,15 @@ function isPersistedAttachment(value: unknown): value is PersistedFlowboardAttac
 
 async function migrateNamespace<T>(params: {
   label: string;
-  legacy: FlowboardKeyedStore<T>;
-  target: FlowboardKeyedStore<T>;
+  legacy: TaskfoldKeyedStore<T>;
+  target: TaskfoldKeyedStore<T>;
   isValid: (value: unknown) => value is T;
 }): Promise<{ imported: number; warnings: string[] }> {
   const warnings: string[] = [];
   let imported = 0;
   for (const entry of await params.legacy.entries()) {
     if (!params.isValid(entry.value)) {
-      warnings.push(`Skipped malformed legacy Flowboard ${params.label} entry ${entry.key}`);
+      warnings.push(`Skipped malformed legacy Taskfold ${params.label} entry ${entry.key}`);
       continue;
     }
     try {
@@ -98,7 +98,7 @@ async function migrateNamespace<T>(params: {
           continue;
         }
         warnings.push(
-          `Skipped legacy Flowboard ${params.label} entry ${entry.key} because the SQLite target already exists`,
+          `Skipped legacy Taskfold ${params.label} entry ${entry.key} because the SQLite target already exists`,
         );
         continue;
       }
@@ -107,7 +107,7 @@ async function migrateNamespace<T>(params: {
       imported++;
     } catch (err) {
       warnings.push(
-        `Failed migrating legacy Flowboard ${params.label} entry ${entry.key}: ${String(err)}`,
+        `Failed migrating legacy Taskfold ${params.label} entry ${entry.key}: ${String(err)}`,
       );
     }
   }
@@ -115,8 +115,8 @@ async function migrateNamespace<T>(params: {
 }
 
 async function targetCardReferencesAttachment(
-  cards: FlowboardKeyedStore,
-  attachment: PersistedFlowboardAttachment,
+  cards: TaskfoldKeyedStore,
+  attachment: PersistedTaskfoldAttachment,
 ): Promise<boolean> {
   const card = await cards.lookup(attachment.attachment.cardId);
   return Boolean(
@@ -129,20 +129,20 @@ async function targetCardReferencesAttachment(
 }
 
 async function migrateAttachments(params: {
-  legacy: FlowboardKeyedStore<PersistedFlowboardAttachment>;
-  cards: FlowboardKeyedStore;
-  target: FlowboardKeyedStore<PersistedFlowboardAttachment>;
+  legacy: TaskfoldKeyedStore<PersistedTaskfoldAttachment>;
+  cards: TaskfoldKeyedStore;
+  target: TaskfoldKeyedStore<PersistedTaskfoldAttachment>;
 }): Promise<{ imported: number; warnings: string[] }> {
   const warnings: string[] = [];
   let imported = 0;
   for (const entry of await params.legacy.entries()) {
     if (!isPersistedAttachment(entry.value)) {
-      warnings.push(`Skipped malformed legacy Flowboard attachment entry ${entry.key}`);
+      warnings.push(`Skipped malformed legacy Taskfold attachment entry ${entry.key}`);
       continue;
     }
     if (!(await targetCardReferencesAttachment(params.cards, entry.value))) {
       warnings.push(
-        `Skipped legacy Flowboard attachment entry ${entry.key} because its owning card was not migrated or does not reference the attachment`,
+        `Skipped legacy Taskfold attachment entry ${entry.key} because its owning card was not migrated or does not reference the attachment`,
       );
       continue;
     }
@@ -154,7 +154,7 @@ async function migrateAttachments(params: {
         continue;
       }
       warnings.push(
-        `Skipped legacy Flowboard attachment entry ${entry.key} because the SQLite target already exists`,
+        `Skipped legacy Taskfold attachment entry ${entry.key} because the SQLite target already exists`,
       );
       continue;
     }
@@ -164,7 +164,7 @@ async function migrateAttachments(params: {
       imported++;
     } catch (err) {
       warnings.push(
-        `Failed migrating legacy Flowboard attachment entry ${entry.key}: ${String(err)}`,
+        `Failed migrating legacy Taskfold attachment entry ${entry.key}: ${String(err)}`,
       );
     }
   }
@@ -173,32 +173,32 @@ async function migrateAttachments(params: {
 
 export const stateMigrations: PluginDoctorStateMigration[] = [
   {
-    id: "flowboard-28-kv-to-sqlite",
-    label: "Flowboard .28 plugin-state KV",
+    id: "taskfold-28-kv-to-sqlite",
+    label: "Taskfold .28 plugin-state KV",
     async detectLegacyState(params) {
       const env = migrationEnv(params);
-      const cards = await openLegacyStore<PersistedFlowboardCard>({
+      const cards = await openLegacyStore<PersistedTaskfoldCard>({
         context: params.context,
         env,
-        namespace: "flowboard.cards",
+        namespace: "taskfold.cards",
         maxEntries: MAX_CARDS,
       }).entries();
-      const boards = await openLegacyStore<PersistedFlowboardBoard>({
+      const boards = await openLegacyStore<PersistedTaskfoldBoard>({
         context: params.context,
         env,
-        namespace: "flowboard.boards",
+        namespace: "taskfold.boards",
         maxEntries: 200,
       }).entries();
-      const subscriptions = await openLegacyStore<PersistedFlowboardNotificationSubscription>({
+      const subscriptions = await openLegacyStore<PersistedTaskfoldNotificationSubscription>({
         context: params.context,
         env,
-        namespace: "flowboard.notify",
+        namespace: "taskfold.notify",
         maxEntries: 2000,
       }).entries();
-      const attachments = await openLegacyStore<PersistedFlowboardAttachment>({
+      const attachments = await openLegacyStore<PersistedTaskfoldAttachment>({
         context: params.context,
         env,
-        namespace: "flowboard.attachments",
+        namespace: "taskfold.attachments",
         maxEntries: MAX_CARDS * 21,
       }).entries();
       const count = cards.length + boards.length + subscriptions.length + attachments.length;
@@ -207,37 +207,37 @@ export const stateMigrations: PluginDoctorStateMigration[] = [
       }
       return {
         preview: [
-          `- Flowboard: ${count} legacy .28 plugin-state KV ${count === 1 ? "entry" : "entries"} → ${resolveFlowboardSqlitePath(env)}`,
+          `- Taskfold: ${count} legacy .28 plugin-state KV ${count === 1 ? "entry" : "entries"} → ${resolveTaskfoldSqlitePath(env)}`,
         ],
       };
     },
     async migrateLegacyState(params) {
       const env = migrationEnv(params);
-      const cards = openLegacyStore<PersistedFlowboardCard>({
+      const cards = openLegacyStore<PersistedTaskfoldCard>({
         context: params.context,
         env,
-        namespace: "flowboard.cards",
+        namespace: "taskfold.cards",
         maxEntries: MAX_CARDS,
       });
-      const boards = openLegacyStore<PersistedFlowboardBoard>({
+      const boards = openLegacyStore<PersistedTaskfoldBoard>({
         context: params.context,
         env,
-        namespace: "flowboard.boards",
+        namespace: "taskfold.boards",
         maxEntries: 200,
       });
-      const subscriptions = openLegacyStore<PersistedFlowboardNotificationSubscription>({
+      const subscriptions = openLegacyStore<PersistedTaskfoldNotificationSubscription>({
         context: params.context,
         env,
-        namespace: "flowboard.notify",
+        namespace: "taskfold.notify",
         maxEntries: 2000,
       });
-      const attachments = openLegacyStore<PersistedFlowboardAttachment>({
+      const attachments = openLegacyStore<PersistedTaskfoldAttachment>({
         context: params.context,
         env,
-        namespace: "flowboard.attachments",
+        namespace: "taskfold.attachments",
         maxEntries: MAX_CARDS * 21,
       });
-      const sqlite = createFlowboardSqliteStores({ env });
+      const sqlite = createTaskfoldSqliteStores({ env });
       try {
         const cardResult = await migrateNamespace({
           label: "card",
@@ -271,7 +271,7 @@ export const stateMigrations: PluginDoctorStateMigration[] = [
           changes:
             imported > 0
               ? [
-                  `Migrated ${imported} Flowboard .28 plugin-state KV ${imported === 1 ? "entry" : "entries"} → relational SQLite`,
+                  `Migrated ${imported} Taskfold .28 plugin-state KV ${imported === 1 ? "entry" : "entries"} → relational SQLite`,
                 ]
               : [],
           warnings: [

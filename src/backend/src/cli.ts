@@ -1,18 +1,18 @@
 import {
-  FLOWBOARD_STATUSES,
-  type FlowboardCard,
-  type FlowboardStatus,
+  TASKFOLD_STATUSES,
+  type TaskfoldCard,
+  type TaskfoldStatus,
 } from "../../contract/index.js";
-// Flowboard plugin module implements cli behavior.
+// Taskfold plugin module implements cli behavior.
 import type { Command } from "commander";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { addGatewayClientOptions, callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
 import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
 import { getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
 import { isRecord } from "openclaw/plugin-sdk/string-coerce-runtime";
-import { resolveFlowboardCardByIdOrPrefix } from "./card-lookup.js";
+import { resolveTaskfoldCardByIdOrPrefix } from "./card-lookup.js";
 import { redactClaimToken } from "./card-redaction.js";
-import type { FlowboardDispatchResult, FlowboardStore } from "./store.js";
+import type { TaskfoldDispatchResult, TaskfoldStore } from "./store.js";
 
 type JsonOptions = {
   json?: boolean;
@@ -62,18 +62,18 @@ function splitLabels(value: string | undefined): string[] | undefined {
     .filter(Boolean);
 }
 
-function isFlowboardStatus(value: string): value is FlowboardStatus {
-  return (FLOWBOARD_STATUSES as readonly string[]).includes(value);
+function isTaskfoldStatus(value: string): value is TaskfoldStatus {
+  return (TASKFOLD_STATUSES as readonly string[]).includes(value);
 }
 
-function formatCardLine(card: FlowboardCard): string {
+function formatCardLine(card: TaskfoldCard): string {
   const boardId = card.metadata?.automation?.boardId ?? "default";
   const milestone = card.milestoneId ? `/${card.milestoneId.slice(0, 8)}` : "/unassigned";
   const agent = card.agentId ? ` ${card.agentId}` : "";
   return `${card.id.slice(0, 8)}  ${card.status.padEnd(8)}  ${card.priority.padEnd(6)}  ${boardId}${milestone}${agent}  ${card.title}`;
 }
 
-function redactDispatchResult(result: FlowboardDispatchResult): FlowboardDispatchResult {
+function redactDispatchResult(result: TaskfoldDispatchResult): TaskfoldDispatchResult {
   return {
     ...result,
     promoted: result.promoted.map(redactClaimToken),
@@ -83,7 +83,7 @@ function redactDispatchResult(result: FlowboardDispatchResult): FlowboardDispatc
   };
 }
 
-function writeCards(cards: FlowboardCard[], options: JsonOptions): void {
+function writeCards(cards: TaskfoldCard[], options: JsonOptions): void {
   if (options.json) {
     writeJson({ cards: cards.map(redactClaimToken) });
     return;
@@ -93,7 +93,7 @@ function writeCards(cards: FlowboardCard[], options: JsonOptions): void {
   }
 }
 
-async function callFlowboardGateway(
+async function callTaskfoldGateway(
   method: string,
   options: GatewayOptions,
   params?: unknown,
@@ -121,7 +121,7 @@ function isGatewayUnavailableError(error: unknown): boolean {
     return true;
   }
   const unknownMethod = message.match(/unknown method:\s*([a-z0-9._-]+)/)?.[1];
-  return unknownMethod === "flowboard.cards.dispatch";
+  return unknownMethod === "taskfold.cards.dispatch";
 }
 
 function hasExplicitGatewayTarget(options: GatewayOptions): boolean {
@@ -139,14 +139,14 @@ function hasConfiguredRemoteGatewayTarget(): boolean {
   }
 }
 
-export function registerFlowboardCli(params: { program: Command; store: FlowboardStore }): void {
-  const flowboard = params.program
-    .command("flowboard")
-    .description("Manage Flowboard cards and worker dispatch");
+export function registerTaskfoldCli(params: { program: Command; store: TaskfoldStore }): void {
+  const taskfold = params.program
+    .command("taskfold")
+    .description("Manage Taskfold cards and worker dispatch");
 
-  flowboard
+  taskfold
     .command("list")
-    .description("List Flowboard cards")
+    .description("List Taskfold cards")
     .option("--board <id>", "Board id")
     .option("--status <status>", "Filter by status")
     .option("--include-archived", "Include archived cards (default false)")
@@ -159,7 +159,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
           includeArchived?: boolean;
         },
       ) => {
-        // Text output hides archived cards like /flowboard list, while --json
+        // Text output hides archived cards like /taskfold list, while --json
         // keeps the shipped full-card contract for existing scripts.
         let cards = await params.store.list({ boardId: options.board });
         if (!options.json && options.includeArchived !== true) {
@@ -172,10 +172,10 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
       },
     );
 
-  flowboard
+  taskfold
     .command("create")
     .argument("<title...>", "Card title")
-    .description("Create a Flowboard card")
+    .description("Create a Taskfold card")
     .option("--notes <text>", "Card notes")
     .option("--status <status>", "Initial status", "todo")
     .option("--priority <priority>", "Priority", "normal")
@@ -216,14 +216,14 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
       },
     );
 
-  flowboard
+  taskfold
     .command("show")
     .argument("<id>", "Card id or prefix")
-    .description("Show one Flowboard card")
+    .description("Show one Taskfold card")
     .option("--json", "Print JSON", false)
     .action(async (id: string, options: JsonOptions) => {
       const cards = await params.store.list();
-      const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+      const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
       if (!card) {
         throw new Error(error);
       }
@@ -237,7 +237,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
       }
     });
 
-  const project = flowboard.command("project").description("Manage Flowboard projects");
+  const project = taskfold.command("project").description("Manage Taskfold projects");
   project
     .command("list")
     .option("--archived", "Include archived projects")
@@ -331,7 +331,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
     .requiredOption("--milestone <id>", "Target milestone id; use unassigned to clear")
     .action(async (id: string, options: { milestone: string }) => {
       const cards = await params.store.list();
-      const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+      const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
       if (!card) {
         throw new Error(error);
       }
@@ -360,18 +360,18 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
       }
     });
 
-  flowboard
+  taskfold
     .command("move")
     .argument("<id>", "Card id or prefix")
-    .description("Move a Flowboard card to another status")
+    .description("Move a Taskfold card to another status")
     .requiredOption("--status <status>", "Target status")
     .option("--json", "Print JSON", false)
     .action(async (id: string, options: JsonOptions & { status: string }) => {
-      if (!isFlowboardStatus(options.status)) {
-        throw new Error(`--status must be one of: ${FLOWBOARD_STATUSES.join(", ")}.`);
+      if (!isTaskfoldStatus(options.status)) {
+        throw new Error(`--status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`);
       }
       const cards = await params.store.list();
-      const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+      const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
       if (!card) {
         throw new Error(error);
       }
@@ -384,7 +384,7 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
     });
 
   addGatewayClientOptions(
-    flowboard
+    taskfold
       .command("dispatch")
       .description("Promote ready cards and start worker runs through the Gateway")
       .option("--board <id>", "Dispatch a single board")
@@ -399,9 +399,9 @@ export function registerFlowboardCli(params: { program: Command; store: Flowboar
     try {
       const method =
         options.maxStarts === undefined
-          ? "flowboard.cards.dispatch"
-          : "flowboard.cards.dispatchWithOptions";
-      const result = await callFlowboardGateway(method, options, {
+          ? "taskfold.cards.dispatch"
+          : "taskfold.cards.dispatchWithOptions";
+      const result = await callTaskfoldGateway(method, options, {
         boardId: options.board,
         ...(options.maxStarts !== undefined ? { maxStarts: options.maxStarts } : {}),
       });

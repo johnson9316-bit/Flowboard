@@ -1,14 +1,14 @@
 import type {
-  FlowboardBoardSummary,
-  FlowboardCard,
-  FlowboardDiagnostic,
-  FlowboardWorkspace,
-  FlowboardWorkspaceAccess,
+  TaskfoldBoardSummary,
+  TaskfoldCard,
+  TaskfoldDiagnostic,
+  TaskfoldWorkspace,
+  TaskfoldWorkspaceAccess,
 } from "../../contract/index.js";
 
-export type { FlowboardBoardSummary } from "../../contract/index.js";
+export type { TaskfoldBoardSummary } from "../../contract/index.js";
 
-type FlowboardCardInput = {
+type TaskfoldCardInput = {
   title?: unknown;
   notes?: unknown;
   status?: unknown;
@@ -41,91 +41,91 @@ type FlowboardCardInput = {
   parents?: unknown;
 };
 
-export type FlowboardCardPatch = Partial<
-  Omit<FlowboardCardInput, "boardId" | "milestoneId" | "position">
+export type TaskfoldCardPatch = Partial<
+  Omit<TaskfoldCardInput, "boardId" | "milestoneId" | "position">
 >;
-export type FlowboardCommentInput = { body?: unknown };
-export type FlowboardLinkInput = {
+export type TaskfoldCommentInput = { body?: unknown };
+export type TaskfoldLinkInput = {
   type?: unknown;
   targetCardId?: unknown;
   title?: unknown;
   url?: unknown;
 };
-export type FlowboardLinkedCreateInput = FlowboardCardInput & {
+export type TaskfoldLinkedCreateInput = TaskfoldCardInput & {
   parents?: unknown;
 };
-export type FlowboardProofInput = {
+export type TaskfoldProofInput = {
   status?: unknown;
   label?: unknown;
   command?: unknown;
   url?: unknown;
   note?: unknown;
 };
-export type FlowboardArtifactInput = {
+export type TaskfoldArtifactInput = {
   label?: unknown;
   url?: unknown;
   path?: unknown;
   mimeType?: unknown;
 };
-export type FlowboardSourceReferenceCreateInput = {
+export type TaskfoldSourceReferenceCreateInput = {
   label?: unknown;
   target?: unknown;
   note?: unknown;
 };
-export type FlowboardSourceReferenceUpdateInput = FlowboardSourceReferenceCreateInput & {
+export type TaskfoldSourceReferenceUpdateInput = TaskfoldSourceReferenceCreateInput & {
   sourceReferenceId?: unknown;
 };
-export type FlowboardSourceReferenceDeleteInput = {
+export type TaskfoldSourceReferenceDeleteInput = {
   sourceReferenceId?: unknown;
 };
-export type FlowboardSourceReferenceReorderInput = {
+export type TaskfoldSourceReferenceReorderInput = {
   sourceReferenceIds?: unknown;
 };
-export type FlowboardAttachmentInput = {
+export type TaskfoldAttachmentInput = {
   fileName?: unknown;
   contentBase64?: unknown;
   mimeType?: unknown;
   note?: unknown;
 };
-export type FlowboardWorkerLogInput = {
+export type TaskfoldWorkerLogInput = {
   level?: unknown;
   message?: unknown;
   sessionKey?: unknown;
   runId?: unknown;
 };
-export type FlowboardProtocolViolationInput = {
+export type TaskfoldProtocolViolationInput = {
   detail?: unknown;
   sessionKey?: unknown;
   runId?: unknown;
 };
-export type FlowboardClaimInput = {
+export type TaskfoldClaimInput = {
   ownerId?: unknown;
   token?: unknown;
   ttlSeconds?: unknown;
 };
-export type FlowboardClaimOptions = {
+export type TaskfoldClaimOptions = {
   /** Trusted dispatcher guard; never accepted from public tool or gateway input. */
   expectedAuthority?: {
     boardId: string;
-    status: FlowboardCard["status"];
+    status: TaskfoldCard["status"];
     agentId?: string;
-    workspace?: FlowboardWorkspace;
-    workspaceAccess?: FlowboardWorkspaceAccess;
+    workspace?: TaskfoldWorkspace;
+    workspaceAccess?: TaskfoldWorkspaceAccess;
   };
   /** Trusted legacy-card adoption; applied only while expectedAuthority still matches. */
-  adoptWorkspaceAccess?: FlowboardWorkspaceAccess;
+  adoptWorkspaceAccess?: TaskfoldWorkspaceAccess;
 };
-export type FlowboardHeartbeatInput = {
+export type TaskfoldHeartbeatInput = {
   token?: unknown;
   ownerId?: unknown;
   note?: unknown;
 };
-export type FlowboardBulkInput = {
+export type TaskfoldBulkInput = {
   ids?: unknown;
   patch?: unknown;
   archived?: unknown;
 };
-export type FlowboardCompleteInput = {
+export type TaskfoldCompleteInput = {
   ownerId?: unknown;
   token?: unknown;
   summary?: unknown;
@@ -134,43 +134,43 @@ export type FlowboardCompleteInput = {
   artifacts?: unknown;
   createdCardIds?: unknown;
 };
-export type FlowboardBlockInput = {
+export type TaskfoldBlockInput = {
   ownerId?: unknown;
   token?: unknown;
   reason?: unknown;
 };
-export type FlowboardDispatchResult = {
-  promoted: FlowboardCard[];
-  reclaimed: FlowboardCard[];
-  blocked: FlowboardCard[];
-  orchestrated: FlowboardCard[];
+export type TaskfoldDispatchResult = {
+  promoted: TaskfoldCard[];
+  reclaimed: TaskfoldCard[];
+  blocked: TaskfoldCard[];
+  orchestrated: TaskfoldCard[];
   count: number;
 };
-export type FlowboardListOptions = {
+export type TaskfoldListOptions = {
   boardId?: unknown;
 };
-export type FlowboardDispatchOptions = FlowboardListOptions & {
+export type TaskfoldDispatchOptions = TaskfoldListOptions & {
   now?: unknown;
 };
-export type FlowboardStatsResult = FlowboardBoardSummary & {
+export type TaskfoldStatsResult = TaskfoldBoardSummary & {
   byAgent: Record<string, number>;
   oldestReadyAgeMs?: number;
 };
-export type FlowboardPromoteInput = {
+export type TaskfoldPromoteInput = {
   force?: unknown;
   reason?: unknown;
 };
-export type FlowboardReassignInput = {
+export type TaskfoldReassignInput = {
   agentId?: unknown;
   status?: unknown;
   resetFailures?: unknown;
   reason?: unknown;
 };
-export type FlowboardReclaimInput = {
+export type TaskfoldReclaimInput = {
   status?: unknown;
   reason?: unknown;
 };
-export type FlowboardBoardInput = {
+export type TaskfoldBoardInput = {
   id?: unknown;
   name?: unknown;
   description?: unknown;
@@ -188,26 +188,26 @@ export type FlowboardBoardInput = {
   orchestration?: unknown;
   archived?: unknown;
 };
-export type FlowboardProjectCreateInput = FlowboardBoardInput & {
+export type TaskfoldProjectCreateInput = TaskfoldBoardInput & {
   initialMilestoneTitle?: unknown;
 };
-export type FlowboardMilestoneCreateInput = {
+export type TaskfoldMilestoneCreateInput = {
   boardId?: unknown;
   title?: unknown;
   description?: unknown;
   color?: unknown;
   position?: unknown;
 };
-export type FlowboardMilestoneUpdateInput = {
+export type TaskfoldMilestoneUpdateInput = {
   title?: unknown;
   description?: unknown;
   color?: unknown;
 };
-export type FlowboardMilestoneReorderInput = {
+export type TaskfoldMilestoneReorderInput = {
   boardId?: unknown;
   milestoneIds?: unknown;
 };
-export type FlowboardProjectDocumentCreateInput = {
+export type TaskfoldProjectDocumentCreateInput = {
   boardId?: unknown;
   key?: unknown;
   section?: unknown;
@@ -218,35 +218,35 @@ export type FlowboardProjectDocumentCreateInput = {
   content?: unknown;
   position?: unknown;
 };
-export type FlowboardProjectDocumentUpdateInput = Omit<
-  FlowboardProjectDocumentCreateInput,
+export type TaskfoldProjectDocumentUpdateInput = Omit<
+  TaskfoldProjectDocumentCreateInput,
   "boardId" | "key" | "section"
 >;
-export type FlowboardProjectDocumentReorderInput = {
+export type TaskfoldProjectDocumentReorderInput = {
   boardId?: unknown;
   documentIds?: unknown;
 };
-export type FlowboardMoveMilestoneInput = {
+export type TaskfoldMoveMilestoneInput = {
   milestoneId?: unknown;
   position?: unknown;
 };
-export type FlowboardMoveProjectInput = {
+export type TaskfoldMoveProjectInput = {
   boardId?: unknown;
   milestoneId?: unknown;
   position?: unknown;
 };
-export type FlowboardSpecifyInput = FlowboardCardPatch & {
+export type TaskfoldSpecifyInput = TaskfoldCardPatch & {
   summary?: unknown;
 };
-export type FlowboardDecomposeChildInput = FlowboardLinkedCreateInput & {
+export type TaskfoldDecomposeChildInput = TaskfoldLinkedCreateInput & {
   idempotencyKey?: unknown;
 };
-export type FlowboardDecomposeInput = {
+export type TaskfoldDecomposeInput = {
   summary?: unknown;
   children?: unknown;
   completeParent?: unknown;
 };
-export type FlowboardNotificationSubscribeInput = {
+export type TaskfoldNotificationSubscribeInput = {
   boardId?: unknown;
   cardId?: unknown;
   sessionKey?: unknown;
@@ -254,23 +254,23 @@ export type FlowboardNotificationSubscribeInput = {
   target?: unknown;
   eventKinds?: unknown;
 };
-export type FlowboardNotificationListOptions = {
+export type TaskfoldNotificationListOptions = {
   boardId?: unknown;
   cardId?: unknown;
 };
-export type FlowboardNotificationEventsInput = FlowboardNotificationListOptions & {
+export type TaskfoldNotificationEventsInput = TaskfoldNotificationListOptions & {
   subscriptionId?: unknown;
   limit?: unknown;
 };
-export type FlowboardMutationScope = {
+export type TaskfoldMutationScope = {
   ownerId?: unknown;
   token?: unknown;
 };
 
-export type FlowboardDiagnosticsResult = {
+export type TaskfoldDiagnosticsResult = {
   diagnostics: Array<{
-    card: FlowboardCard;
-    diagnostics: FlowboardDiagnostic[];
+    card: TaskfoldCard;
+    diagnostics: TaskfoldDiagnostic[];
   }>;
   count: number;
 };

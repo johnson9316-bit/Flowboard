@@ -1,34 +1,34 @@
-// Flowboard plugin module implements gateway behavior.
+// Taskfold plugin module implements gateway behavior.
 import type { OpenClawPluginApi } from "../api.js";
 import { resolveDefaultAgentId } from "openclaw/plugin-sdk/agent-runtime";
 import { redactClaimToken } from "./card-redaction.js";
 import {
-  abortFlowboardCardExecution,
-  inspectFlowboardCardExecution,
-  prepareFlowboardCardExecution,
-  reconcileFlowboardCardExecution,
-  startFlowboardCardExecution,
-  steerFlowboardCardExecution,
-  type FlowboardCardExecutionOptions,
+  abortTaskfoldCardExecution,
+  inspectTaskfoldCardExecution,
+  prepareTaskfoldCardExecution,
+  reconcileTaskfoldCardExecution,
+  startTaskfoldCardExecution,
+  steerTaskfoldCardExecution,
+  type TaskfoldCardExecutionOptions,
 } from "./card-execution.js";
 import {
   assertNoCursorAdvance,
-  createFlowboardDispatchHandler,
-  listFlowboardCards,
+  createTaskfoldDispatchHandler,
+  listTaskfoldCards,
   readId,
   respondError,
-  resolveGatewayFlowboardWorkspaceAccess,
+  resolveGatewayTaskfoldWorkspaceAccess,
   type GatewayMethodContext,
 } from "./gateway-helpers.js";
 import {
-  registerFlowboardWorkspaceBoardMethod,
-  registerFlowboardWorkspaceBulkMethod,
-  registerFlowboardWorkspaceCardMethods,
-  registerFlowboardWorkspaceWorkflowMethods,
+  registerTaskfoldWorkspaceBoardMethod,
+  registerTaskfoldWorkspaceBulkMethod,
+  registerTaskfoldWorkspaceCardMethods,
+  registerTaskfoldWorkspaceWorkflowMethods,
 } from "./gateway-workspace-methods.js";
-import { registerFlowboardProjectGatewayMethods } from "./gateway-project-methods.js";
-import { FlowboardStore } from "./store.js";
-import { resolveAgentFlowboardWorkspaceRuntime } from "./workspace-access.js";
+import { registerTaskfoldProjectGatewayMethods } from "./gateway-project-methods.js";
+import { TaskfoldStore } from "./store.js";
+import { resolveAgentTaskfoldWorkspaceRuntime } from "./workspace-access.js";
 
 const READ_SCOPE = "operator.read" as const;
 const WRITE_SCOPE = "operator.write" as const;
@@ -49,7 +49,7 @@ function readChangeCursor(value: unknown): { epoch: string; revision: number } |
     !Number.isSafeInteger(revision) ||
     revision <= 0
   ) {
-    throw new Error("after must be a valid flowboard change cursor.");
+    throw new Error("after must be a valid taskfold change cursor.");
   }
   return { epoch, revision };
 }
@@ -69,7 +69,7 @@ function readChangeWaitTimeout(value: unknown): number {
   return value;
 }
 
-function redactDiagnosticsRows(result: Awaited<ReturnType<FlowboardStore["diagnostics"]>>) {
+function redactDiagnosticsRows(result: Awaited<ReturnType<TaskfoldStore["diagnostics"]>>) {
   return {
     ...result,
     diagnostics: result.diagnostics.map((row) => ({
@@ -79,13 +79,13 @@ function redactDiagnosticsRows(result: Awaited<ReturnType<FlowboardStore["diagno
   };
 }
 
-export function registerFlowboardGatewayMethods(params: {
+export function registerTaskfoldGatewayMethods(params: {
   api: OpenClawPluginApi;
-  store?: FlowboardStore;
+  store?: TaskfoldStore;
 }) {
   const { api } = params;
-  const store = params.store ?? FlowboardStore.openSqlite();
-  const dispatchCards = createFlowboardDispatchHandler({
+  const store = params.store ?? TaskfoldStore.openSqlite();
+  const dispatchCards = createTaskfoldDispatchHandler({
     api,
     store,
     redactCard: redactClaimToken,
@@ -93,15 +93,15 @@ export function registerFlowboardGatewayMethods(params: {
   const sandbox = (api.runtime as unknown as {
     sandbox?: {
       prepareWorkspaceAuthority?: Parameters<
-        typeof resolveAgentFlowboardWorkspaceRuntime
+        typeof resolveAgentTaskfoldWorkspaceRuntime
       >[0]["prepareSandboxWorkspaceAuthority"];
     };
   }).sandbox;
-  const executionOptions = (request: GatewayMethodContext): FlowboardCardExecutionOptions => {
+  const executionOptions = (request: GatewayMethodContext): TaskfoldCardExecutionOptions => {
     const config = request.context.getRuntimeConfig();
     return {
       runtime: api.runtime,
-      workspaceAccess: resolveGatewayFlowboardWorkspaceAccess({
+      workspaceAccess: resolveGatewayTaskfoldWorkspaceAccess({
         context: request.context,
         client: request.client,
       }),
@@ -113,7 +113,7 @@ export function registerFlowboardGatewayMethods(params: {
         modelProvider,
         modelId,
       ) =>
-        resolveAgentFlowboardWorkspaceRuntime({
+        resolveAgentTaskfoldWorkspaceRuntime({
           config,
           agentId,
           sessionKey,
@@ -126,10 +126,10 @@ export function registerFlowboardGatewayMethods(params: {
   };
 
   api.registerGatewayMethod(
-    "flowboard.cards.list",
+    "taskfold.cards.list",
     async ({ params: requestParams, respond }) => {
       try {
-        respond(true, await listFlowboardCards(store, requestParams.boardId, redactClaimToken));
+        respond(true, await listTaskfoldCards(store, requestParams.boardId, redactClaimToken));
       } catch (error) {
         respondError(respond, error);
       }
@@ -138,12 +138,12 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.execution.prepare",
+    "taskfold.cards.execution.prepare",
     async (request) => {
       try {
         request.respond(
           true,
-          await prepareFlowboardCardExecution({
+          await prepareTaskfoldCardExecution({
             store,
             id: request.params.id,
             options: executionOptions(request),
@@ -157,10 +157,10 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.execution.inspect",
+    "taskfold.cards.execution.inspect",
     async (request) => {
       try {
-        const result = await inspectFlowboardCardExecution({
+        const result = await inspectTaskfoldCardExecution({
           store,
           id: request.params.id,
           runtime: api.runtime,
@@ -174,10 +174,10 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.execution.start",
+    "taskfold.cards.execution.start",
     async (request) => {
       try {
-        const result = await startFlowboardCardExecution({
+        const result = await startTaskfoldCardExecution({
           store,
           id: request.params.id,
           expectedRevision: request.params.expectedRevision,
@@ -192,10 +192,10 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.execution.steer",
+    "taskfold.cards.execution.steer",
     async (request) => {
       try {
-        const result = await steerFlowboardCardExecution({
+        const result = await steerTaskfoldCardExecution({
           store,
           id: request.params.id,
           nextRunId: request.params.nextRunId,
@@ -209,10 +209,10 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.execution.abort",
+    "taskfold.cards.execution.abort",
     async (request) => {
       try {
-        const result = await abortFlowboardCardExecution({
+        const result = await abortTaskfoldCardExecution({
           store,
           id: request.params.id,
           reason: request.params.reason,
@@ -227,10 +227,10 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.execution.reconcile",
+    "taskfold.cards.execution.reconcile",
     async (request) => {
       try {
-        const result = await reconcileFlowboardCardExecution({
+        const result = await reconcileTaskfoldCardExecution({
           store,
           id: request.params.id,
           expectedRunId: request.params.expectedRunId,
@@ -247,7 +247,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.changes.wait",
+    "taskfold.changes.wait",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -264,11 +264,11 @@ export function registerFlowboardGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
 
-  registerFlowboardWorkspaceCardMethods({ api, store, redactCard: redactClaimToken });
-  registerFlowboardProjectGatewayMethods({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceCardMethods({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldProjectGatewayMethods({ api, store, redactCard: redactClaimToken });
 
   api.registerGatewayMethod(
-    "flowboard.cards.move",
+    "taskfold.cards.move",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -284,7 +284,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.delete",
+    "taskfold.cards.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.delete(readId(requestParams)));
@@ -296,7 +296,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.comment",
+    "taskfold.cards.comment",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -310,7 +310,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.link",
+    "taskfold.cards.link",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -324,7 +324,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.linkDependency",
+    "taskfold.cards.linkDependency",
     async ({ params: requestParams, respond }) => {
       try {
         const parentId = requestParams.parentId;
@@ -343,7 +343,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.proof",
+    "taskfold.cards.proof",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -357,7 +357,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.artifact",
+    "taskfold.cards.artifact",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -371,7 +371,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.proof.delete",
+    "taskfold.cards.proof.delete",
     async ({ params: requestParams, respond }) => {
       try {
         const proofId = requestParams.proofId;
@@ -389,7 +389,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.artifact.delete",
+    "taskfold.cards.artifact.delete",
     async ({ params: requestParams, respond }) => {
       try {
         const artifactId = requestParams.artifactId;
@@ -407,7 +407,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.claim",
+    "taskfold.cards.claim",
     async ({ params: requestParams, respond }) => {
       try {
         const claimed = await store.claim(readId(requestParams), requestParams);
@@ -420,7 +420,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.heartbeat",
+    "taskfold.cards.heartbeat",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -434,7 +434,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.release",
+    "taskfold.cards.release",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -448,7 +448,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.promote",
+    "taskfold.cards.promote",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -462,7 +462,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.reassign",
+    "taskfold.cards.reassign",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -476,7 +476,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.reclaim",
+    "taskfold.cards.reclaim",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -490,7 +490,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.complete",
+    "taskfold.cards.complete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -504,7 +504,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.block",
+    "taskfold.cards.block",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -518,7 +518,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.unblock",
+    "taskfold.cards.unblock",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -531,10 +531,10 @@ export function registerFlowboardGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
 
-  registerFlowboardWorkspaceBulkMethod({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceBulkMethod({ api, store, redactCard: redactClaimToken });
 
   api.registerGatewayMethod(
-    "flowboard.cards.diagnostics",
+    "taskfold.cards.diagnostics",
     async ({ respond }) => {
       try {
         respond(true, redactDiagnosticsRows(await store.diagnostics()));
@@ -546,7 +546,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.diagnostics.refresh",
+    "taskfold.cards.diagnostics.refresh",
     async ({ respond }) => {
       try {
         respond(true, redactDiagnosticsRows(await store.refreshDiagnostics()));
@@ -558,19 +558,19 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.dispatch",
+    "taskfold.cards.dispatch",
     async (context) => await dispatchCards(context, { supportsMaxStarts: false }),
     { scope: WRITE_SCOPE },
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.dispatchWithOptions",
+    "taskfold.cards.dispatchWithOptions",
     async (context) => await dispatchCards(context, { supportsMaxStarts: true }),
     { scope: WRITE_SCOPE },
   );
 
   api.registerGatewayMethod(
-    "flowboard.boards.list",
+    "taskfold.boards.list",
     async ({ respond }) => {
       try {
         respond(true, await store.listBoards());
@@ -581,10 +581,10 @@ export function registerFlowboardGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
 
-  registerFlowboardWorkspaceBoardMethod({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceBoardMethod({ api, store, redactCard: redactClaimToken });
 
   api.registerGatewayMethod(
-    "flowboard.boards.archive",
+    "taskfold.boards.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -598,7 +598,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.boards.delete",
+    "taskfold.boards.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteBoard(requestParams.id));
@@ -610,7 +610,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.stats",
+    "taskfold.cards.stats",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.stats({ boardId: requestParams.boardId }));
@@ -622,7 +622,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.runs",
+    "taskfold.cards.runs",
     async ({ params: requestParams, respond }) => {
       try {
         const result = await store.runs(readId(requestParams));
@@ -634,10 +634,10 @@ export function registerFlowboardGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
 
-  registerFlowboardWorkspaceWorkflowMethods({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceWorkflowMethods({ api, store, redactCard: redactClaimToken });
 
   api.registerGatewayMethod(
-    "flowboard.notifications.subscribe",
+    "taskfold.notifications.subscribe",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { subscription: await store.subscribeNotifications(requestParams) });
@@ -649,7 +649,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.notifications.list",
+    "taskfold.notifications.list",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.listNotificationSubscriptions(requestParams));
@@ -661,7 +661,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.notifications.delete",
+    "taskfold.notifications.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteNotificationSubscription(readId(requestParams)));
@@ -673,7 +673,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.notifications.events",
+    "taskfold.notifications.events",
     async ({ params: requestParams, respond }) => {
       try {
         assertNoCursorAdvance(requestParams);
@@ -686,7 +686,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.notifications.advance",
+    "taskfold.notifications.advance",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.advanceNotificationEvents(requestParams));
@@ -698,7 +698,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.list",
+    "taskfold.cards.attachments.list",
     async ({ params: requestParams, respond }) => {
       try {
         const result = await store.listAttachments(readId(requestParams));
@@ -711,7 +711,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.get",
+    "taskfold.cards.attachments.get",
     async ({ params: requestParams, respond }) => {
       try {
         const attachment = await store.getAttachment(readId(requestParams));
@@ -727,7 +727,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.add",
+    "taskfold.cards.attachments.add",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -741,7 +741,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.delete",
+    "taskfold.cards.attachments.delete",
     async ({ params: requestParams, respond }) => {
       try {
         const attachmentId = requestParams.attachmentId;
@@ -761,7 +761,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.workerLog",
+    "taskfold.cards.workerLog",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -775,7 +775,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.protocolViolation",
+    "taskfold.cards.protocolViolation",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -791,7 +791,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.archive",
+    "taskfold.cards.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -807,7 +807,7 @@ export function registerFlowboardGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.export",
+    "taskfold.cards.export",
     async ({ respond }) => {
       try {
         const exported = await store.exportCards();

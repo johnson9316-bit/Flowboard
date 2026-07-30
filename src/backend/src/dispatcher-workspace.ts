@@ -1,14 +1,14 @@
-import type { FlowboardCard } from "../../contract/index.js";
-// Flowboard dispatch workspace helpers keep authority resolution outside the orchestration loop.
+import type { TaskfoldCard } from "../../contract/index.js";
+// Taskfold dispatch workspace helpers keep authority resolution outside the orchestration loop.
 import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
 import { canonicalPathFromExistingAncestor } from "openclaw/plugin-sdk/security-runtime";
-import type { FlowboardStore } from "./store.js";
+import type { TaskfoldStore } from "./store.js";
 import {
-  assertCanonicalFlowboardRootAccess,
-  canonicalizeFlowboardWorkspaceAccess,
-  intersectFlowboardWorkspaceAccess,
-  type FlowboardTargetWorkspaceRuntime,
-  type FlowboardWorkspaceAccess,
+  assertCanonicalTaskfoldRootAccess,
+  canonicalizeTaskfoldWorkspaceAccess,
+  intersectTaskfoldWorkspaceAccess,
+  type TaskfoldTargetWorkspaceRuntime,
+  type TaskfoldWorkspaceAccess,
 } from "./workspace-access.js";
 
 export type ResolveAgentWorkspaceRuntime = (
@@ -17,7 +17,7 @@ export type ResolveAgentWorkspaceRuntime = (
   workspaceDir: string,
   modelProvider?: string,
   modelId?: string,
-) => FlowboardTargetWorkspaceRuntime | Promise<FlowboardTargetWorkspaceRuntime>;
+) => TaskfoldTargetWorkspaceRuntime | Promise<TaskfoldTargetWorkspaceRuntime>;
 
 export function managedWorktreeName(cardId: string): string {
   const suffix = cardId
@@ -27,8 +27,8 @@ export function managedWorktreeName(cardId: string): string {
   return `wb-${suffix}`.slice(0, 64).replace(/-$/, "");
 }
 
-export async function cleanupFlowboardRunWorktree(params: {
-  store: FlowboardStore;
+export async function cleanupTaskfoldRunWorktree(params: {
+  store: TaskfoldStore;
   worktrees: Pick<PluginRuntime["worktrees"], "removeIfLossless">;
   runId: string;
 }): Promise<void> {
@@ -43,15 +43,15 @@ export async function cleanupFlowboardRunWorktree(params: {
 }
 
 export async function resolveDispatchWorkspaceAccess(params: {
-  card: FlowboardCard;
-  currentAccess?: FlowboardWorkspaceAccess;
+  card: TaskfoldCard;
+  currentAccess?: TaskfoldWorkspaceAccess;
   resolveAgentWorkspace?: (agentId?: string) => string;
 }): Promise<{
-  workspaceAccess: FlowboardWorkspaceAccess;
+  workspaceAccess: TaskfoldWorkspaceAccess;
   targetWorkspace?: string;
   persistWorkspaceAccess: boolean;
 }> {
-  const currentAccess = await canonicalizeFlowboardWorkspaceAccess(
+  const currentAccess = await canonicalizeTaskfoldWorkspaceAccess(
     params.currentAccess ?? { unrestricted: true },
   );
   const persistedAccess = params.card.metadata?.automation?.workspaceAccess;
@@ -62,7 +62,7 @@ export async function resolveDispatchWorkspaceAccess(params: {
     targetWorkspace = resolved ? await canonicalPathFromExistingAncestor(resolved) : undefined;
   }
   const cardAccess = persistedAccess
-    ? await canonicalizeFlowboardWorkspaceAccess(persistedAccess)
+    ? await canonicalizeTaskfoldWorkspaceAccess(persistedAccess)
     : currentAccess.unrestricted
       ? !workspace || workspace.kind === "scratch"
         ? currentAccess
@@ -72,7 +72,7 @@ export async function resolveDispatchWorkspaceAccess(params: {
             );
           })()
       : currentAccess;
-  const workspaceAccess = intersectFlowboardWorkspaceAccess(cardAccess, currentAccess);
+  const workspaceAccess = intersectTaskfoldWorkspaceAccess(cardAccess, currentAccess);
   if (!workspaceAccess.unrestricted && !workspaceAccess.writable) {
     throw new Error(
       "card workspace authority is read-only; manual movement is allowed but worker dispatch requires write access.",
@@ -85,7 +85,7 @@ export async function resolveDispatchWorkspaceAccess(params: {
   };
 }
 
-export async function assertRestrictedFlowboardTarget(params: {
+export async function assertRestrictedTaskfoldTarget(params: {
   root: string;
   agentId?: string;
   sessionKey: string;
@@ -93,7 +93,7 @@ export async function assertRestrictedFlowboardTarget(params: {
   modelId?: string;
   resolveAgentWorkspaceRuntime?: ResolveAgentWorkspaceRuntime;
 }): Promise<void> {
-  const resolved: FlowboardTargetWorkspaceRuntime = params.resolveAgentWorkspaceRuntime
+  const resolved: TaskfoldTargetWorkspaceRuntime = params.resolveAgentWorkspaceRuntime
     ? await params.resolveAgentWorkspaceRuntime(
         params.agentId,
         params.sessionKey,
@@ -107,10 +107,10 @@ export async function assertRestrictedFlowboardTarget(params: {
       };
   const targetRuntime = {
     ...resolved,
-    workspaceAccess: await canonicalizeFlowboardWorkspaceAccess(resolved.workspaceAccess),
+    workspaceAccess: await canonicalizeTaskfoldWorkspaceAccess(resolved.workspaceAccess),
   };
   if (!targetRuntime.sandboxed) {
-    throw new Error("target agent is not sandboxed for this restricted Flowboard card.");
+    throw new Error("target agent is not sandboxed for this restricted Taskfold card.");
   }
   if (targetRuntime.confinementError) {
     throw new Error(targetRuntime.confinementError);
@@ -118,5 +118,5 @@ export async function assertRestrictedFlowboardTarget(params: {
   if (targetRuntime.workspaceAccess.unrestricted || !targetRuntime.workspaceAccess.writable) {
     throw new Error("target agent does not have writable workspace-only access.");
   }
-  await assertCanonicalFlowboardRootAccess(params.root, targetRuntime.workspaceAccess);
+  await assertCanonicalTaskfoldRootAccess(params.root, targetRuntime.workspaceAccess);
 }

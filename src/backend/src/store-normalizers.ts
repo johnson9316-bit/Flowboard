@@ -1,57 +1,57 @@
 import { randomUUID } from "node:crypto";
 import {
-  isValidFlowboardBoardId,
-  FLOWBOARD_ATTEMPT_STATUSES,
-  FLOWBOARD_DIAGNOSTIC_KINDS,
-  FLOWBOARD_DIAGNOSTIC_SEVERITIES,
-  FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES,
-  FLOWBOARD_DELIVERY_RELEASE_STATES,
-  FLOWBOARD_DELIVERY_VERIFICATION_STATES,
-  FLOWBOARD_EVENT_KINDS,
-  FLOWBOARD_EXECUTION_MODES,
-  FLOWBOARD_EXECUTION_STATUSES,
-  FLOWBOARD_LINK_TYPES,
-  FLOWBOARD_NOTIFICATION_KINDS,
-  FLOWBOARD_PRIORITIES,
-  FLOWBOARD_PROOF_STATUSES,
-  FLOWBOARD_STATUSES,
-  FLOWBOARD_TEMPLATE_IDS,
-  type FlowboardArtifact,
-  type FlowboardAttachment,
-  type FlowboardAttemptStatus,
-  type FlowboardAutomation,
-  type FlowboardBoardMetadata,
-  type FlowboardClaim,
-  type FlowboardComment,
-  type FlowboardDiagnostic,
-  type FlowboardDiagnosticAction,
-  type FlowboardDiagnosticKind,
-  type FlowboardDiagnosticSeverity,
-  type FlowboardDelivery,
-  type FlowboardDeliveryImplementationState,
-  type FlowboardDeliveryReleaseState,
-  type FlowboardDeliveryVerificationState,
-  type FlowboardEvent,
-  type FlowboardEventKind,
-  type FlowboardExecution,
-  type FlowboardExecutionMode,
-  type FlowboardExecutionStatus,
-  type FlowboardLink,
-  type FlowboardLinkType,
-  type FlowboardMetadata,
-  type FlowboardNotification,
-  type FlowboardNotificationKind,
-  type FlowboardNotificationSubscription,
-  type FlowboardOrchestrationSettings,
-  type FlowboardPriority,
-  type FlowboardProof,
-  type FlowboardProofStatus,
-  type FlowboardRunAttempt,
-  type FlowboardStatus,
-  type FlowboardTemplateId,
-  type FlowboardWorkerLog,
-  type FlowboardWorkerProtocol,
-  type FlowboardWorkspace,
+  isValidTaskfoldBoardId,
+  TASKFOLD_ATTEMPT_STATUSES,
+  TASKFOLD_DIAGNOSTIC_KINDS,
+  TASKFOLD_DIAGNOSTIC_SEVERITIES,
+  TASKFOLD_DELIVERY_IMPLEMENTATION_STATES,
+  TASKFOLD_DELIVERY_RELEASE_STATES,
+  TASKFOLD_DELIVERY_VERIFICATION_STATES,
+  TASKFOLD_EVENT_KINDS,
+  TASKFOLD_EXECUTION_MODES,
+  TASKFOLD_EXECUTION_STATUSES,
+  TASKFOLD_LINK_TYPES,
+  TASKFOLD_NOTIFICATION_KINDS,
+  TASKFOLD_PRIORITIES,
+  TASKFOLD_PROOF_STATUSES,
+  TASKFOLD_STATUSES,
+  TASKFOLD_TEMPLATE_IDS,
+  type TaskfoldArtifact,
+  type TaskfoldAttachment,
+  type TaskfoldAttemptStatus,
+  type TaskfoldAutomation,
+  type TaskfoldBoardMetadata,
+  type TaskfoldClaim,
+  type TaskfoldComment,
+  type TaskfoldDiagnostic,
+  type TaskfoldDiagnosticAction,
+  type TaskfoldDiagnosticKind,
+  type TaskfoldDiagnosticSeverity,
+  type TaskfoldDelivery,
+  type TaskfoldDeliveryImplementationState,
+  type TaskfoldDeliveryReleaseState,
+  type TaskfoldDeliveryVerificationState,
+  type TaskfoldEvent,
+  type TaskfoldEventKind,
+  type TaskfoldExecution,
+  type TaskfoldExecutionMode,
+  type TaskfoldExecutionStatus,
+  type TaskfoldLink,
+  type TaskfoldLinkType,
+  type TaskfoldMetadata,
+  type TaskfoldNotification,
+  type TaskfoldNotificationKind,
+  type TaskfoldNotificationSubscription,
+  type TaskfoldOrchestrationSettings,
+  type TaskfoldPriority,
+  type TaskfoldProof,
+  type TaskfoldProofStatus,
+  type TaskfoldRunAttempt,
+  type TaskfoldStatus,
+  type TaskfoldTemplateId,
+  type TaskfoldWorkerLog,
+  type TaskfoldWorkerProtocol,
+  type TaskfoldWorkspace,
 } from "../../contract/index.js";
 import {
   MAX_ATTACHMENT_BYTES,
@@ -68,10 +68,10 @@ import {
   MAX_CARD_WORKER_LOGS,
 } from "./store-constants.js";
 import type {
-  FlowboardAttachmentInput,
-  FlowboardBoardInput,
-  FlowboardNotificationSubscribeInput,
-  FlowboardProofInput,
+  TaskfoldAttachmentInput,
+  TaskfoldBoardInput,
+  TaskfoldNotificationSubscribeInput,
+  TaskfoldProofInput,
 } from "./store-inputs.js";
 import { isAbsoluteWorkspacePath } from "./workspace-path.js";
 
@@ -85,7 +85,7 @@ export function normalizeBoardId(value: unknown, fallback?: string): string | un
     return undefined;
   }
   const boardId = raw.toLowerCase();
-  if (!isValidFlowboardBoardId(boardId)) {
+  if (!isValidTaskfoldBoardId(boardId)) {
     throw new Error("board id must match [a-z0-9][a-z0-9._-]{0,79}.");
   }
   return boardId;
@@ -96,10 +96,10 @@ export function normalizeBoardIdRequired(value: unknown): string {
 }
 
 export function normalizeBoardMetadata(
-  input: FlowboardBoardInput,
-  fallback: FlowboardBoardMetadata | undefined,
+  input: TaskfoldBoardInput,
+  fallback: TaskfoldBoardMetadata | undefined,
   now = Date.now(),
-): FlowboardBoardMetadata {
+): TaskfoldBoardMetadata {
   const id = normalizeBoardId(input.id, fallback?.id) ?? "default";
   const name = normalizeBoundedString(input.name, fallback?.name, 120, "board name");
   const description = normalizeBoundedString(
@@ -171,8 +171,8 @@ export function normalizeBoardMetadata(
 
 function normalizeOrchestration(
   value: unknown,
-  fallback?: FlowboardOrchestrationSettings,
-): FlowboardOrchestrationSettings | undefined {
+  fallback?: TaskfoldOrchestrationSettings,
+): TaskfoldOrchestrationSettings | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return fallback;
   }
@@ -196,7 +196,7 @@ function normalizeOrchestration(
     120,
     "orchestrator profile",
   );
-  const next: FlowboardOrchestrationSettings = {
+  const next: TaskfoldOrchestrationSettings = {
     ...(autoDecompose !== undefined ? { autoDecompose } : {}),
     ...(autoDecomposePerDispatch ? { autoDecomposePerDispatch } : {}),
     ...(defaultAssignee ? { defaultAssignee } : {}),
@@ -205,20 +205,20 @@ function normalizeOrchestration(
   return Object.keys(next).length ? next : undefined;
 }
 
-function normalizeNotificationKinds(value: unknown): FlowboardNotificationKind[] | undefined {
+function normalizeNotificationKinds(value: unknown): TaskfoldNotificationKind[] | undefined {
   if (value == null) {
     return undefined;
   }
   const entries = typeof value === "string" ? value.split(",") : Array.isArray(value) ? value : [];
-  const kinds: FlowboardNotificationKind[] = [];
+  const kinds: TaskfoldNotificationKind[] = [];
   for (const entry of entries) {
     const kind = typeof entry === "string" ? entry.trim() : "";
-    if (!FLOWBOARD_NOTIFICATION_KINDS.includes(kind as FlowboardNotificationKind)) {
+    if (!TASKFOLD_NOTIFICATION_KINDS.includes(kind as TaskfoldNotificationKind)) {
       throw new Error(
-        `notification kind must be one of: ${FLOWBOARD_NOTIFICATION_KINDS.join(", ")}.`,
+        `notification kind must be one of: ${TASKFOLD_NOTIFICATION_KINDS.join(", ")}.`,
       );
     }
-    const notificationKind = kind as FlowboardNotificationKind;
+    const notificationKind = kind as TaskfoldNotificationKind;
     if (!kinds.includes(notificationKind)) {
       kinds.push(notificationKind);
     }
@@ -227,10 +227,10 @@ function normalizeNotificationKinds(value: unknown): FlowboardNotificationKind[]
 }
 
 export function normalizeNotificationSubscription(
-  input: FlowboardNotificationSubscribeInput,
-  fallback?: FlowboardNotificationSubscription,
+  input: TaskfoldNotificationSubscribeInput,
+  fallback?: TaskfoldNotificationSubscription,
   now = Date.now(),
-): FlowboardNotificationSubscription {
+): TaskfoldNotificationSubscription {
   const boardId = normalizeBoardId(input.boardId, fallback?.boardId) ?? "default";
   const cardId = normalizeBoundedString(input.cardId, fallback?.cardId, 120, "card id");
   const sessionKey = normalizeBoundedString(
@@ -245,7 +245,7 @@ export function normalizeNotificationSubscription(
     throw new Error("notification subscription needs cardId, sessionKey, runId, or target.");
   }
   const eventKinds = normalizeNotificationKinds(input.eventKinds);
-  const preservedFields: Partial<FlowboardNotificationSubscription> = {};
+  const preservedFields: Partial<TaskfoldNotificationSubscription> = {};
   if (fallback) {
     if (fallback.lastEventAt) {
       preservedFields.lastEventAt = fallback.lastEventAt;
@@ -327,9 +327,9 @@ function normalizeDeliveryState<T extends string>(
 
 export function normalizeDelivery(
   value: unknown,
-  fallback?: FlowboardDelivery,
+  fallback?: TaskfoldDelivery,
   now = Date.now(),
-): FlowboardDelivery | undefined {
+): TaskfoldDelivery | undefined {
   if (value === null) {
     return undefined;
   }
@@ -348,25 +348,25 @@ export function normalizeDelivery(
   const implementationState = Object.hasOwn(record, "implementationState")
     ? normalizeDeliveryState(
         record.implementationState,
-        FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES,
+        TASKFOLD_DELIVERY_IMPLEMENTATION_STATES,
         "implementation state",
       )
     : fallback?.implementationState;
   const verificationState = Object.hasOwn(record, "verificationState")
     ? normalizeDeliveryState(
         record.verificationState,
-        FLOWBOARD_DELIVERY_VERIFICATION_STATES,
+        TASKFOLD_DELIVERY_VERIFICATION_STATES,
         "verification state",
       )
     : fallback?.verificationState;
   const releaseState = Object.hasOwn(record, "releaseState")
     ? normalizeDeliveryState(
         record.releaseState,
-        FLOWBOARD_DELIVERY_RELEASE_STATES,
+        TASKFOLD_DELIVERY_RELEASE_STATES,
         "release state",
       )
     : fallback?.releaseState;
-  const delivery: Omit<FlowboardDelivery, "updatedAt"> = {
+  const delivery: Omit<TaskfoldDelivery, "updatedAt"> = {
     ...(readText("objective", 2000, "delivery objective")
       ? { objective: readText("objective", 2000, "delivery objective") }
       : {}),
@@ -377,12 +377,12 @@ export function normalizeDelivery(
       ? { openItems: readText("openItems", 4000, "delivery open items") }
       : {}),
     ...(implementationState
-      ? { implementationState: implementationState as FlowboardDeliveryImplementationState }
+      ? { implementationState: implementationState as TaskfoldDeliveryImplementationState }
       : {}),
     ...(verificationState
-      ? { verificationState: verificationState as FlowboardDeliveryVerificationState }
+      ? { verificationState: verificationState as TaskfoldDeliveryVerificationState }
       : {}),
-    ...(releaseState ? { releaseState: releaseState as FlowboardDeliveryReleaseState } : {}),
+    ...(releaseState ? { releaseState: releaseState as TaskfoldDeliveryReleaseState } : {}),
   };
   return Object.keys(delivery).length ? { ...delivery, updatedAt: now } : undefined;
 }
@@ -424,24 +424,24 @@ export function normalizeExternalUrl(
   return parsed.toString();
 }
 
-export function normalizeStatus(value: unknown, fallback: FlowboardStatus): FlowboardStatus {
+export function normalizeStatus(value: unknown, fallback: TaskfoldStatus): TaskfoldStatus {
   if (typeof value !== "string" || !value.trim()) {
     return fallback;
   }
-  if ((FLOWBOARD_STATUSES as readonly string[]).includes(value)) {
-    return value as FlowboardStatus;
+  if ((TASKFOLD_STATUSES as readonly string[]).includes(value)) {
+    return value as TaskfoldStatus;
   }
-  throw new Error(`status must be one of: ${FLOWBOARD_STATUSES.join(", ")}.`);
+  throw new Error(`status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`);
 }
 
-export function normalizePriority(value: unknown, fallback: FlowboardPriority): FlowboardPriority {
+export function normalizePriority(value: unknown, fallback: TaskfoldPriority): TaskfoldPriority {
   if (typeof value !== "string" || !value.trim()) {
     return fallback;
   }
-  if ((FLOWBOARD_PRIORITIES as readonly string[]).includes(value)) {
-    return value as FlowboardPriority;
+  if ((TASKFOLD_PRIORITIES as readonly string[]).includes(value)) {
+    return value as TaskfoldPriority;
   }
-  throw new Error(`priority must be one of: ${FLOWBOARD_PRIORITIES.join(", ")}.`);
+  throw new Error(`priority must be one of: ${TASKFOLD_PRIORITIES.join(", ")}.`);
 }
 
 export function normalizeLabels(value: unknown, fallback: string[] = []): string[] {
@@ -514,8 +514,8 @@ function normalizePositiveInteger(value: unknown, fieldName: string): number | u
 
 function normalizeWorkspace(
   value: unknown,
-  fallback?: FlowboardWorkspace,
-): FlowboardWorkspace | undefined {
+  fallback?: TaskfoldWorkspace,
+): TaskfoldWorkspace | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return fallback;
   }
@@ -558,8 +558,8 @@ function normalizeWorkspace(
 
 export function normalizeAutomation(
   value: unknown,
-  fallback: FlowboardAutomation = {},
-): FlowboardAutomation | undefined {
+  fallback: TaskfoldAutomation = {},
+): TaskfoldAutomation | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return Object.keys(fallback).length ? fallback : undefined;
   }
@@ -639,66 +639,66 @@ export function deriveChildIdempotencyKey(
 
 function normalizeExecutionMode(
   value: unknown,
-  fallback: FlowboardExecutionMode,
-): FlowboardExecutionMode {
+  fallback: TaskfoldExecutionMode,
+): TaskfoldExecutionMode {
   if (
     typeof value === "string" &&
-    FLOWBOARD_EXECUTION_MODES.includes(value as FlowboardExecutionMode)
+    TASKFOLD_EXECUTION_MODES.includes(value as TaskfoldExecutionMode)
   ) {
-    return value as FlowboardExecutionMode;
+    return value as TaskfoldExecutionMode;
   }
   return fallback;
 }
 
 function normalizeExecutionStatus(
   value: unknown,
-  fallback: FlowboardExecutionStatus,
-): FlowboardExecutionStatus {
+  fallback: TaskfoldExecutionStatus,
+): TaskfoldExecutionStatus {
   if (
     typeof value === "string" &&
-    FLOWBOARD_EXECUTION_STATUSES.includes(value as FlowboardExecutionStatus)
+    TASKFOLD_EXECUTION_STATUSES.includes(value as TaskfoldExecutionStatus)
   ) {
-    return value as FlowboardExecutionStatus;
+    return value as TaskfoldExecutionStatus;
   }
   return fallback;
 }
 
 function normalizeAttemptStatus(
   value: unknown,
-  fallback: FlowboardAttemptStatus,
-): FlowboardAttemptStatus {
+  fallback: TaskfoldAttemptStatus,
+): TaskfoldAttemptStatus {
   if (
     typeof value === "string" &&
-    FLOWBOARD_ATTEMPT_STATUSES.includes(value as FlowboardAttemptStatus)
+    TASKFOLD_ATTEMPT_STATUSES.includes(value as TaskfoldAttemptStatus)
   ) {
-    return value as FlowboardAttemptStatus;
+    return value as TaskfoldAttemptStatus;
   }
   return fallback;
 }
 
-export function normalizeLinkType(value: unknown, fallback: FlowboardLinkType): FlowboardLinkType {
-  if (typeof value === "string" && FLOWBOARD_LINK_TYPES.includes(value as FlowboardLinkType)) {
-    return value as FlowboardLinkType;
+export function normalizeLinkType(value: unknown, fallback: TaskfoldLinkType): TaskfoldLinkType {
+  if (typeof value === "string" && TASKFOLD_LINK_TYPES.includes(value as TaskfoldLinkType)) {
+    return value as TaskfoldLinkType;
   }
   return fallback;
 }
 
 function normalizeProofStatus(
   value: unknown,
-  fallback: FlowboardProofStatus,
-): FlowboardProofStatus {
+  fallback: TaskfoldProofStatus,
+): TaskfoldProofStatus {
   if (
     typeof value === "string" &&
-    FLOWBOARD_PROOF_STATUSES.includes(value as FlowboardProofStatus)
+    TASKFOLD_PROOF_STATUSES.includes(value as TaskfoldProofStatus)
   ) {
-    return value as FlowboardProofStatus;
+    return value as TaskfoldProofStatus;
   }
   return fallback;
 }
 
-export function normalizeTemplateId(value: unknown): FlowboardTemplateId | undefined {
-  return typeof value === "string" && FLOWBOARD_TEMPLATE_IDS.includes(value as FlowboardTemplateId)
-    ? (value as FlowboardTemplateId)
+export function normalizeTemplateId(value: unknown): TaskfoldTemplateId | undefined {
+  return typeof value === "string" && TASKFOLD_TEMPLATE_IDS.includes(value as TaskfoldTemplateId)
+    ? (value as TaskfoldTemplateId)
     : undefined;
 }
 
@@ -708,14 +708,14 @@ export function normalizeTimestamp(value: unknown, fallback: number): number {
     : fallback;
 }
 
-function normalizeEvent(value: unknown): FlowboardEvent | null {
+function normalizeEvent(value: unknown): TaskfoldEvent | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
   const record = value as Record<string, unknown>;
   const id = normalizeOptionalString(record.id);
-  const kind = FLOWBOARD_EVENT_KINDS.includes(record.kind as FlowboardEventKind)
-    ? (record.kind as FlowboardEventKind)
+  const kind = TASKFOLD_EVENT_KINDS.includes(record.kind as TaskfoldEventKind)
+    ? (record.kind as TaskfoldEventKind)
     : null;
   const at = normalizeTimestamp(record.at, 0);
   if (!id || !kind || !at) {
@@ -723,13 +723,13 @@ function normalizeEvent(value: unknown): FlowboardEvent | null {
   }
   const fromStatus =
     typeof record.fromStatus === "string" &&
-    FLOWBOARD_STATUSES.includes(record.fromStatus as FlowboardStatus)
-      ? (record.fromStatus as FlowboardStatus)
+    TASKFOLD_STATUSES.includes(record.fromStatus as TaskfoldStatus)
+      ? (record.fromStatus as TaskfoldStatus)
       : undefined;
   const toStatus =
     typeof record.toStatus === "string" &&
-    FLOWBOARD_STATUSES.includes(record.toStatus as FlowboardStatus)
-      ? (record.toStatus as FlowboardStatus)
+    TASKFOLD_STATUSES.includes(record.toStatus as TaskfoldStatus)
+      ? (record.toStatus as TaskfoldStatus)
       : undefined;
   const fromMilestoneId = normalizeBoundedString(
     record.fromMilestoneId,
@@ -758,17 +758,17 @@ function normalizeEvent(value: unknown): FlowboardEvent | null {
   };
 }
 
-export function normalizeEvents(value: unknown): FlowboardEvent[] {
+export function normalizeEvents(value: unknown): TaskfoldEvent[] {
   if (!Array.isArray(value)) {
     return [];
   }
   return value
     .map(normalizeEvent)
-    .filter((event): event is FlowboardEvent => event !== null)
+    .filter((event): event is TaskfoldEvent => event !== null)
     .slice(-MAX_CARD_EVENTS);
 }
 
-function normalizeAttempt(value: unknown): FlowboardRunAttempt | null {
+function normalizeAttempt(value: unknown): TaskfoldRunAttempt | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -797,8 +797,8 @@ function normalizeAttempt(value: unknown): FlowboardRunAttempt | null {
     ...(endedAt ? { endedAt } : {}),
     ...(engine ? { engine } : {}),
     ...(typeof record.mode === "string" &&
-    FLOWBOARD_EXECUTION_MODES.includes(record.mode as FlowboardExecutionMode)
-      ? { mode: record.mode as FlowboardExecutionMode }
+    TASKFOLD_EXECUTION_MODES.includes(record.mode as TaskfoldExecutionMode)
+      ? { mode: record.mode as TaskfoldExecutionMode }
       : {}),
     ...(model ? { model } : {}),
     ...(sessionKey ? { sessionKey } : {}),
@@ -808,7 +808,7 @@ function normalizeAttempt(value: unknown): FlowboardRunAttempt | null {
   };
 }
 
-function normalizeComment(value: unknown): FlowboardComment | null {
+function normalizeComment(value: unknown): TaskfoldComment | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -823,7 +823,7 @@ function normalizeComment(value: unknown): FlowboardComment | null {
   return { id, body, createdAt, ...(updatedAt ? { updatedAt } : {}) };
 }
 
-function normalizeLink(value: unknown): FlowboardLink | null {
+function normalizeLink(value: unknown): TaskfoldLink | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -849,11 +849,11 @@ function normalizeLink(value: unknown): FlowboardLink | null {
   };
 }
 
-function isDependencyLink(link: FlowboardLink): boolean {
+function isDependencyLink(link: TaskfoldLink): boolean {
   return link.type === "parent" || link.type === "child";
 }
 
-function normalizeProof(value: unknown): FlowboardProof | null {
+function normalizeProof(value: unknown): TaskfoldProof | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -878,7 +878,7 @@ function normalizeProof(value: unknown): FlowboardProof | null {
   };
 }
 
-export function normalizeArtifact(value: unknown): FlowboardArtifact | null {
+export function normalizeArtifact(value: unknown): TaskfoldArtifact | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -902,7 +902,7 @@ export function normalizeArtifact(value: unknown): FlowboardArtifact | null {
   };
 }
 
-function normalizeAttachment(value: unknown): FlowboardAttachment | null {
+function normalizeAttachment(value: unknown): TaskfoldAttachment | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -931,7 +931,7 @@ function normalizeAttachment(value: unknown): FlowboardAttachment | null {
   };
 }
 
-function normalizeWorkerLog(value: unknown): FlowboardWorkerLog | null {
+function normalizeWorkerLog(value: unknown): TaskfoldWorkerLog | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -960,8 +960,8 @@ function normalizeWorkerLog(value: unknown): FlowboardWorkerLog | null {
 
 function normalizeWorkerProtocol(
   value: unknown,
-  fallback?: FlowboardWorkerProtocol,
-): FlowboardWorkerProtocol | undefined {
+  fallback?: TaskfoldWorkerProtocol,
+): TaskfoldWorkerProtocol | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return fallback;
   }
@@ -988,9 +988,9 @@ function normalizeWorkerProtocol(
 
 export function normalizeAttachmentInput(
   cardId: string,
-  input: FlowboardAttachmentInput,
+  input: TaskfoldAttachmentInput,
   now: number,
-): { attachment: FlowboardAttachment; contentBase64: string } {
+): { attachment: TaskfoldAttachment; contentBase64: string } {
   const fileName = normalizeBoundedString(input.fileName, undefined, 240, "attachment file name");
   if (!fileName) {
     throw new Error("attachment fileName is required.");
@@ -1019,7 +1019,7 @@ export function normalizeAttachmentInput(
   }
   const mimeType = normalizeBoundedString(input.mimeType, undefined, 160, "attachment MIME type");
   const note = normalizeBoundedString(input.note, undefined, 400, "attachment note");
-  const attachment: FlowboardAttachment = {
+  const attachment: TaskfoldAttachment = {
     id: randomUUID(),
     cardId,
     createdAt: now,
@@ -1031,7 +1031,7 @@ export function normalizeAttachmentInput(
   return { attachment, contentBase64 };
 }
 
-function normalizeClaim(value: unknown, fallback?: FlowboardClaim): FlowboardClaim | undefined {
+function normalizeClaim(value: unknown, fallback?: TaskfoldClaim): TaskfoldClaim | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return fallback;
   }
@@ -1056,7 +1056,7 @@ function normalizeClaim(value: unknown, fallback?: FlowboardClaim): FlowboardCla
   };
 }
 
-function normalizeDiagnosticAction(value: unknown): FlowboardDiagnosticAction | null {
+function normalizeDiagnosticAction(value: unknown): TaskfoldDiagnosticAction | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -1073,18 +1073,18 @@ function normalizeDiagnosticAction(value: unknown): FlowboardDiagnosticAction | 
   return kind && label ? { kind, label } : null;
 }
 
-function normalizeDiagnostic(value: unknown): FlowboardDiagnostic | null {
+function normalizeDiagnostic(value: unknown): TaskfoldDiagnostic | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
   const record = value as Record<string, unknown>;
-  const kind = FLOWBOARD_DIAGNOSTIC_KINDS.includes(record.kind as FlowboardDiagnosticKind)
-    ? (record.kind as FlowboardDiagnosticKind)
+  const kind = TASKFOLD_DIAGNOSTIC_KINDS.includes(record.kind as TaskfoldDiagnosticKind)
+    ? (record.kind as TaskfoldDiagnosticKind)
     : undefined;
-  const severity = FLOWBOARD_DIAGNOSTIC_SEVERITIES.includes(
-    record.severity as FlowboardDiagnosticSeverity,
+  const severity = TASKFOLD_DIAGNOSTIC_SEVERITIES.includes(
+    record.severity as TaskfoldDiagnosticSeverity,
   )
-    ? (record.severity as FlowboardDiagnosticSeverity)
+    ? (record.severity as TaskfoldDiagnosticSeverity)
     : "warning";
   const title = normalizeBoundedString(record.title, undefined, 160, "diagnostic title");
   const detail = normalizeBoundedString(record.detail, undefined, 800, "diagnostic detail");
@@ -1107,20 +1107,20 @@ function normalizeDiagnostic(value: unknown): FlowboardDiagnostic | null {
     actions: Array.isArray(record.actions)
       ? record.actions
           .map(normalizeDiagnosticAction)
-          .filter((action): action is FlowboardDiagnosticAction => action !== null)
+          .filter((action): action is TaskfoldDiagnosticAction => action !== null)
           .slice(0, 4)
       : [],
   };
 }
 
-function normalizeNotification(value: unknown): FlowboardNotification | null {
+function normalizeNotification(value: unknown): TaskfoldNotification | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
   const record = value as Record<string, unknown>;
   const id = normalizeOptionalString(record.id) ?? randomUUID();
-  const kind = FLOWBOARD_NOTIFICATION_KINDS.includes(record.kind as FlowboardNotificationKind)
-    ? (record.kind as FlowboardNotificationKind)
+  const kind = TASKFOLD_NOTIFICATION_KINDS.includes(record.kind as TaskfoldNotificationKind)
+    ? (record.kind as TaskfoldNotificationKind)
     : undefined;
   const createdAt = normalizeTimestamp(record.createdAt, Date.now());
   const sequence = normalizeTimestamp(record.sequence, 0) || undefined;
@@ -1141,7 +1141,7 @@ function normalizeNotification(value: unknown): FlowboardNotification | null {
   };
 }
 
-export function normalizeProofInput(input: FlowboardProofInput, now: number): FlowboardProof {
+export function normalizeProofInput(input: TaskfoldProofInput, now: number): TaskfoldProof {
   const label = normalizeBoundedString(input.label, undefined, 160, "proof label");
   const command = normalizeBoundedString(input.command, undefined, 1000, "proof command");
   const url = normalizeBoundedString(input.url, undefined, 2000, "proof URL");
@@ -1157,17 +1157,17 @@ export function normalizeProofInput(input: FlowboardProofInput, now: number): Fl
   };
 }
 
-function completionProofConflicts(existing: FlowboardProof, completion: FlowboardProof): boolean {
+function completionProofConflicts(existing: TaskfoldProof, completion: TaskfoldProof): boolean {
   return (["label", "command", "url", "note"] as const).some(
     (field) => completion[field] !== undefined && completion[field] !== existing[field],
   );
 }
 
 export function appendCompletionProof(
-  existing: readonly FlowboardProof[] | undefined,
-  proof: FlowboardProof,
+  existing: readonly TaskfoldProof[] | undefined,
+  proof: TaskfoldProof,
   proofId?: string,
-): FlowboardProof[] {
+): TaskfoldProof[] {
   const entries = [...(existing ?? [])];
   if (!proofId) {
     return [...entries, proof].slice(-MAX_CARD_PROOF);
@@ -1197,9 +1197,9 @@ export function appendCompletionProof(
 
 export function normalizeMetadata(
   value: unknown,
-  fallback: FlowboardMetadata = {},
+  fallback: TaskfoldMetadata = {},
   options: { allowDependencyLinks?: boolean; preserveProofId?: string } = {},
-): FlowboardMetadata {
+): TaskfoldMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return trimMetadataToBudget(fallback, options);
   }
@@ -1212,7 +1212,7 @@ export function normalizeMetadata(
   const hasStale = Object.hasOwn(record, "stale");
   const hasLifecycleStatusSourceUpdatedAt = Object.hasOwn(record, "lifecycleStatusSourceUpdatedAt");
   const links = Array.isArray(record.links)
-    ? record.links.map(normalizeLink).filter((link): link is FlowboardLink => link !== null)
+    ? record.links.map(normalizeLink).filter((link): link is TaskfoldLink => link !== null)
     : undefined;
   const normalizedLinks =
     links === undefined
@@ -1233,38 +1233,38 @@ export function normalizeMetadata(
     attempts: Array.isArray(record.attempts)
       ? record.attempts
           .map(normalizeAttempt)
-          .filter((attempt): attempt is FlowboardRunAttempt => attempt !== null)
+          .filter((attempt): attempt is TaskfoldRunAttempt => attempt !== null)
           .slice(-MAX_CARD_ATTEMPTS)
       : fallback.attempts,
     comments: Array.isArray(record.comments)
       ? record.comments
           .map(normalizeComment)
-          .filter((comment): comment is FlowboardComment => comment !== null)
+          .filter((comment): comment is TaskfoldComment => comment !== null)
           .slice(-MAX_CARD_COMMENTS)
       : fallback.comments,
     links: normalizedLinks,
     proof: Array.isArray(record.proof)
       ? record.proof
           .map(normalizeProof)
-          .filter((proof): proof is FlowboardProof => proof !== null)
+          .filter((proof): proof is TaskfoldProof => proof !== null)
           .slice(-MAX_CARD_PROOF)
       : fallback.proof,
     artifacts: Array.isArray(record.artifacts)
       ? record.artifacts
           .map(normalizeArtifact)
-          .filter((artifact): artifact is FlowboardArtifact => artifact !== null)
+          .filter((artifact): artifact is TaskfoldArtifact => artifact !== null)
           .slice(-MAX_CARD_ARTIFACTS)
       : fallback.artifacts,
     attachments: Array.isArray(record.attachments)
       ? record.attachments
           .map(normalizeAttachment)
-          .filter((attachment): attachment is FlowboardAttachment => attachment !== null)
+          .filter((attachment): attachment is TaskfoldAttachment => attachment !== null)
           .slice(-MAX_CARD_ATTACHMENTS)
       : fallback.attachments,
     workerLogs: Array.isArray(record.workerLogs)
       ? record.workerLogs
           .map(normalizeWorkerLog)
-          .filter((log): log is FlowboardWorkerLog => log !== null)
+          .filter((log): log is TaskfoldWorkerLog => log !== null)
           .slice(-MAX_CARD_WORKER_LOGS)
       : fallback.workerLogs,
     workerProtocol: Object.hasOwn(record, "workerProtocol")
@@ -1282,14 +1282,14 @@ export function normalizeMetadata(
       ? record.diagnostics
           .map(normalizeDiagnostic)
           .filter(
-            (diagnosticLocal): diagnosticLocal is FlowboardDiagnostic => diagnosticLocal !== null,
+            (diagnosticLocal): diagnosticLocal is TaskfoldDiagnostic => diagnosticLocal !== null,
           )
           .slice(-MAX_CARD_DIAGNOSTICS)
       : fallback.diagnostics,
     notifications: Array.isArray(record.notifications)
       ? record.notifications
           .map(normalizeNotification)
-          .filter((notification): notification is FlowboardNotification => notification !== null)
+          .filter((notification): notification is TaskfoldNotification => notification !== null)
           .slice(-MAX_CARD_NOTIFICATIONS)
       : fallback.notifications,
     templateId: normalizeTemplateId(record.templateId) ?? fallback.templateId,
@@ -1318,7 +1318,7 @@ export function normalizeMetadata(
   return trimMetadataToBudget(normalized, options);
 }
 
-export function normalizeExecution(value: unknown): FlowboardExecution | undefined {
+export function normalizeExecution(value: unknown): TaskfoldExecution | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
   }
@@ -1351,9 +1351,9 @@ export function normalizeExecution(value: unknown): FlowboardExecution | undefin
 }
 
 export function syncExecutionSessionKey(
-  execution: FlowboardExecution | undefined,
+  execution: TaskfoldExecution | undefined,
   sessionKey: string | undefined,
-): FlowboardExecution | undefined {
+): TaskfoldExecution | undefined {
   if (!execution) {
     return undefined;
   }
@@ -1364,7 +1364,7 @@ export function syncExecutionSessionKey(
   });
 }
 
-function removeUndefinedExecutionFields(execution: FlowboardExecution): FlowboardExecution {
+function removeUndefinedExecutionFields(execution: TaskfoldExecution): TaskfoldExecution {
   const next = { ...execution };
   if (next.engine === undefined) {
     delete next.engine;
@@ -1381,7 +1381,7 @@ function removeUndefinedExecutionFields(execution: FlowboardExecution): Flowboar
   return next;
 }
 
-function removeUndefinedAutomationFields(automation: FlowboardAutomation): FlowboardAutomation {
+function removeUndefinedAutomationFields(automation: TaskfoldAutomation): TaskfoldAutomation {
   const next = { ...automation };
   for (const key of [
     "tenant",
@@ -1411,7 +1411,7 @@ function removeUndefinedAutomationFields(automation: FlowboardAutomation): Flowb
   return next;
 }
 
-export function removeUndefinedMetadataFields(metadata: FlowboardMetadata): FlowboardMetadata {
+export function removeUndefinedMetadataFields(metadata: TaskfoldMetadata): TaskfoldMetadata {
   const next = { ...metadata };
   for (const key of [
     "attempts",
@@ -1445,9 +1445,9 @@ export function removeUndefinedMetadataFields(metadata: FlowboardMetadata): Flow
 }
 
 export function clearDiagnostics(
-  metadata: FlowboardMetadata | undefined,
-  kinds: readonly FlowboardDiagnosticKind[],
-): FlowboardMetadata {
+  metadata: TaskfoldMetadata | undefined,
+  kinds: readonly TaskfoldDiagnosticKind[],
+): TaskfoldMetadata {
   if (!metadata?.diagnostics) {
     return metadata ?? {};
   }
@@ -1457,11 +1457,11 @@ export function clearDiagnostics(
   };
 }
 
-export function metadataIsEmpty(metadata: FlowboardMetadata | undefined): boolean {
+export function metadataIsEmpty(metadata: TaskfoldMetadata | undefined): boolean {
   return !metadata || Object.keys(metadata).length === 0;
 }
 
-function metadataByteSize(metadata: FlowboardMetadata): number {
+function metadataByteSize(metadata: TaskfoldMetadata): number {
   return Buffer.byteLength(JSON.stringify(metadata), "utf8");
 }
 
@@ -1474,9 +1474,9 @@ function dropFirst<T>(items: readonly T[] | undefined): T[] | undefined {
 }
 
 function dropFirstProofExcept(
-  items: readonly FlowboardProof[] | undefined,
+  items: readonly TaskfoldProof[] | undefined,
   preserveProofId: string | undefined,
-): FlowboardProof[] | undefined {
+): TaskfoldProof[] | undefined {
   if (!items?.length) {
     return undefined;
   }
@@ -1489,8 +1489,8 @@ function dropFirstProofExcept(
 }
 
 function dropFirstNonDependencyLink(
-  items: readonly FlowboardLink[] | undefined,
-): FlowboardLink[] | undefined {
+  items: readonly TaskfoldLink[] | undefined,
+): TaskfoldLink[] | undefined {
   if (!items?.length) {
     return undefined;
   }
@@ -1503,9 +1503,9 @@ function dropFirstNonDependencyLink(
 }
 
 export function appendLinkPreservingDependencies(
-  links: readonly FlowboardLink[],
-  link: FlowboardLink,
-): FlowboardLink[] {
+  links: readonly TaskfoldLink[],
+  link: TaskfoldLink,
+): TaskfoldLink[] {
   const next = [...links, link];
   if (next.length <= MAX_CARD_LINKS) {
     return next;
@@ -1518,9 +1518,9 @@ export function appendLinkPreservingDependencies(
 }
 
 export function trimMetadataToBudget(
-  metadata: FlowboardMetadata,
+  metadata: TaskfoldMetadata,
   options: { preserveProofId?: string } = {},
-): FlowboardMetadata {
+): TaskfoldMetadata {
   let next = removeUndefinedMetadataFields(metadata);
   while (metadataByteSize(next) > MAX_CARD_METADATA_BYTES) {
     const currentSize = metadataByteSize(next);

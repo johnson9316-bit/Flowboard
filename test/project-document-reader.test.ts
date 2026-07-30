@@ -2,10 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { FlowboardProjectDocument } from "../src/contract/index.js";
+import type { TaskfoldProjectDocument } from "../src/contract/index.js";
 import {
-  readFlowboardProjectDocument,
-  writeFlowboardProjectDocumentPath,
+  readTaskfoldProjectDocument,
+  writeTaskfoldProjectDocumentPath,
 } from "../src/backend/src/project-document-reader.js";
 
 const roots: string[] = [];
@@ -17,12 +17,12 @@ afterEach(() => {
 });
 
 function createRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-doc-reader-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-doc-reader-"));
   roots.push(root);
   return root;
 }
 
-function pathDocument(target: string): FlowboardProjectDocument {
+function pathDocument(target: string): TaskfoldProjectDocument {
   return {
     id: "document-1",
     boardId: "project-1",
@@ -40,14 +40,14 @@ function pathDocument(target: string): FlowboardProjectDocument {
 
 const unrestricted = { unrestricted: true } as const;
 
-describe("Flowboard project document reader", () => {
+describe("Taskfold project document reader", () => {
   it("reads a saved Markdown path without storing its content", async () => {
     const root = createRoot();
     const target = path.join(root, "PROJECT.md");
     fs.writeFileSync(target, "# Project\n\nReadable content.\n");
 
     await expect(
-      readFlowboardProjectDocument({ document: pathDocument(target), access: unrestricted }),
+      readTaskfoldProjectDocument({ document: pathDocument(target), access: unrestricted }),
     ).resolves.toMatchObject({
       document: { id: "document-1" },
       content: "# Project\n\nReadable content.\n",
@@ -67,7 +67,7 @@ describe("Flowboard project document reader", () => {
     fs.symlinkSync(outsideFile, path.join(allowed, "linked.md"));
 
     await expect(
-      readFlowboardProjectDocument({
+      readTaskfoldProjectDocument({
         document: pathDocument(path.join(allowed, "linked.md")),
         access: { unrestricted: false, roots: [allowed], writable: false },
       }),
@@ -80,9 +80,9 @@ describe("Flowboard project document reader", () => {
     fs.writeFileSync(target, "# Original\n");
     fs.chmodSync(target, 0o640);
     const document = pathDocument(target);
-    const preview = await readFlowboardProjectDocument({ document, access: unrestricted });
+    const preview = await readTaskfoldProjectDocument({ document, access: unrestricted });
 
-    const saved = await writeFlowboardProjectDocumentPath({
+    const saved = await writeTaskfoldProjectDocumentPath({
       document,
       content: "# Updated\n",
       expectedRevision: preview.revision,
@@ -93,7 +93,7 @@ describe("Flowboard project document reader", () => {
     expect(fs.statSync(target).mode & 0o777).toBe(0o640);
     expect(saved).toMatchObject({ content: "# Updated\n", source: "path" });
     await expect(
-      writeFlowboardProjectDocumentPath({
+      writeTaskfoldProjectDocumentPath({
         document,
         content: "# Overwrite\n",
         expectedRevision: preview.revision,
@@ -113,13 +113,13 @@ describe("Flowboard project document reader", () => {
     fs.writeFileSync(target, "# Project\n");
     fs.writeFileSync(outsideFile, "# Outside\n");
     fs.symlinkSync(outsideFile, path.join(allowed, "linked.md"));
-    const preview = await readFlowboardProjectDocument({
+    const preview = await readTaskfoldProjectDocument({
       document: pathDocument(target),
       access: unrestricted,
     });
 
     await expect(
-      writeFlowboardProjectDocumentPath({
+      writeTaskfoldProjectDocumentPath({
         document: pathDocument(target),
         content: "# Read only\n",
         expectedRevision: preview.revision,
@@ -127,7 +127,7 @@ describe("Flowboard project document reader", () => {
       }),
     ).rejects.toThrow("read-only");
     await expect(
-      writeFlowboardProjectDocumentPath({
+      writeTaskfoldProjectDocumentPath({
         document: pathDocument(path.join(allowed, "linked.md")),
         content: "# Escaped\n",
         expectedRevision: "stale",
@@ -135,7 +135,7 @@ describe("Flowboard project document reader", () => {
       }),
     ).rejects.toThrow("outside the caller's allowed workspaces");
     await expect(
-      writeFlowboardProjectDocumentPath({
+      writeTaskfoldProjectDocumentPath({
         document: pathDocument(target),
         content: "\ud800",
         expectedRevision: preview.revision,
@@ -143,7 +143,7 @@ describe("Flowboard project document reader", () => {
       }),
     ).rejects.toThrow("valid UTF-8");
     await expect(
-      writeFlowboardProjectDocumentPath({
+      writeTaskfoldProjectDocumentPath({
         document: { ...pathDocument(target), target: path.join(root, "NOTES.txt") },
         content: "# Not Markdown\n",
         expectedRevision: preview.revision,
@@ -166,25 +166,25 @@ describe("Flowboard project document reader", () => {
     fs.writeFileSync(invalid, Buffer.from([0xc3, 0x28]));
 
     await expect(
-      readFlowboardProjectDocument({ document: pathDocument(directory), access: unrestricted }),
+      readTaskfoldProjectDocument({ document: pathDocument(directory), access: unrestricted }),
     ).rejects.toThrow("regular file");
     await expect(
-      readFlowboardProjectDocument({ document: pathDocument(env), access: unrestricted }),
+      readTaskfoldProjectDocument({ document: pathDocument(env), access: unrestricted }),
     ).rejects.toThrow("environment files");
     await expect(
-      readFlowboardProjectDocument({ document: pathDocument(text), access: unrestricted }),
+      readTaskfoldProjectDocument({ document: pathDocument(text), access: unrestricted }),
     ).rejects.toThrow("Markdown file");
     await expect(
-      readFlowboardProjectDocument({
+      readTaskfoldProjectDocument({
         document: pathDocument(path.join(root, "missing.md")),
         access: unrestricted,
       }),
     ).rejects.toThrow("does not exist");
     await expect(
-      readFlowboardProjectDocument({ document: pathDocument(oversized), access: unrestricted }),
+      readTaskfoldProjectDocument({ document: pathDocument(oversized), access: unrestricted }),
     ).rejects.toThrow("1 MiB");
     await expect(
-      readFlowboardProjectDocument({ document: pathDocument(invalid), access: unrestricted }),
+      readTaskfoldProjectDocument({ document: pathDocument(invalid), access: unrestricted }),
     ).rejects.toThrow("valid UTF-8");
   });
 
@@ -196,10 +196,10 @@ describe("Flowboard project document reader", () => {
     };
 
     await expect(
-      readFlowboardProjectDocument({ document, access: unrestricted }),
+      readTaskfoldProjectDocument({ document, access: unrestricted }),
     ).resolves.toMatchObject({ source: "stored", content: "# Historical note" });
     await expect(
-      readFlowboardProjectDocument({
+      readTaskfoldProjectDocument({
         document: { ...document, type: "secret_ref", target: "secret://token" },
         access: unrestricted,
       }),

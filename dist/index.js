@@ -32,14 +32,14 @@ var init_card_redaction = __esm({
 });
 
 // src/contract/index.ts
-function isValidFlowboardBoardId(value) {
-  return typeof value === "string" && FLOWBOARD_BOARD_ID_PATTERN.test(value);
+function isValidTaskfoldBoardId(value) {
+  return typeof value === "string" && TASKFOLD_BOARD_ID_PATTERN.test(value);
 }
-var FLOWBOARD_STATUSES, FLOWBOARD_PRIORITIES, FLOWBOARD_EXECUTION_MODES, FLOWBOARD_EXECUTION_STATUSES, FLOWBOARD_EVENT_KINDS, FLOWBOARD_ATTEMPT_STATUSES, FLOWBOARD_LINK_TYPES, FLOWBOARD_PROOF_STATUSES, FLOWBOARD_TEMPLATE_IDS, FLOWBOARD_DIAGNOSTIC_KINDS, FLOWBOARD_DIAGNOSTIC_SEVERITIES, FLOWBOARD_NOTIFICATION_KINDS, FLOWBOARD_MILESTONE_STATES, FLOWBOARD_PROJECT_DOCUMENT_SECTIONS, FLOWBOARD_PROJECT_DOCUMENT_TYPES, FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES, FLOWBOARD_DELIVERY_VERIFICATION_STATES, FLOWBOARD_DELIVERY_RELEASE_STATES, FLOWBOARD_BOARD_ID_PATTERN;
+var TASKFOLD_STATUSES, TASKFOLD_PRIORITIES, TASKFOLD_EXECUTION_MODES, TASKFOLD_EXECUTION_STATUSES, TASKFOLD_EVENT_KINDS, TASKFOLD_ATTEMPT_STATUSES, TASKFOLD_LINK_TYPES, TASKFOLD_PROOF_STATUSES, TASKFOLD_TEMPLATE_IDS, TASKFOLD_DIAGNOSTIC_KINDS, TASKFOLD_DIAGNOSTIC_SEVERITIES, TASKFOLD_NOTIFICATION_KINDS, TASKFOLD_MILESTONE_STATES, TASKFOLD_PROJECT_DOCUMENT_SECTIONS, TASKFOLD_PROJECT_DOCUMENT_TYPES, TASKFOLD_DELIVERY_IMPLEMENTATION_STATES, TASKFOLD_DELIVERY_VERIFICATION_STATES, TASKFOLD_DELIVERY_RELEASE_STATES, TASKFOLD_BOARD_ID_PATTERN;
 var init_contract = __esm({
   "src/contract/index.ts"() {
     "use strict";
-    FLOWBOARD_STATUSES = [
+    TASKFOLD_STATUSES = [
       "triage",
       "backlog",
       "todo",
@@ -50,16 +50,16 @@ var init_contract = __esm({
       "blocked",
       "done"
     ];
-    FLOWBOARD_PRIORITIES = ["low", "normal", "high", "urgent"];
-    FLOWBOARD_EXECUTION_MODES = ["autonomous", "manual"];
-    FLOWBOARD_EXECUTION_STATUSES = [
+    TASKFOLD_PRIORITIES = ["low", "normal", "high", "urgent"];
+    TASKFOLD_EXECUTION_MODES = ["autonomous", "manual"];
+    TASKFOLD_EXECUTION_STATUSES = [
       "idle",
       "running",
       "review",
       "blocked",
       "done"
     ];
-    FLOWBOARD_EVENT_KINDS = [
+    TASKFOLD_EVENT_KINDS = [
       "created",
       "edited",
       "moved",
@@ -86,23 +86,23 @@ var init_contract = __esm({
       "unarchived",
       "stale"
     ];
-    FLOWBOARD_ATTEMPT_STATUSES = [
+    TASKFOLD_ATTEMPT_STATUSES = [
       "running",
       "succeeded",
       "failed",
       "blocked",
       "stopped"
     ];
-    FLOWBOARD_LINK_TYPES = [
+    TASKFOLD_LINK_TYPES = [
       "parent",
       "child",
       "blocks",
       "blocked_by",
       "relates_to"
     ];
-    FLOWBOARD_PROOF_STATUSES = ["passed", "failed", "skipped", "unknown"];
-    FLOWBOARD_TEMPLATE_IDS = ["bugfix", "docs", "release", "pr_review", "plugin"];
-    FLOWBOARD_DIAGNOSTIC_KINDS = [
+    TASKFOLD_PROOF_STATUSES = ["passed", "failed", "skipped", "unknown"];
+    TASKFOLD_TEMPLATE_IDS = ["bugfix", "docs", "release", "pr_review", "plugin"];
+    TASKFOLD_DIAGNOSTIC_KINDS = [
       "stranded_ready",
       "running_without_heartbeat",
       "blocked_too_long",
@@ -110,30 +110,30 @@ var init_contract = __esm({
       "missing_proof",
       "orphaned_session"
     ];
-    FLOWBOARD_DIAGNOSTIC_SEVERITIES = ["warning", "error", "critical"];
-    FLOWBOARD_NOTIFICATION_KINDS = ["completed", "failed", "stale"];
-    FLOWBOARD_MILESTONE_STATES = ["active", "completed", "archived"];
-    FLOWBOARD_PROJECT_DOCUMENT_SECTIONS = [
+    TASKFOLD_DIAGNOSTIC_SEVERITIES = ["warning", "error", "critical"];
+    TASKFOLD_NOTIFICATION_KINDS = ["completed", "failed", "stale"];
+    TASKFOLD_MILESTONE_STATES = ["active", "completed", "archived"];
+    TASKFOLD_PROJECT_DOCUMENT_SECTIONS = [
       "project",
       "codebase",
       "environment",
       "knowledge"
     ];
-    FLOWBOARD_PROJECT_DOCUMENT_TYPES = [
+    TASKFOLD_PROJECT_DOCUMENT_TYPES = [
       "markdown",
       "json",
       "link",
       "path",
       "secret_ref"
     ];
-    FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES = [
+    TASKFOLD_DELIVERY_IMPLEMENTATION_STATES = [
       "not_started",
       "in_progress",
       "code_complete",
       "not_applicable",
       "unknown"
     ];
-    FLOWBOARD_DELIVERY_VERIFICATION_STATES = [
+    TASKFOLD_DELIVERY_VERIFICATION_STATES = [
       "not_started",
       "partial",
       "passed",
@@ -142,19 +142,19 @@ var init_contract = __esm({
       "not_required",
       "unknown"
     ];
-    FLOWBOARD_DELIVERY_RELEASE_STATES = [
+    TASKFOLD_DELIVERY_RELEASE_STATES = [
       "not_started",
       "pending",
       "released",
       "not_required",
       "unknown"
     ];
-    FLOWBOARD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+    TASKFOLD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
   }
 });
 
 // src/backend/src/card-lookup.ts
-function resolveFlowboardCardByIdOrPrefix(cards, id) {
+function resolveTaskfoldCardByIdOrPrefix(cards, id) {
   const exact = cards.find((card2) => card2.id === id);
   if (exact) {
     return { card: exact };
@@ -178,7 +178,7 @@ var init_card_lookup = __esm({
 // src/backend/src/cli.ts
 var cli_exports = {};
 __export(cli_exports, {
-  registerFlowboardCli: () => registerFlowboardCli
+  registerTaskfoldCli: () => registerTaskfoldCli
 });
 import { formatErrorMessage as formatErrorMessage5 } from "openclaw/plugin-sdk/error-runtime";
 import { addGatewayClientOptions, callGatewayFromCli } from "openclaw/plugin-sdk/gateway-runtime";
@@ -210,8 +210,8 @@ function writeLine(value) {
 function splitLabels(value) {
   return value?.split(",").map((entry) => entry.trim()).filter(Boolean);
 }
-function isFlowboardStatus2(value) {
-  return FLOWBOARD_STATUSES.includes(value);
+function isTaskfoldStatus2(value) {
+  return TASKFOLD_STATUSES.includes(value);
 }
 function formatCardLine2(card) {
   const boardId = card.metadata?.automation?.boardId ?? "default";
@@ -237,7 +237,7 @@ function writeCards(cards, options) {
     writeLine(formatCardLine2(card));
   }
 }
-async function callFlowboardGateway(method, options, params) {
+async function callTaskfoldGateway(method, options, params) {
   return await callGatewayFromCli(method, options, params, {
     mode: "cli",
     scopes: options.admin ? ["operator.admin", "operator.write", "operator.read"] : ["operator.write", "operator.read"]
@@ -256,7 +256,7 @@ function isGatewayUnavailableError(error) {
     return true;
   }
   const unknownMethod = message.match(/unknown method:\s*([a-z0-9._-]+)/)?.[1];
-  return unknownMethod === "flowboard.cards.dispatch";
+  return unknownMethod === "taskfold.cards.dispatch";
 }
 function hasExplicitGatewayTarget(options) {
   return Boolean(options.url?.trim() || options.token?.trim());
@@ -271,9 +271,9 @@ function hasConfiguredRemoteGatewayTarget() {
     return false;
   }
 }
-function registerFlowboardCli(params) {
-  const flowboard = params.program.command("flowboard").description("Manage Flowboard cards and worker dispatch");
-  flowboard.command("list").description("List Flowboard cards").option("--board <id>", "Board id").option("--status <status>", "Filter by status").option("--include-archived", "Include archived cards (default false)").option("--json", "Print JSON", false).action(
+function registerTaskfoldCli(params) {
+  const taskfold = params.program.command("taskfold").description("Manage Taskfold cards and worker dispatch");
+  taskfold.command("list").description("List Taskfold cards").option("--board <id>", "Board id").option("--status <status>", "Filter by status").option("--include-archived", "Include archived cards (default false)").option("--json", "Print JSON", false).action(
     async (options) => {
       let cards = await params.store.list({ boardId: options.board });
       if (!options.json && options.includeArchived !== true) {
@@ -285,7 +285,7 @@ function registerFlowboardCli(params) {
       writeCards(cards, options);
     }
   );
-  flowboard.command("create").argument("<title...>", "Card title").description("Create a Flowboard card").option("--notes <text>", "Card notes").option("--status <status>", "Initial status", "todo").option("--priority <priority>", "Priority", "normal").option("--agent <id>", "Assigned agent id").option("--board <id>", "Board id").option("--milestone <id>", "Milestone id; omit for Unassigned").option("--labels <items>", "Comma-separated labels").option("--json", "Print JSON", false).action(
+  taskfold.command("create").argument("<title...>", "Card title").description("Create a Taskfold card").option("--notes <text>", "Card notes").option("--status <status>", "Initial status", "todo").option("--priority <priority>", "Priority", "normal").option("--agent <id>", "Assigned agent id").option("--board <id>", "Board id").option("--milestone <id>", "Milestone id; omit for Unassigned").option("--labels <items>", "Comma-separated labels").option("--json", "Print JSON", false).action(
     async (title, options) => {
       const card = await params.store.create({
         title: title.join(" "),
@@ -305,9 +305,9 @@ function registerFlowboardCli(params) {
       }
     }
   );
-  flowboard.command("show").argument("<id>", "Card id or prefix").description("Show one Flowboard card").option("--json", "Print JSON", false).action(async (id, options) => {
+  taskfold.command("show").argument("<id>", "Card id or prefix").description("Show one Taskfold card").option("--json", "Print JSON", false).action(async (id, options) => {
     const cards = await params.store.list();
-    const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+    const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
     if (!card) {
       throw new Error(error);
     }
@@ -320,7 +320,7 @@ function registerFlowboardCli(params) {
       }
     }
   });
-  const project = flowboard.command("project").description("Manage Flowboard projects");
+  const project = taskfold.command("project").description("Manage Taskfold projects");
   project.command("list").option("--archived", "Include archived projects").option("--json", "Print JSON", false).action(async (options) => {
     const result = await params.store.listProjects({ includeArchived: options.archived });
     if (options.json) {
@@ -381,7 +381,7 @@ function registerFlowboardCli(params) {
   });
   milestone.command("move-card").argument("<id>", "Card id or prefix").requiredOption("--milestone <id>", "Target milestone id; use unassigned to clear").action(async (id, options) => {
     const cards = await params.store.list();
-    const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+    const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
     if (!card) {
       throw new Error(error);
     }
@@ -403,12 +403,12 @@ function registerFlowboardCli(params) {
       writeLine(`${document.section.padEnd(12)} ${document.key.padEnd(20)} ${document.title}`);
     }
   });
-  flowboard.command("move").argument("<id>", "Card id or prefix").description("Move a Flowboard card to another status").requiredOption("--status <status>", "Target status").option("--json", "Print JSON", false).action(async (id, options) => {
-    if (!isFlowboardStatus2(options.status)) {
-      throw new Error(`--status must be one of: ${FLOWBOARD_STATUSES.join(", ")}.`);
+  taskfold.command("move").argument("<id>", "Card id or prefix").description("Move a Taskfold card to another status").requiredOption("--status <status>", "Target status").option("--json", "Print JSON", false).action(async (id, options) => {
+    if (!isTaskfoldStatus2(options.status)) {
+      throw new Error(`--status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`);
     }
     const cards = await params.store.list();
-    const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+    const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
     if (!card) {
       throw new Error(error);
     }
@@ -420,15 +420,15 @@ function registerFlowboardCli(params) {
     }
   });
   addGatewayClientOptions(
-    flowboard.command("dispatch").description("Promote ready cards and start worker runs through the Gateway").option("--board <id>", "Dispatch a single board").option(
+    taskfold.command("dispatch").description("Promote ready cards and start worker runs through the Gateway").option("--board <id>", "Dispatch a single board").option(
       "--max-starts <count>",
       "Maximum new worker runs to start in this pass (default 3)",
       (value) => parsePositiveIntegerOption(value, "--max-starts")
     ).option("--admin", "Request full-host workspace access", false).option("--json", "Print JSON", false)
   ).action(async (options) => {
     try {
-      const method = options.maxStarts === void 0 ? "flowboard.cards.dispatch" : "flowboard.cards.dispatchWithOptions";
-      const result = await callFlowboardGateway(method, options, {
+      const method = options.maxStarts === void 0 ? "taskfold.cards.dispatch" : "taskfold.cards.dispatchWithOptions";
+      const result = await callTaskfoldGateway(method, options, {
         boardId: options.board,
         ...options.maxStarts !== void 0 ? { maxStarts: options.maxStarts } : {}
       });
@@ -493,60 +493,60 @@ import {
   canonicalPathFromExistingAncestor,
   isPathInside
 } from "openclaw/plugin-sdk/security-runtime";
-var FLOWBOARD_TOOL_NAMES = [
-  "flowboard_list",
-  "flowboard_create",
-  "flowboard_link",
-  "flowboard_read",
-  "flowboard_claim",
-  "flowboard_heartbeat",
-  "flowboard_complete",
-  "flowboard_attachment_add",
-  "flowboard_attachment_read",
-  "flowboard_attachment_delete",
-  "flowboard_block",
-  "flowboard_boards",
-  "flowboard_board_create",
-  "flowboard_board_archive",
-  "flowboard_board_delete",
-  "flowboard_stats",
-  "flowboard_runs",
-  "flowboard_specify",
-  "flowboard_decompose",
-  "flowboard_notify_subscribe",
-  "flowboard_notify_list",
-  "flowboard_notify_events",
-  "flowboard_notify_advance",
-  "flowboard_notify_unsubscribe",
-  "flowboard_promote",
-  "flowboard_reassign",
-  "flowboard_reclaim",
-  "flowboard_dispatch",
-  "flowboard_release",
-  "flowboard_comment",
-  "flowboard_proof",
-  "flowboard_worker_log",
-  "flowboard_protocol_violation",
-  "flowboard_unblock",
-  "flowboard_move",
-  "flowboard_projects",
-  "flowboard_project_create",
-  "flowboard_project_read",
-  "flowboard_milestone_create",
-  "flowboard_move_milestone",
-  "flowboard_move_project",
-  "flowboard_project_documents",
-  "flowboard_project_document_create"
+var TASKFOLD_TOOL_NAMES = [
+  "taskfold_list",
+  "taskfold_create",
+  "taskfold_link",
+  "taskfold_read",
+  "taskfold_claim",
+  "taskfold_heartbeat",
+  "taskfold_complete",
+  "taskfold_attachment_add",
+  "taskfold_attachment_read",
+  "taskfold_attachment_delete",
+  "taskfold_block",
+  "taskfold_boards",
+  "taskfold_board_create",
+  "taskfold_board_archive",
+  "taskfold_board_delete",
+  "taskfold_stats",
+  "taskfold_runs",
+  "taskfold_specify",
+  "taskfold_decompose",
+  "taskfold_notify_subscribe",
+  "taskfold_notify_list",
+  "taskfold_notify_events",
+  "taskfold_notify_advance",
+  "taskfold_notify_unsubscribe",
+  "taskfold_promote",
+  "taskfold_reassign",
+  "taskfold_reclaim",
+  "taskfold_dispatch",
+  "taskfold_release",
+  "taskfold_comment",
+  "taskfold_proof",
+  "taskfold_worker_log",
+  "taskfold_protocol_violation",
+  "taskfold_unblock",
+  "taskfold_move",
+  "taskfold_projects",
+  "taskfold_project_create",
+  "taskfold_project_read",
+  "taskfold_milestone_create",
+  "taskfold_move_milestone",
+  "taskfold_move_project",
+  "taskfold_project_documents",
+  "taskfold_project_document_create"
 ];
-var FLOWBOARD_REQUIRED_WORKER_TOOLS = [
-  "flowboard_heartbeat",
-  "flowboard_complete",
-  "flowboard_block"
+var TASKFOLD_REQUIRED_WORKER_TOOLS = [
+  "taskfold_heartbeat",
+  "taskfold_complete",
+  "taskfold_block"
 ];
-function resolveFlowboardAgentWorkspace(config, agentId) {
+function resolveTaskfoldAgentWorkspace(config, agentId) {
   return resolveAgentWorkspaceDir(config, agentId ?? resolveDefaultAgentId(config));
 }
-function resolveConfiguredFlowboardWorkspaceAccess(params) {
+function resolveConfiguredTaskfoldWorkspaceAccess(params) {
   if (params.unrestricted) {
     return { unrestricted: true };
   }
@@ -558,13 +558,13 @@ function resolveConfiguredFlowboardWorkspaceAccess(params) {
     )
   };
 }
-async function resolveAgentFlowboardWorkspaceRuntime(params) {
+async function resolveAgentTaskfoldWorkspaceRuntime(params) {
   const agentId = params.agentId ?? resolveDefaultAgentId(params.config);
   const sandboxRuntime = params.prepareSandboxWorkspaceAuthority ? await params.prepareSandboxWorkspaceAuthority({
     config: params.config,
     agentId,
-    confinedToolNames: FLOWBOARD_TOOL_NAMES,
-    requiredToolNames: FLOWBOARD_REQUIRED_WORKER_TOOLS,
+    confinedToolNames: TASKFOLD_TOOL_NAMES,
+    requiredToolNames: TASKFOLD_REQUIRED_WORKER_TOOLS,
     modelProvider: params.modelProvider,
     modelId: params.modelId,
     sessionKey: params.sessionKey,
@@ -586,9 +586,9 @@ async function resolveAgentFlowboardWorkspaceRuntime(params) {
     ...sandboxRuntime.confinementError ? { confinementError: sandboxRuntime.confinementError } : {}
   };
 }
-function resolveCommandFlowboardWorkspaceAccess(params) {
+function resolveCommandTaskfoldWorkspaceAccess(params) {
   if (params.gatewayClientScopes) {
-    return resolveConfiguredFlowboardWorkspaceAccess({
+    return resolveConfiguredTaskfoldWorkspaceAccess({
       config: params.config,
       unrestricted: params.gatewayClientScopes.includes("operator.admin")
     });
@@ -613,7 +613,7 @@ function resolveCommandFlowboardWorkspaceAccess(params) {
     writable: true
   } : { unrestricted: true };
 }
-function resolveToolFlowboardWorkspaceAccess(context, resolveSandboxWorkspaceAuthority) {
+function resolveToolTaskfoldWorkspaceAccess(context, resolveSandboxWorkspaceAuthority) {
   if (!context?.sandboxed && context?.fsPolicy?.workspaceOnly !== true) {
     return { unrestricted: true };
   }
@@ -629,7 +629,7 @@ function resolveToolFlowboardWorkspaceAccess(context, resolveSandboxWorkspaceAut
     writable: sandboxRuntime ? sandboxRuntime.workspaceAccess === "rw" : !context.sandboxed
   };
 }
-async function canonicalizeFlowboardWorkspaceAccess(access) {
+async function canonicalizeTaskfoldWorkspaceAccess(access) {
   if (access.unrestricted) {
     return access;
   }
@@ -645,7 +645,7 @@ async function canonicalizeFlowboardWorkspaceAccess(access) {
   }
   return { unrestricted: false, roots, writable: access.writable };
 }
-function intersectFlowboardWorkspaceAccess(left, right) {
+function intersectTaskfoldWorkspaceAccess(left, right) {
   if (left.unrestricted) {
     return right;
   }
@@ -671,7 +671,7 @@ function intersectFlowboardWorkspaceAccess(left, right) {
     writable: left.writable && right.writable
   };
 }
-async function assertCanonicalFlowboardPathAccess(candidate, access) {
+async function assertCanonicalTaskfoldPathAccess(candidate, access) {
   if (access.unrestricted) {
     return candidate;
   }
@@ -683,7 +683,7 @@ async function assertCanonicalFlowboardPathAccess(candidate, access) {
   }
   throw new Error("workspace path is outside the caller's allowed workspaces.");
 }
-async function assertCanonicalFlowboardRootAccess(candidate, access) {
+async function assertCanonicalTaskfoldRootAccess(candidate, access) {
   if (access.unrestricted) {
     return candidate;
   }
@@ -700,7 +700,7 @@ async function assertPathAllowed(value, access) {
     return void 0;
   }
   const candidate = await canonicalPathFromExistingAncestor(value.trim());
-  return await assertCanonicalFlowboardPathAccess(candidate, access);
+  return await assertCanonicalTaskfoldPathAccess(candidate, access);
 }
 async function assertWorkspaceAllowed(value, access, options) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -717,7 +717,7 @@ async function assertWorkspaceAllowed(value, access, options) {
 function readRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : void 0;
 }
-function containsFlowboardWorkspaceMutation(value) {
+function containsTaskfoldWorkspaceMutation(value) {
   const record = readRecord(value);
   if (!record) {
     return false;
@@ -725,26 +725,26 @@ function containsFlowboardWorkspaceMutation(value) {
   if (Object.hasOwn(record, "workspace") || Object.hasOwn(record, "defaultWorkspace")) {
     return true;
   }
-  return containsFlowboardWorkspaceMutation(record.patch) || containsFlowboardWorkspaceMutation(readRecord(record.metadata)?.automation) || Array.isArray(record.children) && record.children.some((child) => containsFlowboardWorkspaceMutation(child));
+  return containsTaskfoldWorkspaceMutation(record.patch) || containsTaskfoldWorkspaceMutation(readRecord(record.metadata)?.automation) || Array.isArray(record.children) && record.children.some((child) => containsTaskfoldWorkspaceMutation(child));
 }
-function withFlowboardWorkspaceAccess(value, access) {
-  return { ...withoutFlowboardWorkspaceAccess(value), workspaceAccess: access };
+function withTaskfoldWorkspaceAccess(value, access) {
+  return { ...withoutTaskfoldWorkspaceAccess(value), workspaceAccess: access };
 }
-function withoutFlowboardWorkspaceAccess(value) {
+function withoutTaskfoldWorkspaceAccess(value) {
   const record = readRecord(value) ?? {};
   const { workspaceAccess: _untrustedWorkspaceAccess, ...rest } = record;
   return rest;
 }
-function withFlowboardDecomposeWorkspaceAccess(value, access) {
-  const record = withoutFlowboardWorkspaceAccess(value);
+function withTaskfoldDecomposeWorkspaceAccess(value, access) {
+  const record = withoutTaskfoldWorkspaceAccess(value);
   return {
     ...record,
     ...Array.isArray(record.children) ? {
-      children: record.children.map((child) => withFlowboardWorkspaceAccess(child, access))
+      children: record.children.map((child) => withTaskfoldWorkspaceAccess(child, access))
     } : {}
   };
 }
-async function assertFlowboardWorkspaceMutationAccess(value, access) {
+async function assertTaskfoldWorkspaceMutationAccess(value, access) {
   if (access.unrestricted) {
     return;
   }
@@ -756,34 +756,34 @@ async function assertFlowboardWorkspaceMutationAccess(value, access) {
   await assertWorkspaceAllowed(record.defaultWorkspace, access);
   const patch = readRecord(record.patch);
   if (patch) {
-    await assertFlowboardWorkspaceMutationAccess(patch, access);
+    await assertTaskfoldWorkspaceMutationAccess(patch, access);
   }
   const metadata = readRecord(record.metadata);
   const automation = readRecord(metadata?.automation);
   if (automation) {
-    await assertFlowboardWorkspaceMutationAccess(automation, access);
+    await assertTaskfoldWorkspaceMutationAccess(automation, access);
   }
   if (Array.isArray(record.children)) {
     for (const child of record.children) {
-      await assertFlowboardWorkspaceMutationAccess(child, access);
+      await assertTaskfoldWorkspaceMutationAccess(child, access);
     }
   }
 }
-async function assertFlowboardWorkspaceSourceAccess(workspace, access) {
+async function assertTaskfoldWorkspaceSourceAccess(workspace, access) {
   return await assertWorkspaceAllowed(workspace, access, { sourceOnly: true });
 }
-function guardFlowboardToolsForWorkspaceAccess(tools, context, resolveSandboxWorkspaceAuthority) {
-  const workspaceAccess = resolveToolFlowboardWorkspaceAccess(
+function guardTaskfoldToolsForWorkspaceAccess(tools, context, resolveSandboxWorkspaceAuthority) {
+  const workspaceAccess = resolveToolTaskfoldWorkspaceAccess(
     context,
     resolveSandboxWorkspaceAuthority
   );
   return tools.map((tool) => ({
     ...tool,
     execute: async (toolCallId, rawParams, signal, onUpdate) => {
-      const canonicalAccess = await canonicalizeFlowboardWorkspaceAccess(workspaceAccess);
-      await assertFlowboardWorkspaceMutationAccess(rawParams, canonicalAccess);
-      const sanitizedParams = withoutFlowboardWorkspaceAccess(rawParams);
-      const constrainedParams = tool.name === "flowboard_create" ? withFlowboardWorkspaceAccess(sanitizedParams, canonicalAccess) : tool.name === "flowboard_decompose" ? withFlowboardDecomposeWorkspaceAccess(sanitizedParams, canonicalAccess) : tool.name === "flowboard_specify" && containsFlowboardWorkspaceMutation(sanitizedParams) ? withFlowboardWorkspaceAccess(sanitizedParams, canonicalAccess) : sanitizedParams;
+      const canonicalAccess = await canonicalizeTaskfoldWorkspaceAccess(workspaceAccess);
+      await assertTaskfoldWorkspaceMutationAccess(rawParams, canonicalAccess);
+      const sanitizedParams = withoutTaskfoldWorkspaceAccess(rawParams);
+      const constrainedParams = tool.name === "taskfold_create" ? withTaskfoldWorkspaceAccess(sanitizedParams, canonicalAccess) : tool.name === "taskfold_decompose" ? withTaskfoldDecomposeWorkspaceAccess(sanitizedParams, canonicalAccess) : tool.name === "taskfold_specify" && containsTaskfoldWorkspaceMutation(sanitizedParams) ? withTaskfoldWorkspaceAccess(sanitizedParams, canonicalAccess) : sanitizedParams;
       return await tool.execute(toolCallId, constrainedParams, signal, onUpdate);
     }
   }));
@@ -794,7 +794,7 @@ function managedWorktreeName(cardId) {
   const suffix = cardId.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-");
   return `wb-${suffix}`.slice(0, 64).replace(/-$/, "");
 }
-async function cleanupFlowboardRunWorktree(params) {
+async function cleanupTaskfoldRunWorktree(params) {
   const card = (await params.store.list()).find((entry) => entry.runId === params.runId);
   const workspace = card?.metadata?.automation?.workspace;
   if (!card || workspace?.kind !== "worktree" || !workspace.path) {
@@ -805,7 +805,7 @@ async function cleanupFlowboardRunWorktree(params) {
   });
 }
 async function resolveDispatchWorkspaceAccess(params) {
-  const currentAccess = await canonicalizeFlowboardWorkspaceAccess(
+  const currentAccess = await canonicalizeTaskfoldWorkspaceAccess(
     params.currentAccess ?? { unrestricted: true }
   );
   const persistedAccess = params.card.metadata?.automation?.workspaceAccess;
@@ -815,12 +815,12 @@ async function resolveDispatchWorkspaceAccess(params) {
     const resolved = params.resolveAgentWorkspace?.(params.card.agentId);
     targetWorkspace = resolved ? await canonicalPathFromExistingAncestor2(resolved) : void 0;
   }
-  const cardAccess = persistedAccess ? await canonicalizeFlowboardWorkspaceAccess(persistedAccess) : currentAccess.unrestricted ? !workspace || workspace.kind === "scratch" ? currentAccess : (() => {
+  const cardAccess = persistedAccess ? await canonicalizeTaskfoldWorkspaceAccess(persistedAccess) : currentAccess.unrestricted ? !workspace || workspace.kind === "scratch" ? currentAccess : (() => {
     throw new Error(
       "card workspace authority is unknown; re-save its workspace with current permissions before dispatch."
     );
   })() : currentAccess;
-  const workspaceAccess = intersectFlowboardWorkspaceAccess(cardAccess, currentAccess);
+  const workspaceAccess = intersectTaskfoldWorkspaceAccess(cardAccess, currentAccess);
   if (!workspaceAccess.unrestricted && !workspaceAccess.writable) {
     throw new Error(
       "card workspace authority is read-only; manual movement is allowed but worker dispatch requires write access."
@@ -832,7 +832,7 @@ async function resolveDispatchWorkspaceAccess(params) {
     persistWorkspaceAccess: !persistedAccess
   };
 }
-async function assertRestrictedFlowboardTarget(params) {
+async function assertRestrictedTaskfoldTarget(params) {
   const resolved = params.resolveAgentWorkspaceRuntime ? await params.resolveAgentWorkspaceRuntime(
     params.agentId,
     params.sessionKey,
@@ -845,10 +845,10 @@ async function assertRestrictedFlowboardTarget(params) {
   };
   const targetRuntime = {
     ...resolved,
-    workspaceAccess: await canonicalizeFlowboardWorkspaceAccess(resolved.workspaceAccess)
+    workspaceAccess: await canonicalizeTaskfoldWorkspaceAccess(resolved.workspaceAccess)
   };
   if (!targetRuntime.sandboxed) {
-    throw new Error("target agent is not sandboxed for this restricted Flowboard card.");
+    throw new Error("target agent is not sandboxed for this restricted Taskfold card.");
   }
   if (targetRuntime.confinementError) {
     throw new Error(targetRuntime.confinementError);
@@ -856,7 +856,7 @@ async function assertRestrictedFlowboardTarget(params) {
   if (targetRuntime.workspaceAccess.unrestricted || !targetRuntime.workspaceAccess.writable) {
     throw new Error("target agent does not have writable workspace-only access.");
   }
-  await assertCanonicalFlowboardRootAccess(params.root, targetRuntime.workspaceAccess);
+  await assertCanonicalTaskfoldRootAccess(params.root, targetRuntime.workspaceAccess);
 }
 
 // src/backend/src/dispatcher.ts
@@ -896,19 +896,19 @@ var READY_STRANDED_MS = 60 * 60 * 1e3;
 var RUNNING_HEARTBEAT_STALE_MS = 20 * 60 * 1e3;
 var BLOCKED_TOO_LONG_MS = 24 * 60 * 60 * 1e3;
 var CLAIM_RECLAIM_MS = 5 * 60 * 1e3;
-var FLOWBOARD_INITIAL_CARD_REVISION = 1;
-var FLOWBOARD_PROMPT_VERSION = 1;
-function nextFlowboardCardRevision(current) {
-  return Number.isSafeInteger(current) && current > 0 ? current + 1 : FLOWBOARD_INITIAL_CARD_REVISION;
+var TASKFOLD_INITIAL_CARD_REVISION = 1;
+var TASKFOLD_PROMPT_VERSION = 1;
+function nextTaskfoldCardRevision(current) {
+  return Number.isSafeInteger(current) && current > 0 ? current + 1 : TASKFOLD_INITIAL_CARD_REVISION;
 }
-function isFlowboardClaimReclaimable(claim, now) {
+function isTaskfoldClaimReclaimable(claim, now) {
   return Boolean(claim?.expiresAt && now - claim.expiresAt > CLAIM_RECLAIM_MS);
 }
 function secondsToDurationMs(seconds) {
   const ms = Math.trunc(seconds) * 1e3;
   return Number.isFinite(ms) ? Math.min(MAX_DATE_TIMESTAMP_MS, Math.max(1, ms)) : MAX_DATE_TIMESTAMP_MS;
 }
-function addFlowboardDurationMs(now, durationMs) {
+function addTaskfoldDurationMs(now, durationMs) {
   return resolveExpiresAtMsFromDurationMs(durationMs, { nowMs: now }) ?? MAX_DATE_TIMESTAMP_MS;
 }
 
@@ -931,7 +931,7 @@ function normalizeBoardId(value, fallback) {
     return void 0;
   }
   const boardId = raw.toLowerCase();
-  if (!isValidFlowboardBoardId(boardId)) {
+  if (!isValidTaskfoldBoardId(boardId)) {
     throw new Error("board id must match [a-z0-9][a-z0-9._-]{0,79}.");
   }
   return boardId;
@@ -1027,9 +1027,9 @@ function normalizeNotificationKinds(value) {
   const kinds = [];
   for (const entry of entries) {
     const kind = typeof entry === "string" ? entry.trim() : "";
-    if (!FLOWBOARD_NOTIFICATION_KINDS.includes(kind)) {
+    if (!TASKFOLD_NOTIFICATION_KINDS.includes(kind)) {
       throw new Error(
-        `notification kind must be one of: ${FLOWBOARD_NOTIFICATION_KINDS.join(", ")}.`
+        `notification kind must be one of: ${TASKFOLD_NOTIFICATION_KINDS.join(", ")}.`
       );
     }
     const notificationKind = kind;
@@ -1132,17 +1132,17 @@ function normalizeDelivery(value, fallback, now = Date.now()) {
   const readText = (key, maxLength, fieldName) => Object.hasOwn(record, key) ? normalizeOptionalBoundedString(record[key], maxLength, fieldName) : fallback?.[key];
   const implementationState = Object.hasOwn(record, "implementationState") ? normalizeDeliveryState(
     record.implementationState,
-    FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES,
+    TASKFOLD_DELIVERY_IMPLEMENTATION_STATES,
     "implementation state"
   ) : fallback?.implementationState;
   const verificationState = Object.hasOwn(record, "verificationState") ? normalizeDeliveryState(
     record.verificationState,
-    FLOWBOARD_DELIVERY_VERIFICATION_STATES,
+    TASKFOLD_DELIVERY_VERIFICATION_STATES,
     "verification state"
   ) : fallback?.verificationState;
   const releaseState = Object.hasOwn(record, "releaseState") ? normalizeDeliveryState(
     record.releaseState,
-    FLOWBOARD_DELIVERY_RELEASE_STATES,
+    TASKFOLD_DELIVERY_RELEASE_STATES,
     "release state"
   ) : fallback?.releaseState;
   const delivery = {
@@ -1185,19 +1185,19 @@ function normalizeStatus(value, fallback) {
   if (typeof value !== "string" || !value.trim()) {
     return fallback;
   }
-  if (FLOWBOARD_STATUSES.includes(value)) {
+  if (TASKFOLD_STATUSES.includes(value)) {
     return value;
   }
-  throw new Error(`status must be one of: ${FLOWBOARD_STATUSES.join(", ")}.`);
+  throw new Error(`status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`);
 }
 function normalizePriority(value, fallback) {
   if (typeof value !== "string" || !value.trim()) {
     return fallback;
   }
-  if (FLOWBOARD_PRIORITIES.includes(value)) {
+  if (TASKFOLD_PRIORITIES.includes(value)) {
     return value;
   }
-  throw new Error(`priority must be one of: ${FLOWBOARD_PRIORITIES.join(", ")}.`);
+  throw new Error(`priority must be one of: ${TASKFOLD_PRIORITIES.join(", ")}.`);
 }
 function normalizeLabels(value, fallback = []) {
   if (value == null) {
@@ -1353,37 +1353,37 @@ function deriveChildIdempotencyKey(parentKey, index) {
   return key.length <= 160 ? key : void 0;
 }
 function normalizeExecutionMode(value, fallback) {
-  if (typeof value === "string" && FLOWBOARD_EXECUTION_MODES.includes(value)) {
+  if (typeof value === "string" && TASKFOLD_EXECUTION_MODES.includes(value)) {
     return value;
   }
   return fallback;
 }
 function normalizeExecutionStatus(value, fallback) {
-  if (typeof value === "string" && FLOWBOARD_EXECUTION_STATUSES.includes(value)) {
+  if (typeof value === "string" && TASKFOLD_EXECUTION_STATUSES.includes(value)) {
     return value;
   }
   return fallback;
 }
 function normalizeAttemptStatus(value, fallback) {
-  if (typeof value === "string" && FLOWBOARD_ATTEMPT_STATUSES.includes(value)) {
+  if (typeof value === "string" && TASKFOLD_ATTEMPT_STATUSES.includes(value)) {
     return value;
   }
   return fallback;
 }
 function normalizeLinkType(value, fallback) {
-  if (typeof value === "string" && FLOWBOARD_LINK_TYPES.includes(value)) {
+  if (typeof value === "string" && TASKFOLD_LINK_TYPES.includes(value)) {
     return value;
   }
   return fallback;
 }
 function normalizeProofStatus(value, fallback) {
-  if (typeof value === "string" && FLOWBOARD_PROOF_STATUSES.includes(value)) {
+  if (typeof value === "string" && TASKFOLD_PROOF_STATUSES.includes(value)) {
     return value;
   }
   return fallback;
 }
 function normalizeTemplateId(value) {
-  return typeof value === "string" && FLOWBOARD_TEMPLATE_IDS.includes(value) ? value : void 0;
+  return typeof value === "string" && TASKFOLD_TEMPLATE_IDS.includes(value) ? value : void 0;
 }
 function normalizeTimestamp(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : fallback;
@@ -1394,13 +1394,13 @@ function normalizeEvent(value) {
   }
   const record = value;
   const id = normalizeOptionalString(record.id);
-  const kind = FLOWBOARD_EVENT_KINDS.includes(record.kind) ? record.kind : null;
+  const kind = TASKFOLD_EVENT_KINDS.includes(record.kind) ? record.kind : null;
   const at = normalizeTimestamp(record.at, 0);
   if (!id || !kind || !at) {
     return null;
   }
-  const fromStatus = typeof record.fromStatus === "string" && FLOWBOARD_STATUSES.includes(record.fromStatus) ? record.fromStatus : void 0;
-  const toStatus = typeof record.toStatus === "string" && FLOWBOARD_STATUSES.includes(record.toStatus) ? record.toStatus : void 0;
+  const fromStatus = typeof record.fromStatus === "string" && TASKFOLD_STATUSES.includes(record.fromStatus) ? record.fromStatus : void 0;
+  const toStatus = typeof record.toStatus === "string" && TASKFOLD_STATUSES.includes(record.toStatus) ? record.toStatus : void 0;
   const fromMilestoneId = normalizeBoundedString(
     record.fromMilestoneId,
     void 0,
@@ -1456,7 +1456,7 @@ function normalizeAttempt(value) {
     startedAt,
     ...endedAt ? { endedAt } : {},
     ...engine ? { engine } : {},
-    ...typeof record.mode === "string" && FLOWBOARD_EXECUTION_MODES.includes(record.mode) ? { mode: record.mode } : {},
+    ...typeof record.mode === "string" && TASKFOLD_EXECUTION_MODES.includes(record.mode) ? { mode: record.mode } : {},
     ...model ? { model } : {},
     ...sessionKey ? { sessionKey } : {},
     ...runId ? { runId } : {},
@@ -1689,8 +1689,8 @@ function normalizeDiagnostic(value) {
     return null;
   }
   const record = value;
-  const kind = FLOWBOARD_DIAGNOSTIC_KINDS.includes(record.kind) ? record.kind : void 0;
-  const severity = FLOWBOARD_DIAGNOSTIC_SEVERITIES.includes(
+  const kind = TASKFOLD_DIAGNOSTIC_KINDS.includes(record.kind) ? record.kind : void 0;
+  const severity = TASKFOLD_DIAGNOSTIC_SEVERITIES.includes(
     record.severity
   ) ? record.severity : "warning";
   const title = normalizeBoundedString(record.title, void 0, 160, "diagnostic title");
@@ -1717,7 +1717,7 @@ function normalizeNotification(value) {
   }
   const record = value;
   const id = normalizeOptionalString(record.id) ?? randomUUID();
-  const kind = FLOWBOARD_NOTIFICATION_KINDS.includes(record.kind) ? record.kind : void 0;
+  const kind = TASKFOLD_NOTIFICATION_KINDS.includes(record.kind) ? record.kind : void 0;
   const createdAt = normalizeTimestamp(record.createdAt, Date.now());
   const sequence = normalizeTimestamp(record.sequence, 0) || void 0;
   const message = normalizeBoundedString(record.message, void 0, 240, "notification message");
@@ -2042,7 +2042,7 @@ function trimMetadataToBudget(metadata, options = {}) {
 // src/backend/src/store-card-helpers.ts
 function compareCards(left, right) {
   if (left.status !== right.status) {
-    return FLOWBOARD_STATUSES.indexOf(left.status) - FLOWBOARD_STATUSES.indexOf(right.status);
+    return TASKFOLD_STATUSES.indexOf(left.status) - TASKFOLD_STATUSES.indexOf(right.status);
   }
   if (left.position !== right.position) {
     return left.position - right.position;
@@ -2091,7 +2091,7 @@ function syncExecutionAttemptMetadata(metadata, execution, now) {
     ...attemptStatus !== "succeeded" && existingAttempt?.error ? { error: existingAttempt.error } : {},
     // Stamped once when the attempt appears, then carried forward, so a prompt
     // change mid-run cannot relabel an attempt already under way.
-    promptVersion: existingAttempt?.promptVersion ?? FLOWBOARD_PROMPT_VERSION
+    promptVersion: existingAttempt?.promptVersion ?? TASKFOLD_PROMPT_VERSION
   };
   if (existingIndex >= 0) {
     attempts[existingIndex] = nextAttempt;
@@ -2302,7 +2302,7 @@ function mergeDiagnostics(previous, next) {
     } : entry;
   });
 }
-function flowboardLastActivityAt(card) {
+function taskfoldLastActivityAt(card) {
   return Math.max(
     card.metadata?.claim?.lastHeartbeatAt ?? 0,
     card.execution?.updatedAt ?? 0,
@@ -2315,7 +2315,7 @@ function computeCardDiagnostics(card, now) {
   }
   const diagnostics = [];
   const claim = card.metadata?.claim;
-  const lastHeartbeatAt = flowboardLastActivityAt(card);
+  const lastHeartbeatAt = taskfoldLastActivityAt(card);
   if ((card.status === "todo" || card.status === "backlog" || card.status === "ready") && card.agentId && now - card.updatedAt > READY_STRANDED_MS) {
     diagnostics.push(
       diagnostic(
@@ -2489,14 +2489,14 @@ function retryGuidance(card) {
   const failureCount = card.metadata?.failureCount ?? 0;
   if (maxRetries && failureCount >= maxRetries) {
     lines.push(
-      "This is the final attempt within the card's retry budget. If you cannot finish, call flowboard_block with a precise diagnosis and record what you learned \u2014 a bare failure leaves the next person with nothing."
+      "This is the final attempt within the card's retry budget. If you cannot finish, call taskfold_block with a precise diagnosis and record what you learned \u2014 a bare failure leaves the next person with nothing."
     );
   }
   return lines;
 }
 function buildWorkerContext(card, cards = [], now = Date.now()) {
   const lines = [
-    `# Flowboard card ${card.id}`,
+    `# Taskfold card ${card.id}`,
     `Title: ${card.title}`,
     `Status: ${card.status}`,
     `Priority: ${card.priority}`,
@@ -2624,17 +2624,17 @@ function buildWorkerContext(card, cards = [], now = Date.now()) {
 }
 function buildWorkerPrompt(params) {
   return [
-    `Work on this OpenClaw Flowboard card: ${params.card.title}`,
+    `Work on this OpenClaw Taskfold card: ${params.card.title}`,
     "",
     "## Worker protocol",
     `Card id: ${params.card.id}`,
     `Claim ownerId: ${params.ownerId}`,
     `Claim token: ${params.token}`,
     "",
-    "Heartbeat with flowboard_heartbeat using the card id and token while working.",
-    "When done, call flowboard_complete with the card id, token, summary, and proof.",
-    "If you called flowboard_proof separately, pass its returned proofId to flowboard_complete.",
-    "If blocked, call flowboard_block with the card id, token, and reason.",
+    "Heartbeat with taskfold_heartbeat using the card id and token while working.",
+    "When done, call taskfold_complete with the card id, token, summary, and proof.",
+    "If you called taskfold_proof separately, pass its returned proofId to taskfold_complete.",
+    "If blocked, call taskfold_block with the card id, token, and reason.",
     "",
     params.context
   ].join("\n");
@@ -2642,14 +2642,14 @@ function buildWorkerPrompt(params) {
 
 // src/backend/src/dispatcher.ts
 var DEFAULT_DISPATCH_MAX_STARTS = 3;
-var DEFAULT_DISPATCH_OWNER = "flowboard-dispatcher";
-async function createManagedFlowboardWorktree(params) {
+var DEFAULT_DISPATCH_OWNER = "taskfold-dispatcher";
+async function createManagedTaskfoldWorktree(params) {
   return await params.worktrees.create({
     repoRoot: params.repoRoot,
     name: params.name,
     ...params.baseRef ? { baseRef: params.baseRef } : {},
     // This host release has a fixed managed-worktree owner enum. Card IDs
-    // remain globally unique and Flowboard data stays in its own SQLite namespace.
+    // remain globally unique and Taskfold data stays in its own SQLite namespace.
     ownerKind: "workboard",
     ownerId: params.ownerId
   });
@@ -2671,7 +2671,7 @@ function cardHasActiveClaim(card, now) {
 function buildSessionKey(card) {
   const boardId = sanitizeSessionSegment(cardBoardId(card), "default");
   const cardId = sanitizeSessionSegment(card.id, "card");
-  const suffix = `subagent:flowboard-${boardId}-${cardId}`;
+  const suffix = `subagent:taskfold-${boardId}-${cardId}`;
   return card.agentId ? `agent:${sanitizeSessionSegment(card.agentId, "agent")}:${suffix}` : suffix;
 }
 function buildExecution(params) {
@@ -2696,7 +2696,7 @@ async function materializeWorkspace(params) {
   if (!sourcePath || !path.isAbsolute(sourcePath)) {
     throw new Error("worktree workspace path must be an absolute git checkout path");
   }
-  const canonicalSourcePath = await assertFlowboardWorkspaceSourceAccess(
+  const canonicalSourcePath = await assertTaskfoldWorkspaceSourceAccess(
     workspace,
     params.workspaceAccess
   );
@@ -2704,7 +2704,7 @@ async function materializeWorkspace(params) {
     throw new Error("worktree workspace path is required");
   }
   if (workspace.kind === "dir" || !params.workspaceAccess.unrestricted) {
-    await assertCanonicalFlowboardRootAccess(canonicalSourcePath, params.workspaceAccess);
+    await assertCanonicalTaskfoldRootAccess(canonicalSourcePath, params.workspaceAccess);
     return workspace.kind === "worktree" ? { cwd: canonicalSourcePath, workspace: { kind: "dir", path: canonicalSourcePath } } : { cwd: canonicalSourcePath };
   }
   if (!params.materializeWorktree) {
@@ -2713,7 +2713,7 @@ async function materializeWorkspace(params) {
   if (!params.worktrees) {
     throw new Error("managed worktree runtime is unavailable");
   }
-  const worktree = await createManagedFlowboardWorktree({
+  const worktree = await createManagedTaskfoldWorktree({
     worktrees: params.worktrees,
     repoRoot: canonicalSourcePath,
     name: managedWorktreeName(params.card.id),
@@ -2764,7 +2764,7 @@ function selectStartableCards(cards, limit, candidates, ownerOverride, now) {
   const runningByOwner = /* @__PURE__ */ new Map();
   for (const card of cards) {
     const claim = card.metadata?.claim;
-    const consumesOwnerSlot = !isFlowboardClaimReclaimable(claim, now) && (card.status === "running" || card.status !== "done" && cardHasActiveClaim(card, now) || card.execution?.status === "running");
+    const consumesOwnerSlot = !isTaskfoldClaimReclaimable(claim, now) && (card.status === "running" || card.status !== "done" && cardHasActiveClaim(card, now) || card.execution?.status === "running");
     if (!consumesOwnerSlot || cardIsArchived(card)) {
       continue;
     }
@@ -2790,10 +2790,10 @@ function selectStartableCards(cards, limit, candidates, ownerOverride, now) {
   }
   return [...selected, ...fallback];
 }
-async function dispatchAndStartFlowboardCards(params) {
-  return await runFlowboardDispatch(params);
+async function dispatchAndStartTaskfoldCards(params) {
+  return await runTaskfoldDispatch(params);
 }
-async function runFlowboardDispatch(params) {
+async function runTaskfoldDispatch(params) {
   const now = params.options?.now ?? Date.now();
   const boardId = params.options?.boardId;
   const dispatch = await params.store.dispatch({ now, boardId });
@@ -2858,8 +2858,8 @@ async function runFlowboardDispatch(params) {
         }
         try {
           implicitWorkspaceCwd = targetWorkspace;
-          await assertCanonicalFlowboardRootAccess(implicitWorkspaceCwd, workspaceAccess);
-          await assertRestrictedFlowboardTarget({
+          await assertCanonicalTaskfoldRootAccess(implicitWorkspaceCwd, workspaceAccess);
+          await assertRestrictedTaskfoldTarget({
             root: implicitWorkspaceCwd,
             agentId: card.agentId,
             sessionKey,
@@ -2878,16 +2878,16 @@ async function runFlowboardDispatch(params) {
       }
     } else {
       try {
-        const canonicalSourcePath = await assertFlowboardWorkspaceSourceAccess(
+        const canonicalSourcePath = await assertTaskfoldWorkspaceSourceAccess(
           requestedWorkspace,
           workspaceAccess
         );
         if (canonicalSourcePath && requestedWorkspace.kind === "dir" && workspaceAccess.unrestricted) {
-          await assertCanonicalFlowboardRootAccess(canonicalSourcePath, workspaceAccess);
+          await assertCanonicalTaskfoldRootAccess(canonicalSourcePath, workspaceAccess);
         }
         if (canonicalSourcePath && !workspaceAccess.unrestricted) {
-          await assertCanonicalFlowboardRootAccess(canonicalSourcePath, workspaceAccess);
-          await assertRestrictedFlowboardTarget({
+          await assertCanonicalTaskfoldRootAccess(canonicalSourcePath, workspaceAccess);
+          await assertRestrictedTaskfoldTarget({
             root: canonicalSourcePath,
             agentId: card.agentId,
             sessionKey,
@@ -2931,7 +2931,7 @@ async function runFlowboardDispatch(params) {
       });
       const runCwd = materialized.cwd ?? implicitWorkspaceCwd;
       if (runCwd && !workspaceAccess.unrestricted) {
-        await assertRestrictedFlowboardTarget({
+        await assertRestrictedTaskfoldTarget({
           root: runCwd,
           // Claim may populate agentId; keep the sessionKey target identity.
           agentId: card.agentId,
@@ -2955,11 +2955,11 @@ async function runFlowboardDispatch(params) {
         }),
         ...params.options?.provider ? { provider: params.options.provider } : {},
         ...params.options?.model ? { model: params.options.model } : {},
-        lane: `flowboard:${cardBoardId(card)}:${card.id}`,
+        lane: `taskfold:${cardBoardId(card)}:${card.id}`,
         // Keyed on the winning claim token, which is minted once per claim and so
         // identifies exactly this dispatch attempt. A millisecond timestamp could
         // collide between two attempts and changed on unrelated card writes.
-        idempotencyKey: `flowboard:${card.id}:${claimValue}`,
+        idempotencyKey: `taskfold:${card.id}:${claimValue}`,
         lightContext: true,
         deliver: false,
         ...runCwd ? { cwd: runCwd } : {}
@@ -3072,10 +3072,10 @@ async function gitCheckout(path6) {
   }
 }
 async function resolveWorkspaceAccess(card, currentAccess) {
-  const callerAccess = await canonicalizeFlowboardWorkspaceAccess(currentAccess);
+  const callerAccess = await canonicalizeTaskfoldWorkspaceAccess(currentAccess);
   const persisted = card.metadata?.automation?.workspaceAccess;
-  const workspaceAccess = persisted ? intersectFlowboardWorkspaceAccess(
-    await canonicalizeFlowboardWorkspaceAccess(persisted),
+  const workspaceAccess = persisted ? intersectTaskfoldWorkspaceAccess(
+    await canonicalizeTaskfoldWorkspaceAccess(persisted),
     callerAccess
   ) : callerAccess;
   if (!workspaceAccess.unrestricted && !workspaceAccess.writable) {
@@ -3094,12 +3094,12 @@ async function resolveExecutionSource(store, card, currentAccess) {
   if (!sourceWorkspace || sourceWorkspace.kind === "scratch") {
     throw new Error("card has no local Git checkout; set a card or project workspace first.");
   }
-  const sourcePath = await assertFlowboardWorkspaceSourceAccess(sourceWorkspace, workspaceAccess);
+  const sourcePath = await assertTaskfoldWorkspaceSourceAccess(sourceWorkspace, workspaceAccess);
   if (!sourcePath) {
     throw new Error("card workspace path is required.");
   }
   const checkout = await gitCheckout(sourcePath);
-  const checkedRoot = await assertFlowboardWorkspaceSourceAccess(
+  const checkedRoot = await assertTaskfoldWorkspaceSourceAccess(
     { kind: "dir", path: checkout.root },
     workspaceAccess
   );
@@ -3117,7 +3117,7 @@ async function ensureTargetCanRun(params) {
   if (params.source.workspaceAccess.unrestricted) {
     return;
   }
-  await assertRestrictedFlowboardTarget({
+  await assertRestrictedTaskfoldTarget({
     root: params.source.sourceCheckout,
     agentId: params.card.agentId ?? params.options.defaultAgentId,
     sessionKey: params.sessionKey,
@@ -3186,7 +3186,7 @@ async function resolveCard(store, id) {
   }
   return card;
 }
-async function prepareFlowboardCardExecution(params) {
+async function prepareTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   if (card.metadata?.archivedAt) {
     throw new Error("card is archived.");
@@ -3213,7 +3213,7 @@ async function prepareFlowboardCardExecution(params) {
     execution: card.execution ?? null
   };
 }
-async function startFlowboardCardExecution(params) {
+async function startTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   {
     const latest = await resolveCard(params.store, card.id);
@@ -3237,7 +3237,7 @@ async function startFlowboardCardExecution(params) {
         ttlSeconds: latest.metadata?.automation?.maxRuntimeSeconds
       });
       claimToken = claimed.token;
-      const worktree = await createManagedFlowboardWorktree({
+      const worktree = await createManagedTaskfoldWorktree({
         worktrees: params.options.runtime.worktrees,
         repoRoot: source.sourceCheckout,
         name: managedWorktreeName(latest.id),
@@ -3283,11 +3283,11 @@ async function startFlowboardCardExecution(params) {
           ownerId,
           token: claimToken
         }),
-        lane: `flowboard:${cardBoardId(current)}:${current.id}`,
+        lane: `taskfold:${cardBoardId(current)}:${current.id}`,
         // The claim token is minted fresh per winning claim, so it identifies
         // exactly this start attempt. A timestamp could collide inside one
         // millisecond and changed on writes unrelated to starting a run.
-        idempotencyKey: `flowboard:execution:${current.id}:${claimed.token}`,
+        idempotencyKey: `taskfold:execution:${current.id}:${claimed.token}`,
         lightContext: true,
         deliver: false,
         cwd: worktreePath
@@ -3335,7 +3335,7 @@ async function startFlowboardCardExecution(params) {
     }
   }
 }
-async function inspectFlowboardCardExecution(params) {
+async function inspectTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   const sessionKey = card.execution?.sessionKey ?? card.sessionKey;
   const runId = card.execution?.runId ?? card.runId;
@@ -3354,10 +3354,10 @@ async function inspectFlowboardCardExecution(params) {
     preview: boundExecutionPreview(redactExecutionPayload(preview, token))
   };
 }
-async function steerFlowboardCardExecution(params) {
+async function steerTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
-    throw new Error("card has no active Flowboard execution.");
+    throw new Error("card has no active Taskfold execution.");
   }
   const sessionKey = card.execution.sessionKey ?? card.sessionKey;
   if (!sessionKey) {
@@ -3373,17 +3373,17 @@ async function steerFlowboardCardExecution(params) {
   }
   return { card: updated };
 }
-async function abortFlowboardCardExecution(params) {
+async function abortTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   if (!activeExecution(card) || card.execution?.status !== "running") {
-    throw new Error("card has no active Flowboard execution.");
+    throw new Error("card has no active Taskfold execution.");
   }
   const expectedRunId = readOptionalString(params.expectedRunId, 200);
   const runId = card.execution.runId ?? card.runId;
   if (expectedRunId && runId && expectedRunId !== runId) {
     throw new Error("card execution changed before it could be stopped.");
   }
-  const reason = readOptionalString(params.reason, 1e3) ?? "Flowboard execution stopped by operator.";
+  const reason = readOptionalString(params.reason, 1e3) ?? "Taskfold execution stopped by operator.";
   const stopped = await params.store.stopExecution(card.id, {
     ...runId ? { expectedRunId: runId } : {},
     reason
@@ -3399,7 +3399,7 @@ function terminalExecutionOutcome(value) {
   }
   throw new Error("outcome must be a terminal OpenClaw subagent outcome.");
 }
-async function reconcileFlowboardCardExecution(params) {
+async function reconcileTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
   const expectedRunId = readOptionalString(params.expectedRunId, 200);
   const runId = card.execution?.runId ?? card.runId;
@@ -3427,7 +3427,7 @@ import { formatErrorMessage as formatErrorMessage3 } from "openclaw/plugin-sdk/e
 import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
 function respondError(respond, error) {
   respond(false, void 0, {
-    code: "flowboard_error",
+    code: "taskfold_error",
     message: formatErrorMessage3(error)
   });
 }
@@ -3457,14 +3457,14 @@ function readPatch(params) {
 }
 function assertNoCursorAdvance(params) {
   if (params.advance === true) {
-    throw new Error("notification cursor advancement requires flowboard.notifications.advance.");
+    throw new Error("notification cursor advancement requires taskfold.notifications.advance.");
   }
 }
-async function listFlowboardCards(store, boardId, redactCard) {
+async function listTaskfoldCards(store, boardId, redactCard) {
   const [cards, { boards }] = await Promise.all([store.list({ boardId }), store.listBoards()]);
-  return { cards: cards.map(redactCard), boards, statuses: FLOWBOARD_STATUSES };
+  return { cards: cards.map(redactCard), boards, statuses: TASKFOLD_STATUSES };
 }
-function resolveGatewayFlowboardWorkspaceAccess(params) {
+function resolveGatewayTaskfoldWorkspaceAccess(params) {
   if (!params.client) {
     return { unrestricted: true };
   }
@@ -3472,23 +3472,23 @@ function resolveGatewayFlowboardWorkspaceAccess(params) {
   if (scopes.includes("operator.admin")) {
     return { unrestricted: true };
   }
-  return resolveConfiguredFlowboardWorkspaceAccess({
+  return resolveConfiguredTaskfoldWorkspaceAccess({
     config: params.context.getRuntimeConfig(),
     unrestricted: false
   });
 }
-function createFlowboardDispatchHandler(params) {
+function createTaskfoldDispatchHandler(params) {
   const sandbox = params.api.runtime.sandbox;
   return async ({ params: requestParams, respond, client, context }, options) => {
     try {
       const boardId = requestParams && typeof requestParams === "object" && "boardId" in requestParams ? requestParams.boardId : void 0;
       const rawMaxStarts = requestParams && typeof requestParams === "object" && "maxStarts" in requestParams ? requestParams.maxStarts : void 0;
       if (!options.supportsMaxStarts && rawMaxStarts !== void 0) {
-        throw new Error("maxStarts requires flowboard.cards.dispatchWithOptions.");
+        throw new Error("maxStarts requires taskfold.cards.dispatchWithOptions.");
       }
       const maxStarts = options.supportsMaxStarts ? readOptionalPositiveInteger(rawMaxStarts, "maxStarts") : void 0;
-      const workspaceAccess = resolveGatewayFlowboardWorkspaceAccess({ context, client });
-      const result = await dispatchAndStartFlowboardCards({
+      const workspaceAccess = resolveGatewayTaskfoldWorkspaceAccess({ context, client });
+      const result = await dispatchAndStartTaskfoldCards({
         store: params.store,
         subagent: params.api.runtime.subagent,
         worktrees: params.api.runtime.worktrees,
@@ -3496,10 +3496,10 @@ function createFlowboardDispatchHandler(params) {
           boardId: typeof boardId === "string" ? boardId : void 0,
           ...maxStarts !== void 0 ? { maxStarts } : {},
           materializeWorktree: true,
-          resolveAgentWorkspace: (agentId) => resolveFlowboardAgentWorkspace(context.getRuntimeConfig(), agentId),
+          resolveAgentWorkspace: (agentId) => resolveTaskfoldAgentWorkspace(context.getRuntimeConfig(), agentId),
           resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => {
             const config = context.getRuntimeConfig();
-            return resolveAgentFlowboardWorkspaceRuntime({
+            return resolveAgentTaskfoldWorkspaceRuntime({
               config,
               agentId,
               sessionKey,
@@ -3528,29 +3528,29 @@ function createFlowboardDispatchHandler(params) {
 // src/backend/src/gateway-workspace-methods.ts
 var WRITE_SCOPE = "operator.write";
 async function resolveGatewayWorkspaceMutationAccess(request, value) {
-  const access = await canonicalizeFlowboardWorkspaceAccess(
-    resolveGatewayFlowboardWorkspaceAccess({
+  const access = await canonicalizeTaskfoldWorkspaceAccess(
+    resolveGatewayTaskfoldWorkspaceAccess({
       context: request.context,
       client: request.client
     })
   );
-  await assertFlowboardWorkspaceMutationAccess(value, access);
+  await assertTaskfoldWorkspaceMutationAccess(value, access);
   return access;
 }
-function registerFlowboardWorkspaceCardMethods(params) {
+function registerTaskfoldWorkspaceCardMethods(params) {
   const { api, store, redactCard } = params;
   api.registerGatewayMethod(
-    "flowboard.cards.create",
+    "taskfold.cards.create",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
-        const input = withoutFlowboardWorkspaceAccess(requestParams);
+        const input = withoutTaskfoldWorkspaceAccess(requestParams);
         const project = await store.getProject(input.boardId);
         const inputWithProjectWorkspace = input.workspace === void 0 && project.board.defaultWorkspace ? { ...input, workspace: project.board.defaultWorkspace } : input;
         const access = await resolveGatewayWorkspaceMutationAccess(request, inputWithProjectWorkspace);
         respond(true, {
           card: redactCard(
-            await store.create(withFlowboardWorkspaceAccess(inputWithProjectWorkspace, access))
+            await store.create(withTaskfoldWorkspaceAccess(inputWithProjectWorkspace, access))
           )
         });
       } catch (error) {
@@ -3560,17 +3560,17 @@ function registerFlowboardWorkspaceCardMethods(params) {
     { scope: WRITE_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.update",
+    "taskfold.cards.update",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
-        const patch = withoutFlowboardWorkspaceAccess(readPatch(requestParams));
+        const patch = withoutTaskfoldWorkspaceAccess(readPatch(requestParams));
         const access = await resolveGatewayWorkspaceMutationAccess(request, patch);
         respond(true, {
           card: redactCard(
             await store.update(
               readId(requestParams),
-              containsFlowboardWorkspaceMutation(patch) ? withFlowboardWorkspaceAccess(patch, access) : patch
+              containsTaskfoldWorkspaceMutation(patch) ? withTaskfoldWorkspaceAccess(patch, access) : patch
             )
           )
         });
@@ -3581,19 +3581,19 @@ function registerFlowboardWorkspaceCardMethods(params) {
     { scope: WRITE_SCOPE }
   );
 }
-function registerFlowboardWorkspaceBulkMethod(params) {
+function registerTaskfoldWorkspaceBulkMethod(params) {
   const { api, store, redactCard } = params;
   api.registerGatewayMethod(
-    "flowboard.cards.bulk",
+    "taskfold.cards.bulk",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
-        const sanitizedParams = withoutFlowboardWorkspaceAccess(requestParams);
-        const patch = withoutFlowboardWorkspaceAccess(readPatch(requestParams));
+        const sanitizedParams = withoutTaskfoldWorkspaceAccess(requestParams);
+        const patch = withoutTaskfoldWorkspaceAccess(readPatch(requestParams));
         const access = await resolveGatewayWorkspaceMutationAccess(request, patch);
         const result = await store.bulkUpdate({
           ...sanitizedParams,
-          patch: containsFlowboardWorkspaceMutation(patch) ? withFlowboardWorkspaceAccess(patch, access) : patch
+          patch: containsTaskfoldWorkspaceMutation(patch) ? withTaskfoldWorkspaceAccess(patch, access) : patch
         });
         respond(true, { cards: result.cards.map(redactCard) });
       } catch (error) {
@@ -3603,10 +3603,10 @@ function registerFlowboardWorkspaceBulkMethod(params) {
     { scope: WRITE_SCOPE }
   );
 }
-function registerFlowboardWorkspaceBoardMethod(params) {
+function registerTaskfoldWorkspaceBoardMethod(params) {
   const { api, store } = params;
   api.registerGatewayMethod(
-    "flowboard.boards.upsert",
+    "taskfold.boards.upsert",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
@@ -3619,16 +3619,16 @@ function registerFlowboardWorkspaceBoardMethod(params) {
     { scope: WRITE_SCOPE }
   );
 }
-function registerFlowboardWorkspaceWorkflowMethods(params) {
+function registerTaskfoldWorkspaceWorkflowMethods(params) {
   const { api, store, redactCard } = params;
   api.registerGatewayMethod(
-    "flowboard.cards.specify",
+    "taskfold.cards.specify",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
-        const sanitizedParams = withoutFlowboardWorkspaceAccess(requestParams);
+        const sanitizedParams = withoutTaskfoldWorkspaceAccess(requestParams);
         const access = await resolveGatewayWorkspaceMutationAccess(request, sanitizedParams);
-        const input = containsFlowboardWorkspaceMutation(sanitizedParams) ? withFlowboardWorkspaceAccess(sanitizedParams, access) : sanitizedParams;
+        const input = containsTaskfoldWorkspaceMutation(sanitizedParams) ? withTaskfoldWorkspaceAccess(sanitizedParams, access) : sanitizedParams;
         respond(true, {
           card: redactCard(await store.specify(readId(requestParams), input, null))
         });
@@ -3639,15 +3639,15 @@ function registerFlowboardWorkspaceWorkflowMethods(params) {
     { scope: WRITE_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.decompose",
+    "taskfold.cards.decompose",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
-        const sanitizedParams = withoutFlowboardWorkspaceAccess(requestParams);
+        const sanitizedParams = withoutTaskfoldWorkspaceAccess(requestParams);
         const access = await resolveGatewayWorkspaceMutationAccess(request, sanitizedParams);
         const result = await store.decompose(
           readId(requestParams),
-          withFlowboardDecomposeWorkspaceAccess(sanitizedParams, access),
+          withTaskfoldDecomposeWorkspaceAccess(sanitizedParams, access),
           null
         );
         respond(true, {
@@ -3717,7 +3717,7 @@ async function resolveProjectDocumentFile(params) {
   } catch {
     throw new Error("project document file does not exist.");
   }
-  await assertFlowboardWorkspaceSourceAccess({ kind: "dir", path: resolvedPath }, params.access);
+  await assertTaskfoldWorkspaceSourceAccess({ kind: "dir", path: resolvedPath }, params.access);
   let stat;
   try {
     stat = await fs.stat(resolvedPath);
@@ -3738,7 +3738,7 @@ async function resolveProjectDocumentFile(params) {
   }
   return { content: decodeUtf8(bytes), bytes, path: resolvedPath, stat };
 }
-async function readFlowboardProjectDocument(params) {
+async function readTaskfoldProjectDocument(params) {
   const { document } = params;
   if (document.type === "markdown") {
     const content = document.content ?? "";
@@ -3759,7 +3759,7 @@ async function readFlowboardProjectDocument(params) {
     modifiedAt: Math.trunc(Number(file.stat.mtimeMs))
   };
 }
-async function writeFlowboardProjectDocumentPath(params) {
+async function writeTaskfoldProjectDocumentPath(params) {
   if (!params.access.unrestricted && !params.access.writable) {
     throw new Error("project document workspace access is read-only.");
   }
@@ -3774,7 +3774,7 @@ async function writeFlowboardProjectDocumentPath(params) {
   const directory = path2.dirname(current.path);
   const temporaryPath = path2.join(
     directory,
-    `.${path2.basename(current.path)}.flowboard-${randomUUID3()}.tmp`
+    `.${path2.basename(current.path)}.taskfold-${randomUUID3()}.tmp`
   );
   const originalMode = Number(current.stat.mode) & 4095;
   try {
@@ -3791,7 +3791,7 @@ async function writeFlowboardProjectDocumentPath(params) {
     await fs.rm(temporaryPath, { force: true }).catch(() => void 0);
     throw error;
   }
-  return await readFlowboardProjectDocument({
+  return await readTaskfoldProjectDocument({
     document: params.document,
     access: params.access
   });
@@ -3801,17 +3801,17 @@ async function writeFlowboardProjectDocumentPath(params) {
 var READ_SCOPE = "operator.read";
 var WRITE_SCOPE2 = "operator.write";
 async function assertProjectWorkspaceAccess(request, value) {
-  const access = await canonicalizeFlowboardWorkspaceAccess(
-    resolveGatewayFlowboardWorkspaceAccess({
+  const access = await canonicalizeTaskfoldWorkspaceAccess(
+    resolveGatewayTaskfoldWorkspaceAccess({
       context: request.context,
       client: request.client
     })
   );
-  await assertFlowboardWorkspaceMutationAccess(value, access);
+  await assertTaskfoldWorkspaceMutationAccess(value, access);
 }
 async function resolveProjectWorkspaceReadAccess(request) {
-  return await canonicalizeFlowboardWorkspaceAccess(
-    resolveGatewayFlowboardWorkspaceAccess({
+  return await canonicalizeTaskfoldWorkspaceAccess(
+    resolveGatewayTaskfoldWorkspaceAccess({
       context: request.context,
       client: request.client
     })
@@ -3824,10 +3824,10 @@ async function resolveProjectWorkspaceWriteAccess(request) {
   }
   return access;
 }
-function registerFlowboardProjectGatewayMethods(params) {
+function registerTaskfoldProjectGatewayMethods(params) {
   const { api, store, redactCard } = params;
   api.registerGatewayMethod(
-    "flowboard.projects.list",
+    "taskfold.projects.list",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.listProjects(requestParams));
@@ -3838,7 +3838,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.get",
+    "taskfold.projects.get",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { project: await store.getProject(requestParams.id) });
@@ -3849,7 +3849,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.create",
+    "taskfold.projects.create",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
@@ -3862,7 +3862,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.update",
+    "taskfold.projects.update",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
@@ -3875,7 +3875,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.reorder",
+    "taskfold.projects.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.reorderProjects(requestParams.ids));
@@ -3886,7 +3886,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.archive",
+    "taskfold.projects.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -3900,7 +3900,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.restore",
+    "taskfold.projects.restore",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.archiveProject(requestParams.id, false));
@@ -3911,7 +3911,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.list",
+    "taskfold.projects.milestones.list",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.listMilestones(requestParams.boardId));
@@ -3922,7 +3922,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.create",
+    "taskfold.projects.milestones.create",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.createMilestone(requestParams) });
@@ -3933,7 +3933,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.update",
+    "taskfold.projects.milestones.update",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.updateMilestone(readId(requestParams), requestParams) });
@@ -3944,7 +3944,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.reorder",
+    "taskfold.projects.milestones.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.reorderMilestones(requestParams));
@@ -3955,7 +3955,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.complete",
+    "taskfold.projects.milestones.complete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.completeMilestone(readId(requestParams)) });
@@ -3966,7 +3966,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.archive",
+    "taskfold.projects.milestones.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.archiveMilestone(readId(requestParams)) });
@@ -3977,7 +3977,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.restore",
+    "taskfold.projects.milestones.restore",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.restoreMilestone(readId(requestParams)) });
@@ -3988,14 +3988,14 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.list",
+    "taskfold.projects.documents.list",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
         const access = await resolveProjectWorkspaceReadAccess(request);
         const project = await store.getProject(requestParams.boardId);
         if (project.board.defaultWorkspace?.path) {
-          await assertFlowboardWorkspaceSourceAccess(project.board.defaultWorkspace, access);
+          await assertTaskfoldWorkspaceSourceAccess(project.board.defaultWorkspace, access);
         }
         respond(
           true,
@@ -4010,14 +4010,14 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.read",
+    "taskfold.projects.documents.read",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
         const access = await resolveProjectWorkspaceReadAccess(request);
         const document = await store.getProjectDocument(readId(requestParams));
         respond(true, {
-          preview: await readFlowboardProjectDocument({ document, access })
+          preview: await readTaskfoldProjectDocument({ document, access })
         });
       } catch (error) {
         respondError(respond, error);
@@ -4026,14 +4026,14 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: READ_SCOPE }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.write",
+    "taskfold.projects.documents.write",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
         const access = await resolveProjectWorkspaceWriteAccess(request);
         const document = await store.getProjectDocument(readId(requestParams));
         if (document.type === "markdown") {
-          const preview = await readFlowboardProjectDocument({ document, access });
+          const preview = await readTaskfoldProjectDocument({ document, access });
           if (typeof requestParams.expectedRevision !== "string" || requestParams.expectedRevision !== preview.revision) {
             throw new Error("project document changed; reload it before saving.");
           }
@@ -4041,12 +4041,12 @@ function registerFlowboardProjectGatewayMethods(params) {
             content: requestParams.content
           });
           respond(true, {
-            preview: await readFlowboardProjectDocument({ document: updated, access })
+            preview: await readTaskfoldProjectDocument({ document: updated, access })
           });
           return;
         }
         respond(true, {
-          preview: await writeFlowboardProjectDocumentPath({
+          preview: await writeTaskfoldProjectDocumentPath({
             document,
             content: requestParams.content,
             expectedRevision: requestParams.expectedRevision,
@@ -4060,7 +4060,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.create",
+    "taskfold.projects.documents.create",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { document: await store.createProjectDocument(requestParams) });
@@ -4071,7 +4071,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.update",
+    "taskfold.projects.documents.update",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -4085,7 +4085,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.reorder",
+    "taskfold.projects.documents.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.reorderProjectDocuments(requestParams));
@@ -4096,7 +4096,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.hide",
+    "taskfold.projects.documents.hide",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -4110,7 +4110,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.restore",
+    "taskfold.projects.documents.restore",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -4124,7 +4124,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.delete",
+    "taskfold.projects.documents.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteProjectDocument(readId(requestParams)));
@@ -4135,7 +4135,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.create",
+    "taskfold.cards.sources.create",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -4148,7 +4148,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.update",
+    "taskfold.cards.sources.update",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -4161,7 +4161,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.delete",
+    "taskfold.cards.sources.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -4174,7 +4174,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.reorder",
+    "taskfold.cards.sources.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -4187,7 +4187,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.moveMilestone",
+    "taskfold.cards.moveMilestone",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -4200,7 +4200,7 @@ function registerFlowboardProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.moveProject",
+    "taskfold.cards.moveProject",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -4224,13 +4224,17 @@ import path3 from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-state-runtime";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
-var FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
+var TASKFOLD_DB_RELATIVE_PATH = ["plugins", "taskfold", "taskfold.sqlite"];
+var LEGACY_FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
 var SCHEMA_VERSION = 7;
-var FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
-var FLOWBOARD_SQLITE_DIR_MODE = 448;
-var FLOWBOARD_SQLITE_FILE_MODE = 384;
-function resolveFlowboardSqlitePath(env = process.env) {
-  return path3.join(resolveStateDir(env), ...FLOWBOARD_DB_RELATIVE_PATH);
+var TASKFOLD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
+var TASKFOLD_SQLITE_DIR_MODE = 448;
+var TASKFOLD_SQLITE_FILE_MODE = 384;
+function resolveTaskfoldSqlitePath(env = process.env) {
+  return path3.join(resolveStateDir(env), ...TASKFOLD_DB_RELATIVE_PATH);
+}
+function resolveLegacyFlowboardSqlitePath(env = process.env) {
+  return path3.join(resolveStateDir(env), ...LEGACY_FLOWBOARD_DB_RELATIVE_PATH);
 }
 function jsonValue(value) {
   return value === void 0 ? null : JSON.stringify(value);
@@ -4258,14 +4262,14 @@ function numberValue(row, key) {
 function requiredString(row, key) {
   const value = stringValue(row, key);
   if (!value) {
-    throw new Error(`flowboard sqlite row missing ${key}`);
+    throw new Error(`taskfold sqlite row missing ${key}`);
   }
   return value;
 }
 function requiredNumber(row, key) {
   const value = numberValue(row, key);
   if (value === void 0) {
-    throw new Error(`flowboard sqlite row missing ${key}`);
+    throw new Error(`taskfold sqlite row missing ${key}`);
   }
   return value;
 }
@@ -4295,6 +4299,12 @@ function runTransaction(db, run) {
     throw error;
   }
 }
+function quoteIdentifier(value) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+function quoteSqlString(value) {
+  return `'${value.replaceAll("'", "''")}'`;
+}
 function tableColumns(db, tableName) {
   return new Set(
     db.prepare(`PRAGMA table_info(${tableName})`).all().flatMap(
@@ -4308,17 +4318,17 @@ function ensureColumn(db, tableName, columnName, definition) {
   }
   db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definition}`);
 }
-var FLOWBOARD_SCHEMA_SQL = `
-    CREATE TABLE IF NOT EXISTS flowboard_meta (
+var TASKFOLD_SCHEMA_SQL = `
+    CREATE TABLE IF NOT EXISTS taskfold_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     ) STRICT;
-    CREATE TABLE IF NOT EXISTS flowboard_schema_migrations (
+    CREATE TABLE IF NOT EXISTS taskfold_schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_boards (
+    CREATE TABLE IF NOT EXISTS taskfold_boards (
       id TEXT PRIMARY KEY,
       name TEXT,
       description TEXT,
@@ -4339,7 +4349,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       archived_at INTEGER
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_cards (
+    CREATE TABLE IF NOT EXISTS taskfold_cards (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -4375,21 +4385,21 @@ var FLOWBOARD_SCHEMA_SQL = `
       lifecycle_status_source_updated_at INTEGER,
       failure_count INTEGER
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_cards_board_status_idx
-      ON flowboard_cards(board_id, status, position);
-    CREATE INDEX IF NOT EXISTS flowboard_cards_session_idx
-      ON flowboard_cards(session_key, run_id);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_board_status_idx
+      ON taskfold_cards(board_id, status, position);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_session_idx
+      ON taskfold_cards(session_key, run_id);
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_labels (
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_card_labels (
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       label TEXT NOT NULL,
       PRIMARY KEY(card_id, ordinal)
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_events (
+    CREATE TABLE IF NOT EXISTS taskfold_card_events (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       kind TEXT NOT NULL,
       at INTEGER NOT NULL,
@@ -4401,9 +4411,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_attempts (
+    CREATE TABLE IF NOT EXISTS taskfold_card_attempts (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       status TEXT NOT NULL,
       started_at INTEGER NOT NULL,
@@ -4416,18 +4426,18 @@ var FLOWBOARD_SCHEMA_SQL = `
       error TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_comments (
+    CREATE TABLE IF NOT EXISTS taskfold_card_comments (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       body TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_links (
+    CREATE TABLE IF NOT EXISTS taskfold_card_links (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       type TEXT NOT NULL,
       target_card_id TEXT,
@@ -4436,9 +4446,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_proof (
+    CREATE TABLE IF NOT EXISTS taskfold_card_proof (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       status TEXT NOT NULL,
       label TEXT,
@@ -4448,9 +4458,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_artifacts (
+    CREATE TABLE IF NOT EXISTS taskfold_card_artifacts (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       label TEXT,
       url TEXT,
@@ -4459,8 +4469,8 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_delivery (
-      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_card_delivery (
+      card_id TEXT PRIMARY KEY REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       objective TEXT,
       delivery_summary TEXT,
       open_items TEXT,
@@ -4470,9 +4480,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       updated_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_source_references (
+    CREATE TABLE IF NOT EXISTS taskfold_card_source_references (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       label TEXT NOT NULL,
       target TEXT NOT NULL,
@@ -4481,11 +4491,11 @@ var FLOWBOARD_SCHEMA_SQL = `
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_card_source_references_card_position_idx
-      ON flowboard_card_source_references(card_id, position);
+    CREATE INDEX IF NOT EXISTS taskfold_card_source_references_card_position_idx
+      ON taskfold_card_source_references(card_id, position);
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_diagnostics (
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_card_diagnostics (
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       kind TEXT NOT NULL,
       severity TEXT NOT NULL,
@@ -4498,9 +4508,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       PRIMARY KEY(card_id, ordinal)
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_notifications (
+    CREATE TABLE IF NOT EXISTS taskfold_card_notifications (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       kind TEXT NOT NULL,
       message TEXT NOT NULL,
@@ -4510,9 +4520,9 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_worker_logs (
+    CREATE TABLE IF NOT EXISTS taskfold_worker_logs (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       level TEXT NOT NULL,
       message TEXT NOT NULL,
@@ -4521,16 +4531,16 @@ var FLOWBOARD_SCHEMA_SQL = `
       run_id TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_worker_protocol (
-      card_id TEXT PRIMARY KEY REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+    CREATE TABLE IF NOT EXISTS taskfold_worker_protocol (
+      card_id TEXT PRIMARY KEY REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       state TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       detail TEXT
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_card_attachments (
+    CREATE TABLE IF NOT EXISTS taskfold_card_attachments (
       id TEXT PRIMARY KEY,
-      card_id TEXT NOT NULL REFERENCES flowboard_cards(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES taskfold_cards(id) ON DELETE CASCADE,
       ordinal INTEGER NOT NULL,
       file_name TEXT NOT NULL,
       byte_size INTEGER NOT NULL,
@@ -4538,15 +4548,15 @@ var FLOWBOARD_SCHEMA_SQL = `
       note TEXT,
       created_at INTEGER NOT NULL
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_card_attachments_card_idx
-      ON flowboard_card_attachments(card_id, ordinal);
+    CREATE INDEX IF NOT EXISTS taskfold_card_attachments_card_idx
+      ON taskfold_card_attachments(card_id, ordinal);
 
-    CREATE TABLE IF NOT EXISTS flowboard_attachment_blobs (
+    CREATE TABLE IF NOT EXISTS taskfold_attachment_blobs (
       attachment_id TEXT PRIMARY KEY,
       content BLOB NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_notification_subscriptions (
+    CREATE TABLE IF NOT EXISTS taskfold_notification_subscriptions (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       card_id TEXT,
@@ -4562,7 +4572,7 @@ var FLOWBOARD_SCHEMA_SQL = `
       updated_at INTEGER NOT NULL
     ) STRICT;
 
-    CREATE TABLE IF NOT EXISTS flowboard_milestones (
+    CREATE TABLE IF NOT EXISTS taskfold_milestones (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -4575,10 +4585,10 @@ var FLOWBOARD_SCHEMA_SQL = `
       completed_at INTEGER,
       archived_at INTEGER
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_milestones_board_position_idx
-      ON flowboard_milestones(board_id, position);
+    CREATE INDEX IF NOT EXISTS taskfold_milestones_board_position_idx
+      ON taskfold_milestones(board_id, position);
 
-    CREATE TABLE IF NOT EXISTS flowboard_project_documents (
+    CREATE TABLE IF NOT EXISTS taskfold_project_documents (
       id TEXT PRIMARY KEY,
       board_id TEXT NOT NULL,
       document_key TEXT NOT NULL,
@@ -4596,72 +4606,72 @@ var FLOWBOARD_SCHEMA_SQL = `
       updated_at INTEGER NOT NULL,
       UNIQUE(board_id, document_key)
     ) STRICT;
-    CREATE INDEX IF NOT EXISTS flowboard_project_documents_board_section_position_idx
-      ON flowboard_project_documents(board_id, section, position);
+    CREATE INDEX IF NOT EXISTS taskfold_project_documents_board_section_position_idx
+      ON taskfold_project_documents(board_id, section, position);
   `;
-function ensureFlowboardSchema(db) {
-  db.exec(FLOWBOARD_SCHEMA_SQL);
+function ensureTaskfoldSchema(db) {
+  db.exec(TASKFOLD_SCHEMA_SQL);
   ensureColumn(
     db,
-    "flowboard_cards",
+    "taskfold_cards",
     "lifecycle_status_source_updated_at",
     "lifecycle_status_source_updated_at INTEGER"
   );
-  ensureColumn(db, "flowboard_cards", "milestone_id", "milestone_id TEXT");
-  ensureColumn(db, "flowboard_card_events", "from_milestone_id", "from_milestone_id TEXT");
-  ensureColumn(db, "flowboard_card_events", "to_milestone_id", "to_milestone_id TEXT");
-  ensureColumn(db, "flowboard_boards", "position", "position REAL");
-  ensureColumn(db, "flowboard_boards", "version", "version TEXT");
-  ensureColumn(db, "flowboard_boards", "current_objective", "current_objective TEXT");
-  ensureColumn(db, "flowboard_boards", "core_value", "core_value TEXT");
-  ensureColumn(db, "flowboard_boards", "source_of_truth", "source_of_truth TEXT");
-  ensureColumn(db, "flowboard_boards", "repository_url", "repository_url TEXT");
-  ensureColumn(db, "flowboard_boards", "planning_path", "planning_path TEXT");
-  ensureColumn(db, "flowboard_boards", "homepage_url", "homepage_url TEXT");
+  ensureColumn(db, "taskfold_cards", "milestone_id", "milestone_id TEXT");
+  ensureColumn(db, "taskfold_card_events", "from_milestone_id", "from_milestone_id TEXT");
+  ensureColumn(db, "taskfold_card_events", "to_milestone_id", "to_milestone_id TEXT");
+  ensureColumn(db, "taskfold_boards", "position", "position REAL");
+  ensureColumn(db, "taskfold_boards", "version", "version TEXT");
+  ensureColumn(db, "taskfold_boards", "current_objective", "current_objective TEXT");
+  ensureColumn(db, "taskfold_boards", "core_value", "core_value TEXT");
+  ensureColumn(db, "taskfold_boards", "source_of_truth", "source_of_truth TEXT");
+  ensureColumn(db, "taskfold_boards", "repository_url", "repository_url TEXT");
+  ensureColumn(db, "taskfold_boards", "planning_path", "planning_path TEXT");
+  ensureColumn(db, "taskfold_boards", "homepage_url", "homepage_url TEXT");
   ensureColumn(
     db,
-    "flowboard_project_documents",
+    "taskfold_project_documents",
     "source",
     "source TEXT NOT NULL DEFAULT 'project'"
   );
-  ensureColumn(db, "flowboard_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
-  ensureColumn(db, "flowboard_cards", "claim_owner_id", "claim_owner_id TEXT");
-  ensureColumn(db, "flowboard_card_attempts", "prompt_version", "prompt_version INTEGER");
+  ensureColumn(db, "taskfold_cards", "revision", "revision INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "taskfold_cards", "claim_owner_id", "claim_owner_id TEXT");
+  ensureColumn(db, "taskfold_card_attempts", "prompt_version", "prompt_version INTEGER");
   db.exec(`
-    CREATE INDEX IF NOT EXISTS flowboard_cards_board_milestone_position_idx
-      ON flowboard_cards(board_id, milestone_id, position);
-    CREATE INDEX IF NOT EXISTS flowboard_cards_claim_owner_idx
-      ON flowboard_cards(claim_owner_id, status);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_board_milestone_position_idx
+      ON taskfold_cards(board_id, milestone_id, position);
+    CREATE INDEX IF NOT EXISTS taskfold_cards_claim_owner_idx
+      ON taskfold_cards(claim_owner_id, status);
   `);
   const migrationId = `schema-${SCHEMA_VERSION}`;
-  const current = db.prepare("SELECT 1 AS found FROM flowboard_schema_migrations WHERE id = ?").get(migrationId);
+  const current = db.prepare("SELECT 1 AS found FROM taskfold_schema_migrations WHERE id = ?").get(migrationId);
   if (!current) {
     db.prepare(
-      "INSERT OR IGNORE INTO flowboard_schema_migrations (id, applied_at) VALUES (?, ?)"
+      "INSERT OR IGNORE INTO taskfold_schema_migrations (id, applied_at) VALUES (?, ?)"
     ).run(migrationId, Date.now());
   }
 }
 function ensureChangeEpoch(db) {
-  const existing = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'").get();
+  const existing = db.prepare("SELECT value FROM taskfold_meta WHERE key = 'change_epoch'").get();
   const current = existing ? stringValue(existing, "value") : void 0;
   if (current) {
     return current;
   }
   const epoch = randomUUID4();
-  db.prepare("INSERT OR IGNORE INTO flowboard_meta (key, value) VALUES ('change_epoch', ?)").run(
+  db.prepare("INSERT OR IGNORE INTO taskfold_meta (key, value) VALUES ('change_epoch', ?)").run(
     epoch
   );
-  const stored = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_epoch'").get();
+  const stored = db.prepare("SELECT value FROM taskfold_meta WHERE key = 'change_epoch'").get();
   return (stored ? stringValue(stored, "value") : void 0) ?? epoch;
 }
 function reserveChangeRevisions(db, count) {
   return runTransaction(db, () => {
-    const row = db.prepare("SELECT value FROM flowboard_meta WHERE key = 'change_revision'").get();
+    const row = db.prepare("SELECT value FROM taskfold_meta WHERE key = 'change_revision'").get();
     const stored = Number.parseInt(row ? stringValue(row, "value") ?? "" : "", 10);
     const base = Number.isSafeInteger(stored) && stored > 0 ? stored : 0;
     db.prepare(
       `
-        INSERT INTO flowboard_meta (key, value) VALUES ('change_revision', ?)
+        INSERT INTO taskfold_meta (key, value) VALUES ('change_revision', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
       `
     ).run(String(base + count));
@@ -4677,32 +4687,101 @@ function chmodIfExists(targetPath, mode) {
     }
   }
 }
-function hardenFlowboardDatabaseFiles(dbPath) {
-  fs2.chmodSync(path3.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
-  chmodIfExists(dbPath, FLOWBOARD_SQLITE_FILE_MODE);
-  chmodIfExists(`${dbPath}-wal`, FLOWBOARD_SQLITE_FILE_MODE);
-  chmodIfExists(`${dbPath}-shm`, FLOWBOARD_SQLITE_FILE_MODE);
-  chmodIfExists(`${dbPath}-journal`, FLOWBOARD_SQLITE_FILE_MODE);
+function copyLegacyFlowboardDatabase(dbPath, legacyDbPath) {
+  if (!legacyDbPath || path3.resolve(legacyDbPath) === path3.resolve(dbPath) || fs2.existsSync(dbPath) || !fs2.existsSync(legacyDbPath)) {
+    return;
+  }
+  const source = new DatabaseSync(legacyDbPath);
+  try {
+    source.exec(`VACUUM INTO ${quoteSqlString(dbPath)}`);
+  } finally {
+    source.close();
+  }
 }
-function createDatabase(dbPath) {
-  fs2.mkdirSync(path3.dirname(dbPath), { recursive: true, mode: FLOWBOARD_SQLITE_DIR_MODE });
-  chmodIfExists(path3.dirname(dbPath), FLOWBOARD_SQLITE_DIR_MODE);
+function migrateLegacyFlowboardTables(db) {
+  const legacyTables = db.prepare(
+    `
+          SELECT name
+          FROM sqlite_master
+          WHERE type = 'table' AND name LIKE 'flowboard!_%' ESCAPE '!'
+          ORDER BY name ASC
+        `
+  ).all().flatMap((row) => {
+    const name = stringValue(row, "name");
+    return name ? [name] : [];
+  });
+  if (legacyTables.length === 0) {
+    return;
+  }
+  const taskfoldTables = new Set(
+    db.prepare(
+      `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name LIKE 'taskfold!_%' ESCAPE '!'
+          `
+    ).all().flatMap((row) => {
+      const name = stringValue(row, "name");
+      return name ? [name] : [];
+    })
+  );
+  const conflicts = legacyTables.map((name) => name.replace(/^flowboard_/, "taskfold_")).filter((name) => taskfoldTables.has(name));
+  if (conflicts.length > 0) {
+    throw new Error(
+      `cannot migrate legacy Flowboard database because Taskfold tables already exist: ${conflicts.join(", ")}`
+    );
+  }
+  runTransaction(db, () => {
+    for (const legacyTable of legacyTables) {
+      const taskfoldTable = legacyTable.replace(/^flowboard_/, "taskfold_");
+      db.exec(
+        `ALTER TABLE ${quoteIdentifier(legacyTable)} RENAME TO ${quoteIdentifier(taskfoldTable)}`
+      );
+    }
+    const legacyIndexes = db.prepare(
+      `
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'index' AND name LIKE 'flowboard!_%' ESCAPE '!'
+            ORDER BY name ASC
+          `
+    ).all().flatMap((row) => {
+      const name = stringValue(row, "name");
+      return name ? [name] : [];
+    });
+    for (const legacyIndex of legacyIndexes) {
+      db.exec(`DROP INDEX ${quoteIdentifier(legacyIndex)}`);
+    }
+  });
+}
+function hardenTaskfoldDatabaseFiles(dbPath) {
+  fs2.chmodSync(path3.dirname(dbPath), TASKFOLD_SQLITE_DIR_MODE);
+  chmodIfExists(dbPath, TASKFOLD_SQLITE_FILE_MODE);
+  chmodIfExists(`${dbPath}-wal`, TASKFOLD_SQLITE_FILE_MODE);
+  chmodIfExists(`${dbPath}-shm`, TASKFOLD_SQLITE_FILE_MODE);
+  chmodIfExists(`${dbPath}-journal`, TASKFOLD_SQLITE_FILE_MODE);
+}
+function createDatabase(dbPath, legacyDbPath) {
+  fs2.mkdirSync(path3.dirname(dbPath), { recursive: true, mode: TASKFOLD_SQLITE_DIR_MODE });
+  chmodIfExists(path3.dirname(dbPath), TASKFOLD_SQLITE_DIR_MODE);
+  copyLegacyFlowboardDatabase(dbPath, legacyDbPath);
   if (!fs2.existsSync(dbPath)) {
-    fs2.closeSync(fs2.openSync(dbPath, "a", FLOWBOARD_SQLITE_FILE_MODE));
+    fs2.closeSync(fs2.openSync(dbPath, "a", TASKFOLD_SQLITE_FILE_MODE));
   }
   const db = new DatabaseSync(dbPath);
   let maintenance;
   try {
     maintenance = configureSqliteConnectionPragmas(db, {
-      busyTimeoutMs: FLOWBOARD_SQLITE_BUSY_TIMEOUT_MS,
+      busyTimeoutMs: TASKFOLD_SQLITE_BUSY_TIMEOUT_MS,
       checkpointIntervalMs: 0,
-      databaseLabel: "flowboard database",
+      databaseLabel: "taskfold database",
       databasePath: dbPath,
       foreignKeys: true,
       synchronous: "NORMAL"
     });
-    ensureFlowboardSchema(db);
-    hardenFlowboardDatabaseFiles(dbPath);
+    migrateLegacyFlowboardTables(db);
+    ensureTaskfoldSchema(db);
+    hardenTaskfoldDatabaseFiles(dbPath);
     return { db, maintenance };
   } catch (error) {
     try {
@@ -4717,13 +4796,13 @@ function childRows(db, table, cardId) {
   return db.prepare(`SELECT * FROM ${table} WHERE card_id = ? ORDER BY ordinal ASC`).all(cardId);
 }
 function readLabels(db, cardId) {
-  return childRows(db, "flowboard_card_labels", cardId).flatMap((row) => {
+  return childRows(db, "taskfold_card_labels", cardId).flatMap((row) => {
     const label = stringValue(row, "label");
     return label ? [label] : [];
   });
 }
 function readEvents(db, cardId) {
-  const events = childRows(db, "flowboard_card_events", cardId).map((row) => {
+  const events = childRows(db, "taskfold_card_events", cardId).map((row) => {
     const event = {
       id: requiredString(row, "id"),
       kind: requiredString(row, "kind"),
@@ -4777,7 +4856,7 @@ function readExecution(row) {
 }
 function readMetadata(db, row) {
   const cardId = requiredString(row, "id");
-  const attempts = childRows(db, "flowboard_card_attempts", cardId).map((child) => {
+  const attempts = childRows(db, "taskfold_card_attempts", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       status: requiredString(child, "status"),
@@ -4817,7 +4896,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const comments = childRows(db, "flowboard_card_comments", cardId).map((child) => {
+  const comments = childRows(db, "taskfold_card_comments", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       body: requiredString(child, "body"),
@@ -4829,7 +4908,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const links = childRows(db, "flowboard_card_links", cardId).map((child) => {
+  const links = childRows(db, "taskfold_card_links", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       type: requiredString(child, "type"),
@@ -4849,7 +4928,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const proof = childRows(db, "flowboard_card_proof", cardId).map((child) => {
+  const proof = childRows(db, "taskfold_card_proof", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       status: requiredString(child, "status"),
@@ -4873,7 +4952,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const artifacts = childRows(db, "flowboard_card_artifacts", cardId).map((child) => {
+  const artifacts = childRows(db, "taskfold_card_artifacts", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       createdAt: requiredNumber(child, "created_at")
@@ -4896,7 +4975,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const attachments = childRows(db, "flowboard_card_attachments", cardId).map((child) => {
+  const attachments = childRows(db, "taskfold_card_attachments", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       cardId: requiredString(child, "card_id"),
@@ -4914,7 +4993,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const workerLogs = childRows(db, "flowboard_worker_logs", cardId).map((child) => {
+  const workerLogs = childRows(db, "taskfold_worker_logs", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       createdAt: requiredNumber(child, "created_at"),
@@ -4931,7 +5010,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const diagnostics = childRows(db, "flowboard_card_diagnostics", cardId).map((child) => ({
+  const diagnostics = childRows(db, "taskfold_card_diagnostics", cardId).map((child) => ({
     kind: requiredString(child, "kind"),
     severity: requiredString(child, "severity"),
     title: requiredString(child, "title"),
@@ -4941,7 +5020,7 @@ function readMetadata(db, row) {
     count: requiredNumber(child, "count"),
     actions: parseJson(child.actions_json) ?? []
   }));
-  const notifications = childRows(db, "flowboard_card_notifications", cardId).map((child) => {
+  const notifications = childRows(db, "taskfold_card_notifications", cardId).map((child) => {
     const entry = {
       id: requiredString(child, "id"),
       kind: requiredString(child, "kind"),
@@ -4962,7 +5041,7 @@ function readMetadata(db, row) {
     }
     return entry;
   });
-  const protocol = db.prepare("SELECT * FROM flowboard_worker_protocol WHERE card_id = ?").get(cardId);
+  const protocol = db.prepare("SELECT * FROM taskfold_worker_protocol WHERE card_id = ?").get(cardId);
   const automation = parseJson(row.automation_json);
   const claim = parseJson(row.claim_json);
   const stale = parseJson(row.stale_json);
@@ -4994,7 +5073,7 @@ function readMetadata(db, row) {
   });
 }
 function readDelivery(db, cardId) {
-  const row = db.prepare("SELECT * FROM flowboard_card_delivery WHERE card_id = ?").get(cardId);
+  const row = db.prepare("SELECT * FROM taskfold_card_delivery WHERE card_id = ?").get(cardId);
   if (!row) {
     return void 0;
   }
@@ -5028,7 +5107,7 @@ function readDelivery(db, cardId) {
   return delivery;
 }
 function readSourceReferences(db, cardId) {
-  return childRows(db, "flowboard_card_source_references", cardId).map((child) => {
+  return childRows(db, "taskfold_card_source_references", cardId).map((child) => {
     const reference = {
       id: requiredString(child, "id"),
       label: requiredString(child, "label"),
@@ -5095,7 +5174,7 @@ function insertCard(db, card) {
   const metadata = card.metadata;
   db.prepare(
     `
-      INSERT INTO flowboard_cards (
+      INSERT INTO taskfold_cards (
         id, board_id, title, notes, status, priority, agent_id, session_key, run_id, task_id,
         source_url, milestone_id, position, created_at, updated_at, started_at, completed_at,
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
@@ -5185,17 +5264,17 @@ function insertCard(db, card) {
     revision: card.revision,
     claim_owner_id: bindNull(metadata?.claim?.ownerId)
   });
-  insertChildren(db, "flowboard_card_labels", card.id, card.labels, (label, ordinal) => {
-    db.prepare("INSERT INTO flowboard_card_labels (card_id, ordinal, label) VALUES (?, ?, ?)").run(
+  insertChildren(db, "taskfold_card_labels", card.id, card.labels, (label, ordinal) => {
+    db.prepare("INSERT INTO taskfold_card_labels (card_id, ordinal, label) VALUES (?, ?, ?)").run(
       card.id,
       ordinal,
       label
     );
   });
-  insertChildren(db, "flowboard_card_events", card.id, card.events, (event, ordinal) => {
+  insertChildren(db, "taskfold_card_events", card.id, card.events, (event, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_events
+        INSERT INTO taskfold_card_events
           (id, card_id, ordinal, kind, at, from_status, to_status, from_milestone_id, to_milestone_id, session_key, run_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -5213,10 +5292,10 @@ function insertCard(db, card) {
       bindNull(event.runId)
     );
   });
-  insertChildren(db, "flowboard_card_attempts", card.id, metadata?.attempts, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_attempts", card.id, metadata?.attempts, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_attempts
+        INSERT INTO taskfold_card_attempts
           (id, card_id, ordinal, status, started_at, ended_at, engine, mode, model, session_key, run_id, error, prompt_version)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -5236,18 +5315,18 @@ function insertCard(db, card) {
       bindNull(entry.promptVersion)
     );
   });
-  insertChildren(db, "flowboard_card_comments", card.id, metadata?.comments, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_comments", card.id, metadata?.comments, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_comments (id, card_id, ordinal, body, created_at, updated_at)
+        INSERT INTO taskfold_card_comments (id, card_id, ordinal, body, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `
     ).run(entry.id, card.id, ordinal, entry.body, entry.createdAt, bindNull(entry.updatedAt));
   });
-  insertChildren(db, "flowboard_card_links", card.id, metadata?.links, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_links", card.id, metadata?.links, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_links
+        INSERT INTO taskfold_card_links
           (id, card_id, ordinal, type, target_card_id, title, url, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -5262,10 +5341,10 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
-  insertChildren(db, "flowboard_card_proof", card.id, metadata?.proof, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_proof", card.id, metadata?.proof, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_proof
+        INSERT INTO taskfold_card_proof
           (id, card_id, ordinal, status, label, command, url, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -5281,10 +5360,10 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
-  insertChildren(db, "flowboard_card_artifacts", card.id, metadata?.artifacts, (entry, ordinal) => {
+  insertChildren(db, "taskfold_card_artifacts", card.id, metadata?.artifacts, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_card_artifacts
+        INSERT INTO taskfold_card_artifacts
           (id, card_id, ordinal, label, url, path, mime_type, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -5299,11 +5378,11 @@ function insertCard(db, card) {
       entry.createdAt
     );
   });
-  db.prepare("DELETE FROM flowboard_card_delivery WHERE card_id = ?").run(card.id);
+  db.prepare("DELETE FROM taskfold_card_delivery WHERE card_id = ?").run(card.id);
   if (card.delivery) {
     db.prepare(
       `
-        INSERT INTO flowboard_card_delivery
+        INSERT INTO taskfold_card_delivery
           (card_id, objective, delivery_summary, open_items, implementation_state,
            verification_state, release_state, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -5321,13 +5400,13 @@ function insertCard(db, card) {
   }
   insertChildren(
     db,
-    "flowboard_card_source_references",
+    "taskfold_card_source_references",
     card.id,
     card.sourceReferences,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_source_references
+          INSERT INTO taskfold_card_source_references
             (id, card_id, ordinal, label, target, note, position, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -5346,13 +5425,13 @@ function insertCard(db, card) {
   );
   insertChildren(
     db,
-    "flowboard_card_attachments",
+    "taskfold_card_attachments",
     card.id,
     metadata?.attachments,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_attachments
+          INSERT INTO taskfold_card_attachments
             (id, card_id, ordinal, file_name, byte_size, mime_type, note, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -5370,13 +5449,13 @@ function insertCard(db, card) {
   );
   insertChildren(
     db,
-    "flowboard_card_diagnostics",
+    "taskfold_card_diagnostics",
     card.id,
     metadata?.diagnostics,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_diagnostics
+          INSERT INTO taskfold_card_diagnostics
             (card_id, ordinal, kind, severity, title, detail, first_seen_at, last_seen_at, count, actions_json)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -5396,13 +5475,13 @@ function insertCard(db, card) {
   );
   insertChildren(
     db,
-    "flowboard_card_notifications",
+    "taskfold_card_notifications",
     card.id,
     metadata?.notifications,
     (entry, ordinal) => {
       db.prepare(
         `
-          INSERT INTO flowboard_card_notifications
+          INSERT INTO taskfold_card_notifications
             (id, card_id, ordinal, kind, message, created_at, sequence, session_key, run_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
@@ -5419,10 +5498,10 @@ function insertCard(db, card) {
       );
     }
   );
-  insertChildren(db, "flowboard_worker_logs", card.id, metadata?.workerLogs, (entry, ordinal) => {
+  insertChildren(db, "taskfold_worker_logs", card.id, metadata?.workerLogs, (entry, ordinal) => {
     db.prepare(
       `
-        INSERT INTO flowboard_worker_logs
+        INSERT INTO taskfold_worker_logs
           (id, card_id, ordinal, level, message, created_at, session_key, run_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
@@ -5437,11 +5516,11 @@ function insertCard(db, card) {
       bindNull(entry.runId)
     );
   });
-  db.prepare("DELETE FROM flowboard_worker_protocol WHERE card_id = ?").run(card.id);
+  db.prepare("DELETE FROM taskfold_worker_protocol WHERE card_id = ?").run(card.id);
   if (metadata?.workerProtocol) {
     db.prepare(
       `
-        INSERT INTO flowboard_worker_protocol (card_id, state, updated_at, detail)
+        INSERT INTO taskfold_worker_protocol (card_id, state, updated_at, detail)
         VALUES (?, ?, ?, ?)
       `
     ).run(
@@ -5452,22 +5531,22 @@ function insertCard(db, card) {
     );
   }
 }
-var FlowboardSqliteCardStore = class {
+var TaskfoldSqliteCardStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.card.id !== key) {
-      throw new Error("invalid flowboard card payload");
+      throw new Error("invalid taskfold card payload");
     }
     runTransaction(this.db, () => insertCard(this.db, value.card));
   }
   async compareAndSwap(key, expectedRevision, value) {
     if (value.version !== 1 || value.card.id !== key) {
-      throw new Error("invalid flowboard card payload");
+      throw new Error("invalid taskfold card payload");
     }
     return runTransaction(this.db, () => {
-      const row = this.db.prepare("SELECT revision FROM flowboard_cards WHERE id = ?").get(key);
+      const row = this.db.prepare("SELECT revision FROM taskfold_cards WHERE id = ?").get(key);
       if (!row || (numberValue(row, "revision") ?? 0) !== expectedRevision) {
         return false;
       }
@@ -5476,42 +5555,42 @@ var FlowboardSqliteCardStore = class {
     });
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_cards WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_cards WHERE id = ?").get(key);
     return row ? { version: 1, card: readCard(this.db, row) } : void 0;
   }
   async delete(key) {
     const result = runTransaction(this.db, () => {
       this.db.prepare(
         `
-            DELETE FROM flowboard_attachment_blobs
+            DELETE FROM taskfold_attachment_blobs
             WHERE attachment_id IN (
-              SELECT id FROM flowboard_card_attachments WHERE card_id = ?
+              SELECT id FROM taskfold_card_attachments WHERE card_id = ?
             )
           `
       ).run(key);
-      return this.db.prepare("DELETE FROM flowboard_cards WHERE id = ?").run(key);
+      return this.db.prepare("DELETE FROM taskfold_cards WHERE id = ?").run(key);
     });
     return result.changes > 0;
   }
   async entries() {
-    return this.db.prepare("SELECT * FROM flowboard_cards ORDER BY created_at ASC, id ASC").all().map((row) => ({
+    return this.db.prepare("SELECT * FROM taskfold_cards ORDER BY created_at ASC, id ASC").all().map((row) => ({
       key: requiredString(row, "id"),
       value: { version: 1, card: readCard(this.db, row) }
     }));
   }
 };
-var FlowboardSqliteBoardStore = class {
+var TaskfoldSqliteBoardStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.board.id !== key) {
-      throw new Error("invalid flowboard board payload");
+      throw new Error("invalid taskfold board payload");
     }
     const board = value.board;
     this.db.prepare(
       `
-          INSERT INTO flowboard_boards (
+          INSERT INTO taskfold_boards (
             id, name, description, icon, color, position, version, current_objective, core_value,
             source_of_truth, repository_url, planning_path, homepage_url,
             default_workspace_json, orchestration_json,
@@ -5558,7 +5637,7 @@ var FlowboardSqliteBoardStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_boards WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_boards WHERE id = ?").get(key);
     if (!row) {
       return void 0;
     }
@@ -5589,11 +5668,11 @@ var FlowboardSqliteBoardStore = class {
     };
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_boards WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_boards WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
-    const rows = this.db.prepare("SELECT id FROM flowboard_boards ORDER BY id ASC").all();
+    const rows = this.db.prepare("SELECT id FROM taskfold_boards ORDER BY id ASC").all();
     const entries = [];
     for (const row of rows) {
       const key = requiredString(row, "id");
@@ -5620,18 +5699,18 @@ function readMilestone(row) {
     ...numberValue(row, "archived_at") !== void 0 ? { archivedAt: numberValue(row, "archived_at") } : {}
   };
 }
-var FlowboardSqliteMilestoneStore = class {
+var TaskfoldSqliteMilestoneStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.milestone.id !== key) {
-      throw new Error("invalid flowboard milestone payload");
+      throw new Error("invalid taskfold milestone payload");
     }
     const milestone = value.milestone;
     this.db.prepare(
       `
-          INSERT INTO flowboard_milestones (
+          INSERT INTO taskfold_milestones (
             id, board_id, title, description, color, position, state, created_at, updated_at,
             completed_at, archived_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -5662,15 +5741,15 @@ var FlowboardSqliteMilestoneStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_milestones WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_milestones WHERE id = ?").get(key);
     return row ? { version: 1, milestone: readMilestone(row) } : void 0;
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_milestones WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_milestones WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
-    return this.db.prepare("SELECT * FROM flowboard_milestones ORDER BY board_id ASC, position ASC, id ASC").all().map((row) => ({
+    return this.db.prepare("SELECT * FROM taskfold_milestones ORDER BY board_id ASC, position ASC, id ASC").all().map((row) => ({
       key: requiredString(row, "id"),
       value: { version: 1, milestone: readMilestone(row) }
     }));
@@ -5695,18 +5774,18 @@ function readProjectDocument(row) {
     ...numberValue(row, "system") === 1 ? { system: true } : {}
   };
 }
-var FlowboardSqliteProjectDocumentStore = class {
+var TaskfoldSqliteProjectDocumentStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.document.id !== key) {
-      throw new Error("invalid flowboard project document payload");
+      throw new Error("invalid taskfold project document payload");
     }
     const document = value.document;
     this.db.prepare(
       `
-          INSERT INTO flowboard_project_documents (
+          INSERT INTO taskfold_project_documents (
             id, board_id, document_key, section, source, type, title, summary, target, content,
             position, hidden_at, system, created_at, updated_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -5745,34 +5824,34 @@ var FlowboardSqliteProjectDocumentStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_project_documents WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_project_documents WHERE id = ?").get(key);
     return row ? { version: 1, document: readProjectDocument(row) } : void 0;
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_project_documents WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_project_documents WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
     return this.db.prepare(
-      "SELECT * FROM flowboard_project_documents ORDER BY board_id ASC, section ASC, position ASC, id ASC"
+      "SELECT * FROM taskfold_project_documents ORDER BY board_id ASC, section ASC, position ASC, id ASC"
     ).all().map((row) => ({
       key: requiredString(row, "id"),
       value: { version: 1, document: readProjectDocument(row) }
     }));
   }
 };
-var FlowboardSqliteSubscriptionStore = class {
+var TaskfoldSqliteSubscriptionStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.subscription.id !== key) {
-      throw new Error("invalid flowboard notification subscription payload");
+      throw new Error("invalid taskfold notification subscription payload");
     }
     const subscription = value.subscription;
     this.db.prepare(
       `
-          INSERT INTO flowboard_notification_subscriptions (
+          INSERT INTO taskfold_notification_subscriptions (
             id, board_id, card_id, session_key, run_id, target, event_kinds_json,
             last_event_at, last_event_id, last_event_sequence, delivered_event_ids_json,
             created_at, updated_at
@@ -5808,7 +5887,7 @@ var FlowboardSqliteSubscriptionStore = class {
     );
   }
   async lookup(key) {
-    const row = this.db.prepare("SELECT * FROM flowboard_notification_subscriptions WHERE id = ?").get(key);
+    const row = this.db.prepare("SELECT * FROM taskfold_notification_subscriptions WHERE id = ?").get(key);
     if (!row) {
       return void 0;
     }
@@ -5834,12 +5913,12 @@ var FlowboardSqliteSubscriptionStore = class {
     };
   }
   async delete(key) {
-    const result = this.db.prepare("DELETE FROM flowboard_notification_subscriptions WHERE id = ?").run(key);
+    const result = this.db.prepare("DELETE FROM taskfold_notification_subscriptions WHERE id = ?").run(key);
     return result.changes > 0;
   }
   async entries() {
     const rows = this.db.prepare(
-      "SELECT id FROM flowboard_notification_subscriptions ORDER BY created_at ASC, id ASC"
+      "SELECT id FROM taskfold_notification_subscriptions ORDER BY created_at ASC, id ASC"
     ).all();
     const entries = [];
     for (const row of rows) {
@@ -5852,18 +5931,18 @@ var FlowboardSqliteSubscriptionStore = class {
     return entries;
   }
 };
-var FlowboardSqliteAttachmentStore = class {
+var TaskfoldSqliteAttachmentStore = class {
   constructor(db) {
     this.db = db;
   }
   async register(key, value) {
     if (value.version !== 1 || value.attachment.id !== key) {
-      throw new Error("invalid flowboard attachment payload");
+      throw new Error("invalid taskfold attachment payload");
     }
     const attachment = value.attachment;
     this.db.prepare(
       `
-          INSERT INTO flowboard_attachment_blobs (attachment_id, content)
+          INSERT INTO taskfold_attachment_blobs (attachment_id, content)
           VALUES (?, ?)
           ON CONFLICT(attachment_id) DO UPDATE SET content = excluded.content
         `
@@ -5873,8 +5952,8 @@ var FlowboardSqliteAttachmentStore = class {
     const row = this.db.prepare(
       `
           SELECT a.*, b.content
-          FROM flowboard_card_attachments a
-          JOIN flowboard_attachment_blobs b ON b.attachment_id = a.id
+          FROM taskfold_card_attachments a
+          JOIN taskfold_attachment_blobs b ON b.attachment_id = a.id
           WHERE a.id = ?
         `
     ).get(key);
@@ -5897,8 +5976,8 @@ var FlowboardSqliteAttachmentStore = class {
   }
   async delete(key) {
     const deleted = runTransaction(this.db, () => {
-      this.db.prepare("DELETE FROM flowboard_attachment_blobs WHERE attachment_id = ?").run(key);
-      return this.db.prepare("DELETE FROM flowboard_card_attachments WHERE id = ?").run(key);
+      this.db.prepare("DELETE FROM taskfold_attachment_blobs WHERE attachment_id = ?").run(key);
+      return this.db.prepare("DELETE FROM taskfold_card_attachments WHERE id = ?").run(key);
     });
     return deleted.changes > 0;
   }
@@ -5906,8 +5985,8 @@ var FlowboardSqliteAttachmentStore = class {
     const rows = this.db.prepare(
       `
           SELECT a.id
-          FROM flowboard_card_attachments a
-          JOIN flowboard_attachment_blobs b ON b.attachment_id = a.id
+          FROM taskfold_card_attachments a
+          JOIN taskfold_attachment_blobs b ON b.attachment_id = a.id
           ORDER BY a.created_at ASC, a.id ASC
         `
     ).all();
@@ -5922,17 +6001,19 @@ var FlowboardSqliteAttachmentStore = class {
     return entries;
   }
 };
-function createFlowboardSqliteStores(options = {}) {
+function createTaskfoldSqliteStores(options = {}) {
+  const dbPath = options.dbPath ?? resolveTaskfoldSqlitePath(options.env);
   const { db, maintenance } = createDatabase(
-    options.dbPath ?? resolveFlowboardSqlitePath(options.env)
+    dbPath,
+    options.legacyDbPath ?? (options.dbPath ? void 0 : resolveLegacyFlowboardSqlitePath(options.env))
   );
   return {
-    cards: new FlowboardSqliteCardStore(db),
-    boards: new FlowboardSqliteBoardStore(db),
-    milestones: new FlowboardSqliteMilestoneStore(db),
-    documents: new FlowboardSqliteProjectDocumentStore(db),
-    subscriptions: new FlowboardSqliteSubscriptionStore(db),
-    attachments: new FlowboardSqliteAttachmentStore(db),
+    cards: new TaskfoldSqliteCardStore(db),
+    boards: new TaskfoldSqliteBoardStore(db),
+    milestones: new TaskfoldSqliteMilestoneStore(db),
+    documents: new TaskfoldSqliteProjectDocumentStore(db),
+    subscriptions: new TaskfoldSqliteSubscriptionStore(db),
+    attachments: new TaskfoldSqliteAttachmentStore(db),
     // This connection-local primitive changes only after another connection commits.
     dataVersion: () => requiredNumber(db.prepare("PRAGMA data_version").get(), "data_version"),
     changeEpoch: ensureChangeEpoch(db),
@@ -6019,7 +6100,7 @@ function normalizeAutomationPatch(patch, current) {
 // src/backend/src/store-change-tracker.ts
 import { randomUUID as randomUUID5 } from "node:crypto";
 var CHANGE_REVISION_BLOCK = 1e4;
-var FlowboardChangeTracker = class {
+var TaskfoldChangeTracker = class {
   constructor(readDataVersion, epoch, reserveRevisions) {
     this.readDataVersion = readDataVersion;
     this.epoch = epoch ?? randomUUID5();
@@ -6115,19 +6196,19 @@ var FlowboardChangeTracker = class {
 };
 
 // src/backend/src/store-core.ts
-var FlowboardRevisionConflictError = class extends Error {
+var TaskfoldRevisionConflictError = class extends Error {
   constructor(cardId, expectedRevision) {
     super(`card ${cardId} changed since revision ${expectedRevision}.`);
     this.cardId = cardId;
     this.expectedRevision = expectedRevision;
-    this.name = "FlowboardRevisionConflictError";
+    this.name = "TaskfoldRevisionConflictError";
   }
 };
 var CARD_CAS_MAX_ATTEMPTS = 3;
 function stampCardRevisions(store) {
   const stamp = (value) => {
     if (value?.version === 1 && value.card) {
-      value.card.revision = nextFlowboardCardRevision(value.card.revision);
+      value.card.revision = nextTaskfoldCardRevision(value.card.revision);
     }
     return value;
   };
@@ -6141,7 +6222,7 @@ function stampCardRevisions(store) {
     } : {}
   };
 }
-var FlowboardCoreStore = class {
+var TaskfoldCoreStore = class {
   mutationQueue = Promise.resolve();
   lastNotificationSequence = 0;
   changes;
@@ -6152,7 +6233,7 @@ var FlowboardCoreStore = class {
   subscriptionStore;
   attachmentStore;
   constructor(store, stores = {}) {
-    this.changes = new FlowboardChangeTracker(
+    this.changes = new TaskfoldChangeTracker(
       stores.dataVersion,
       stores.changeEpoch,
       stores.reserveChangeRevisions
@@ -6518,7 +6599,7 @@ var FlowboardCoreStore = class {
       throw new Error(`card not found: ${id}`);
     }
     if (options.expectedRevision !== void 0 && existing.revision !== options.expectedRevision) {
-      throw new FlowboardRevisionConflictError(id, options.expectedRevision);
+      throw new TaskfoldRevisionConflictError(id, options.expectedRevision);
     }
     const lifecycleStatusSourceUpdatedAt = lifecycleStatusSourceUpdatedAtFromPatch(patch.metadata);
     const existingLifecycleStatusSourceUpdatedAt = existing.metadata?.lifecycleStatusSourceUpdatedAt;
@@ -6638,7 +6719,7 @@ var FlowboardCoreStore = class {
       card
     });
     if (!swapped) {
-      throw new FlowboardRevisionConflictError(card.id, expectedRevision);
+      throw new TaskfoldRevisionConflictError(card.id, expectedRevision);
     }
   }
   /**
@@ -6650,7 +6731,7 @@ var FlowboardCoreStore = class {
       try {
         return await run();
       } catch (error) {
-        if (!(error instanceof FlowboardRevisionConflictError) || attempt >= CARD_CAS_MAX_ATTEMPTS) {
+        if (!(error instanceof TaskfoldRevisionConflictError) || attempt >= CARD_CAS_MAX_ATTEMPTS) {
           throw error;
         }
       }
@@ -7002,7 +7083,7 @@ var FlowboardCoreStore = class {
       workerProtocol: {
         state: "idle",
         updatedAt: now,
-        detail: "Awaiting flowboard_specify or flowboard_decompose."
+        detail: "Awaiting taskfold_specify or taskfold_decompose."
       }
     });
     const next = removeUndefinedCardFields({
@@ -7034,7 +7115,7 @@ import { randomUUID as randomUUID8 } from "node:crypto";
 
 // src/backend/src/store-enrichment.ts
 import { randomUUID as randomUUID7 } from "node:crypto";
-var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
+var TaskfoldEnrichmentStore = class extends TaskfoldCoreStore {
   async addProof(id, input, scope) {
     const now = Date.now();
     const proof = normalizeProofInput(input, now);
@@ -7257,7 +7338,7 @@ var FlowboardEnrichmentStore = class extends FlowboardCoreStore {
 };
 
 // src/backend/src/store-promote.ts
-var FlowboardPromoteStore = class extends FlowboardEnrichmentStore {
+var TaskfoldPromoteStore = class extends TaskfoldEnrichmentStore {
   async promoteReady(now = Date.now()) {
     return await this.enqueueMutation(async () => {
       const promoted = [];
@@ -7326,7 +7407,7 @@ function assertClaimIdentity(claim, input) {
     throw new Error("claim owner does not match.");
   }
 }
-var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
+var TaskfoldWorkflowStore = class extends TaskfoldPromoteStore {
   async claimExecution(id, input) {
     const ownerId = normalizeBoundedString(input.ownerId, void 0, 120, "claim owner");
     if (!ownerId) {
@@ -7343,7 +7424,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
         throw new Error(`card not found: ${id}`);
       }
       if (existing.revision !== expectedRevision) {
-        throw new FlowboardRevisionConflictError(id, expectedRevision);
+        throw new TaskfoldRevisionConflictError(id, expectedRevision);
       }
       if (existing.metadata?.archivedAt) {
         throw new Error("card is archived.");
@@ -7356,11 +7437,11 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       }
       const now = Date.now();
       const existingClaim = existing.metadata?.claim;
-      if (existingClaim && (isFutureDateTimestampMs2(existingClaim.expiresAt, { nowMs: now }) || !isFlowboardClaimReclaimable(existingClaim, now))) {
+      if (existingClaim && (isFutureDateTimestampMs2(existingClaim.expiresAt, { nowMs: now }) || !isTaskfoldClaimReclaimable(existingClaim, now))) {
         throw new Error(`card already claimed by ${existingClaim.ownerId}.`);
       }
       const token = randomUUID9();
-      const expiresAt = addFlowboardDurationMs(
+      const expiresAt = addTaskfoldDurationMs(
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS
       );
@@ -7393,7 +7474,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
         throw new Error("card has no active execution.");
       }
       const now = Date.now();
-      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "stop reason") ?? "Flowboard execution stopped by operator.";
+      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "stop reason") ?? "Taskfold execution stopped by operator.";
       return await this.updateCard(id, {
         execution: { ...existing.execution, status: "blocked", updatedAt: now },
         metadata: {
@@ -7427,7 +7508,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       const endedAt = typeof input.endedAt === "number" && Number.isSafeInteger(input.endedAt) && input.endedAt >= 0 ? Math.min(input.endedAt, now) : now;
       const outcome = normalizeOptionalString(input.outcome)?.toLowerCase();
       const succeeded = outcome === "ok";
-      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "execution end reason") ?? (succeeded ? void 0 : `Flowboard execution ended with ${outcome || "an unknown"} outcome.`);
+      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "execution end reason") ?? (succeeded ? void 0 : `Taskfold execution ended with ${outcome || "an unknown"} outcome.`);
       return await this.updateCard(existing.id, {
         execution: {
           ...existing.execution,
@@ -7462,7 +7543,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
     const { ownerId, ttlSeconds, token } = input;
     return await this.enqueueMutation(async () => {
       const now = Date.now();
-      const expiresAt = addFlowboardDurationMs(
+      const expiresAt = addTaskfoldDurationMs(
         now,
         ttlSeconds ? secondsToDurationMs(ttlSeconds) : DEFAULT_CLAIM_TTL_MS
       );
@@ -7486,7 +7567,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       const existingClaim = guarded.metadata?.claim;
       const activeClaim = existingClaim && (isFutureDateTimestampMs2(existingClaim.expiresAt, { nowMs: now }) || // Direct claims must honor the same running-worker heartbeat grace
       // as dispatcher recovery; otherwise they silently steal live tokens.
-      guarded.status === "running" && !isFlowboardClaimReclaimable(existingClaim, now)) ? existingClaim : void 0;
+      guarded.status === "running" && !isTaskfoldClaimReclaimable(existingClaim, now)) ? existingClaim : void 0;
       if (cardParentIds(guarded).length > 0 && guarded.status !== "ready" && !activeClaim) {
         throw new Error("card dependencies are not done.");
       }
@@ -7533,7 +7614,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       const nextClaim = {
         ...claim,
         lastHeartbeatAt: now,
-        expiresAt: claim.expiresAt ? addFlowboardDurationMs(
+        expiresAt: claim.expiresAt ? addTaskfoldDurationMs(
           now,
           Math.max(
             1,
@@ -7612,7 +7693,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       kind: "completed",
       createdAt: now,
       sequence: this.nextNotificationSequence(now),
-      message: capText(summary, 240) ?? "Flowboard card completed.",
+      message: capText(summary, 240) ?? "Taskfold card completed.",
       ...cardSessionKey(existing) ? { sessionKey: cardSessionKey(existing) } : {},
       ...cardRunId(existing) ? { runId: cardRunId(existing) } : {}
     };
@@ -7660,14 +7741,14 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       }
       assertCanMutateClaimedCard(existing, scope === null ? void 0 : scope);
       const now = Date.now();
-      const reason = normalizeBoundedString(input.reason, void 0, 2e3, "block reason") ?? "Flowboard card blocked.";
+      const reason = normalizeBoundedString(input.reason, void 0, 2e3, "block reason") ?? "Taskfold card blocked.";
       const metadata = existing.metadata ?? {};
       const notification = {
         id: randomUUID9(),
         kind: "failed",
         createdAt: now,
         sequence: this.nextNotificationSequence(now),
-        message: capText(reason, 240) ?? "Flowboard card blocked.",
+        message: capText(reason, 240) ?? "Taskfold card blocked.",
         ...cardSessionKey(existing) ? { sessionKey: cardSessionKey(existing) } : {},
         ...cardRunId(existing) ? { runId: cardRunId(existing) } : {}
       };
@@ -7733,7 +7814,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
       }
       assertCanMutateClaimedCard(existing, scope === null ? void 0 : scope);
       const now = Date.now();
-      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "reclaim reason") ?? "Flowboard claim reclaimed.";
+      const reason = normalizeBoundedString(input.reason, void 0, 1e3, "reclaim reason") ?? "Taskfold claim reclaimed.";
       const targetStatus = input.status === void 0 ? existing.status === "running" ? "ready" : existing.status : normalizeStatus(input.status, existing.status);
       const reclaimed = await this.updateCard(
         id,
@@ -7907,7 +7988,7 @@ var FlowboardWorkflowStore = class extends FlowboardPromoteStore {
 };
 
 // src/backend/src/store-notifications.ts
-var FlowboardNotificationStore = class extends FlowboardWorkflowStore {
+var TaskfoldNotificationStore = class extends TaskfoldWorkflowStore {
   async subscribeNotifications(input) {
     return await this.enqueueMutation(async () => {
       const subscription = normalizeNotificationSubscription(input);
@@ -8167,7 +8248,7 @@ async function addTopLevelModuleAiInstructions(params) {
     }
   }
 }
-async function resolveFlowboardProjectDocumentWorkspacePath(workspacePath) {
+async function resolveTaskfoldProjectDocumentWorkspacePath(workspacePath) {
   let root;
   try {
     root = await fs3.realpath(workspacePath);
@@ -8185,7 +8266,7 @@ async function resolveFlowboardProjectDocumentWorkspacePath(workspacePath) {
   }
   return root;
 }
-function isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, target) {
+function isTaskfoldProjectDocumentDiscoveryPath(workspaceRoot, target) {
   if (!target || !path4.isAbsolute(target)) {
     return false;
   }
@@ -8213,8 +8294,8 @@ function isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, target) {
   }
   return EXTRA_DOCUMENT_PATHS.includes(relativePath);
 }
-async function discoverFlowboardProjectDocuments(workspacePath) {
-  const root = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
+async function discoverTaskfoldProjectDocuments(workspacePath) {
+  const root = await resolveTaskfoldProjectDocumentWorkspacePath(workspacePath);
   const results = [];
   const targets = /* @__PURE__ */ new Set();
   const params = { root, results, targets };
@@ -8244,10 +8325,10 @@ function presentProjectDocument(document) {
   return next;
 }
 function isDocumentSection(value) {
-  return typeof value === "string" && FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.includes(value);
+  return typeof value === "string" && TASKFOLD_PROJECT_DOCUMENT_SECTIONS.includes(value);
 }
 function isDocumentType(value) {
-  return typeof value === "string" && FLOWBOARD_PROJECT_DOCUMENT_TYPES.includes(value);
+  return typeof value === "string" && TASKFOLD_PROJECT_DOCUMENT_TYPES.includes(value);
 }
 function normalizeDocumentKey(value, fallback) {
   const key = normalizeBoundedString(value, fallback, 80, "document key");
@@ -8267,10 +8348,10 @@ function normalizeDocumentSection(value, fallback) {
     if (fallback) {
       return fallback;
     }
-    throw new Error(`document section must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
+    throw new Error(`document section must be one of: ${TASKFOLD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
   }
   if (!isDocumentSection(value)) {
-    throw new Error(`document section must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
+    throw new Error(`document section must be one of: ${TASKFOLD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
   }
   return value;
 }
@@ -8279,10 +8360,10 @@ function normalizeDocumentType(value, fallback) {
     if (fallback) {
       return fallback;
     }
-    throw new Error(`document type must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
+    throw new Error(`document type must be one of: ${TASKFOLD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
   }
   if (!isDocumentType(value)) {
-    throw new Error(`document type must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
+    throw new Error(`document type must be one of: ${TASKFOLD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
   }
   return value;
 }
@@ -8312,7 +8393,7 @@ function boardRunningCards(cards) {
     (card) => card.status === "running" || card.execution?.status === "running" || card.metadata?.attempts?.some((attempt) => attempt.status === "running")
   );
 }
-var FlowboardProjectStore = class extends FlowboardNotificationStore {
+var TaskfoldProjectStore = class extends TaskfoldNotificationStore {
   async ensureBoardDirect(boardId, now = Date.now()) {
     const existing = await this.boardStore.lookup(boardId);
     if (existing?.version === 1) {
@@ -8341,14 +8422,14 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
     let workspaceRoot;
     let candidates;
     try {
-      workspaceRoot = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
-      candidates = await discoverFlowboardProjectDocuments(workspaceRoot);
+      workspaceRoot = await resolveTaskfoldProjectDocumentWorkspacePath(workspacePath);
+      candidates = await discoverTaskfoldProjectDocuments(workspaceRoot);
     } catch {
       return;
     }
     for (const entry of await this.documentStore.entries()) {
       const document = entry.value?.version === 1 ? entry.value.document : void 0;
-      if (document?.boardId === board.id && isAutomaticProjectDocument(document) && !isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, document.target)) {
+      if (document?.boardId === board.id && isAutomaticProjectDocument(document) && !isTaskfoldProjectDocumentDiscoveryPath(workspaceRoot, document.target)) {
         await this.documentStore.delete(entry.key);
       }
     }
@@ -8664,7 +8745,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
   }
   async setMilestoneState(id, state) {
     return await this.enqueueMutation(async () => {
-      if (!FLOWBOARD_MILESTONE_STATES.includes(state)) {
+      if (!TASKFOLD_MILESTONE_STATES.includes(state)) {
         throw new Error("invalid milestone state.");
       }
       const entry = await this.milestoneStore.lookup(id.trim());
@@ -8979,7 +9060,7 @@ var FlowboardProjectStore = class extends FlowboardNotificationStore {
 };
 
 // src/backend/src/store.ts
-var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
+var TaskfoldStore = class _TaskfoldStore extends TaskfoldProjectStore {
   async shouldAutoOrchestrate(card) {
     if (card.status !== "triage" || card.metadata?.archivedAt || card.metadata?.workerProtocol?.state === "idle") {
       return false;
@@ -9010,7 +9091,7 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
         const maxRuntimeSeconds = latest.metadata?.automation?.maxRuntimeSeconds;
         const runtimeStartedAt = latestAttempt?.startedAt ?? claim?.claimedAt ?? latest.startedAt;
         const timedOut = Boolean(maxRuntimeSeconds && runtimeStartedAt) && now - runtimeStartedAt > secondsToDurationMs(maxRuntimeSeconds);
-        const claimExpired = isFlowboardClaimReclaimable(claim, now);
+        const claimExpired = isTaskfoldClaimReclaimable(claim, now);
         const retriesExhausted = retryBudgetExhausted(latest);
         if (latest.status === "running" && (timedOut || claimExpired)) {
           const reason = timedOut ? "Run exceeded the card max runtime." : "Claim expired without a recent heartbeat.";
@@ -9164,44 +9245,44 @@ var FlowboardStore = class _FlowboardStore extends FlowboardProjectStore {
     return buildWorkerContext(card, await this.list());
   }
   static open(openKeyedStore) {
-    return new _FlowboardStore(
+    return new _TaskfoldStore(
       openKeyedStore({
-        namespace: "flowboard.cards",
+        namespace: "taskfold.cards",
         maxEntries: MAX_CARDS
       }),
       {
         boards: openKeyedStore({
-          namespace: "flowboard.boards",
+          namespace: "taskfold.boards",
           maxEntries: 200
         }),
         milestones: openKeyedStore({
-          namespace: "flowboard.milestones",
+          namespace: "taskfold.milestones",
           maxEntries: 2e3
         }),
         documents: openKeyedStore({
-          namespace: "flowboard.project-documents",
+          namespace: "taskfold.project-documents",
           maxEntries: 4e3
         }),
         subscriptions: openKeyedStore({
-          namespace: "flowboard.notify",
+          namespace: "taskfold.notify",
           maxEntries: 2e3
         }),
         attachments: openKeyedStore({
-          namespace: "flowboard.attachments",
+          namespace: "taskfold.attachments",
           maxEntries: MAX_ATTACHMENT_ENTRIES
         })
       }
     );
   }
   static openSqlite() {
-    return _FlowboardStore.fromSqliteStores(createFlowboardSqliteStores());
+    return _TaskfoldStore.fromSqliteStores(createTaskfoldSqliteStores());
   }
   /**
    * Single wiring point from SQLite stores to a card store. Tests use this too,
    * so a newly added capability cannot be silently missing under test only.
    */
   static fromSqliteStores(stores) {
-    return new _FlowboardStore(stores.cards, {
+    return new _TaskfoldStore(stores.cards, {
       boards: stores.boards,
       milestones: stores.milestones,
       documents: stores.documents,
@@ -9226,7 +9307,7 @@ function readChangeCursor(value) {
   const epoch = value.epoch;
   const revision = value.revision;
   if (typeof epoch !== "string" || !epoch || epoch.length > 128 || typeof revision !== "number" || !Number.isSafeInteger(revision) || revision <= 0) {
-    throw new Error("after must be a valid flowboard change cursor.");
+    throw new Error("after must be a valid taskfold change cursor.");
   }
   return { epoch, revision };
 }
@@ -9248,10 +9329,10 @@ function redactDiagnosticsRows(result) {
     }))
   };
 }
-function registerFlowboardGatewayMethods(params) {
+function registerTaskfoldGatewayMethods(params) {
   const { api } = params;
-  const store = params.store ?? FlowboardStore.openSqlite();
-  const dispatchCards = createFlowboardDispatchHandler({
+  const store = params.store ?? TaskfoldStore.openSqlite();
+  const dispatchCards = createTaskfoldDispatchHandler({
     api,
     store,
     redactCard: redactClaimToken
@@ -9261,12 +9342,12 @@ function registerFlowboardGatewayMethods(params) {
     const config = request.context.getRuntimeConfig();
     return {
       runtime: api.runtime,
-      workspaceAccess: resolveGatewayFlowboardWorkspaceAccess({
+      workspaceAccess: resolveGatewayTaskfoldWorkspaceAccess({
         context: request.context,
         client: request.client
       }),
       defaultAgentId: resolveDefaultAgentId2(config),
-      resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => resolveAgentFlowboardWorkspaceRuntime({
+      resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => resolveAgentTaskfoldWorkspaceRuntime({
         config,
         agentId,
         sessionKey,
@@ -9278,10 +9359,10 @@ function registerFlowboardGatewayMethods(params) {
     };
   };
   api.registerGatewayMethod(
-    "flowboard.cards.list",
+    "taskfold.cards.list",
     async ({ params: requestParams, respond }) => {
       try {
-        respond(true, await listFlowboardCards(store, requestParams.boardId, redactClaimToken));
+        respond(true, await listTaskfoldCards(store, requestParams.boardId, redactClaimToken));
       } catch (error) {
         respondError(respond, error);
       }
@@ -9289,12 +9370,12 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.execution.prepare",
+    "taskfold.cards.execution.prepare",
     async (request) => {
       try {
         request.respond(
           true,
-          await prepareFlowboardCardExecution({
+          await prepareTaskfoldCardExecution({
             store,
             id: request.params.id,
             options: executionOptions(request)
@@ -9307,10 +9388,10 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.execution.inspect",
+    "taskfold.cards.execution.inspect",
     async (request) => {
       try {
-        const result = await inspectFlowboardCardExecution({
+        const result = await inspectTaskfoldCardExecution({
           store,
           id: request.params.id,
           runtime: api.runtime
@@ -9323,10 +9404,10 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.execution.start",
+    "taskfold.cards.execution.start",
     async (request) => {
       try {
-        const result = await startFlowboardCardExecution({
+        const result = await startTaskfoldCardExecution({
           store,
           id: request.params.id,
           expectedRevision: request.params.expectedRevision,
@@ -9340,10 +9421,10 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.execution.steer",
+    "taskfold.cards.execution.steer",
     async (request) => {
       try {
-        const result = await steerFlowboardCardExecution({
+        const result = await steerTaskfoldCardExecution({
           store,
           id: request.params.id,
           nextRunId: request.params.nextRunId
@@ -9356,10 +9437,10 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.execution.abort",
+    "taskfold.cards.execution.abort",
     async (request) => {
       try {
-        const result = await abortFlowboardCardExecution({
+        const result = await abortTaskfoldCardExecution({
           store,
           id: request.params.id,
           reason: request.params.reason,
@@ -9373,10 +9454,10 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.execution.reconcile",
+    "taskfold.cards.execution.reconcile",
     async (request) => {
       try {
-        const result = await reconcileFlowboardCardExecution({
+        const result = await reconcileTaskfoldCardExecution({
           store,
           id: request.params.id,
           expectedRunId: request.params.expectedRunId,
@@ -9392,7 +9473,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.changes.wait",
+    "taskfold.changes.wait",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -9408,10 +9489,10 @@ function registerFlowboardGatewayMethods(params) {
     },
     { scope: READ_SCOPE2 }
   );
-  registerFlowboardWorkspaceCardMethods({ api, store, redactCard: redactClaimToken });
-  registerFlowboardProjectGatewayMethods({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceCardMethods({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldProjectGatewayMethods({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
-    "flowboard.cards.move",
+    "taskfold.cards.move",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9426,7 +9507,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.delete",
+    "taskfold.cards.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.delete(readId(requestParams)));
@@ -9437,7 +9518,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.comment",
+    "taskfold.cards.comment",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9450,7 +9531,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.link",
+    "taskfold.cards.link",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9463,7 +9544,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.linkDependency",
+    "taskfold.cards.linkDependency",
     async ({ params: requestParams, respond }) => {
       try {
         const parentId = requestParams.parentId;
@@ -9481,7 +9562,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.proof",
+    "taskfold.cards.proof",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9494,7 +9575,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.artifact",
+    "taskfold.cards.artifact",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9507,7 +9588,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.proof.delete",
+    "taskfold.cards.proof.delete",
     async ({ params: requestParams, respond }) => {
       try {
         const proofId = requestParams.proofId;
@@ -9524,7 +9605,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.artifact.delete",
+    "taskfold.cards.artifact.delete",
     async ({ params: requestParams, respond }) => {
       try {
         const artifactId = requestParams.artifactId;
@@ -9541,7 +9622,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.claim",
+    "taskfold.cards.claim",
     async ({ params: requestParams, respond }) => {
       try {
         const claimed = await store.claim(readId(requestParams), requestParams);
@@ -9553,7 +9634,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.heartbeat",
+    "taskfold.cards.heartbeat",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9566,7 +9647,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.release",
+    "taskfold.cards.release",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9579,7 +9660,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.promote",
+    "taskfold.cards.promote",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9592,7 +9673,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.reassign",
+    "taskfold.cards.reassign",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9605,7 +9686,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.reclaim",
+    "taskfold.cards.reclaim",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9618,7 +9699,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.complete",
+    "taskfold.cards.complete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9631,7 +9712,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.block",
+    "taskfold.cards.block",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9644,7 +9725,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.unblock",
+    "taskfold.cards.unblock",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9656,9 +9737,9 @@ function registerFlowboardGatewayMethods(params) {
     },
     { scope: WRITE_SCOPE3 }
   );
-  registerFlowboardWorkspaceBulkMethod({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceBulkMethod({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
-    "flowboard.cards.diagnostics",
+    "taskfold.cards.diagnostics",
     async ({ respond }) => {
       try {
         respond(true, redactDiagnosticsRows(await store.diagnostics()));
@@ -9669,7 +9750,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.diagnostics.refresh",
+    "taskfold.cards.diagnostics.refresh",
     async ({ respond }) => {
       try {
         respond(true, redactDiagnosticsRows(await store.refreshDiagnostics()));
@@ -9680,17 +9761,17 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.dispatch",
+    "taskfold.cards.dispatch",
     async (context) => await dispatchCards(context, { supportsMaxStarts: false }),
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.dispatchWithOptions",
+    "taskfold.cards.dispatchWithOptions",
     async (context) => await dispatchCards(context, { supportsMaxStarts: true }),
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.boards.list",
+    "taskfold.boards.list",
     async ({ respond }) => {
       try {
         respond(true, await store.listBoards());
@@ -9700,9 +9781,9 @@ function registerFlowboardGatewayMethods(params) {
     },
     { scope: READ_SCOPE2 }
   );
-  registerFlowboardWorkspaceBoardMethod({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceBoardMethod({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
-    "flowboard.boards.archive",
+    "taskfold.boards.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9715,7 +9796,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.boards.delete",
+    "taskfold.boards.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteBoard(requestParams.id));
@@ -9726,7 +9807,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.stats",
+    "taskfold.cards.stats",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.stats({ boardId: requestParams.boardId }));
@@ -9737,7 +9818,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.runs",
+    "taskfold.cards.runs",
     async ({ params: requestParams, respond }) => {
       try {
         const result = await store.runs(readId(requestParams));
@@ -9748,9 +9829,9 @@ function registerFlowboardGatewayMethods(params) {
     },
     { scope: READ_SCOPE2 }
   );
-  registerFlowboardWorkspaceWorkflowMethods({ api, store, redactCard: redactClaimToken });
+  registerTaskfoldWorkspaceWorkflowMethods({ api, store, redactCard: redactClaimToken });
   api.registerGatewayMethod(
-    "flowboard.notifications.subscribe",
+    "taskfold.notifications.subscribe",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { subscription: await store.subscribeNotifications(requestParams) });
@@ -9761,7 +9842,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.notifications.list",
+    "taskfold.notifications.list",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.listNotificationSubscriptions(requestParams));
@@ -9772,7 +9853,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.notifications.delete",
+    "taskfold.notifications.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteNotificationSubscription(readId(requestParams)));
@@ -9783,7 +9864,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.notifications.events",
+    "taskfold.notifications.events",
     async ({ params: requestParams, respond }) => {
       try {
         assertNoCursorAdvance(requestParams);
@@ -9795,7 +9876,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.notifications.advance",
+    "taskfold.notifications.advance",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.advanceNotificationEvents(requestParams));
@@ -9806,7 +9887,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.list",
+    "taskfold.cards.attachments.list",
     async ({ params: requestParams, respond }) => {
       try {
         const result = await store.listAttachments(readId(requestParams));
@@ -9818,7 +9899,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.get",
+    "taskfold.cards.attachments.get",
     async ({ params: requestParams, respond }) => {
       try {
         const attachment = await store.getAttachment(readId(requestParams));
@@ -9833,7 +9914,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: READ_SCOPE2 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.add",
+    "taskfold.cards.attachments.add",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9846,7 +9927,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.attachments.delete",
+    "taskfold.cards.attachments.delete",
     async ({ params: requestParams, respond }) => {
       try {
         const attachmentId = requestParams.attachmentId;
@@ -9865,7 +9946,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.workerLog",
+    "taskfold.cards.workerLog",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9878,7 +9959,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.protocolViolation",
+    "taskfold.cards.protocolViolation",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9893,7 +9974,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.archive",
+    "taskfold.cards.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -9908,7 +9989,7 @@ function registerFlowboardGatewayMethods(params) {
     { scope: WRITE_SCOPE3 }
   );
   api.registerGatewayMethod(
-    "flowboard.cards.export",
+    "taskfold.cards.export",
     async ({ respond }) => {
       try {
         const exported = await store.exportCards();
@@ -9922,11 +10003,11 @@ function registerFlowboardGatewayMethods(params) {
 }
 
 // src/backend/src/change-events.ts
-var FLOWBOARD_EXTERNAL_CHANGE_CHECK_MS = 1e3;
-function createFlowboardChangeEventService(store) {
+var TASKFOLD_EXTERNAL_CHANGE_CHECK_MS = 1e3;
+function createTaskfoldChangeEventService(store) {
   let timer;
   return {
-    id: "flowboard-change-events",
+    id: "taskfold-change-events",
     start(ctx) {
       if (timer) {
         return;
@@ -9936,9 +10017,9 @@ function createFlowboardChangeEventService(store) {
         try {
           store.reconcileExternalChanges();
         } catch (error) {
-          ctx.logger.warn(`flowboard external change check failed: ${String(error)}`);
+          ctx.logger.warn(`taskfold external change check failed: ${String(error)}`);
         }
-      }, FLOWBOARD_EXTERNAL_CHANGE_CHECK_MS);
+      }, TASKFOLD_EXTERNAL_CHANGE_CHECK_MS);
       timer.unref?.();
     },
     stop() {
@@ -9998,10 +10079,10 @@ function withoutOption(tokens, flag) {
   const index = tokens.indexOf(flag);
   return index >= 0 ? [...tokens.slice(0, index), ...tokens.slice(index + 2)] : tokens;
 }
-function isFlowboardStatus(value) {
-  return FLOWBOARD_STATUSES.includes(value);
+function isTaskfoldStatus(value) {
+  return TASKFOLD_STATUSES.includes(value);
 }
-function canMutateFlowboard(params) {
+function canMutateTaskfold(params) {
   const scopes = params.gatewayClientScopes;
   if (scopes) {
     return scopes.includes(ADMIN_SCOPE) || scopes.includes(WRITE_SCOPE4);
@@ -10009,7 +10090,7 @@ function canMutateFlowboard(params) {
   return params.senderIsOwner === true;
 }
 function requireWriteAccess(params) {
-  if (canMutateFlowboard(params)) {
+  if (canMutateTaskfold(params)) {
     return void 0;
   }
   return {
@@ -10017,34 +10098,34 @@ function requireWriteAccess(params) {
     isError: true
   };
 }
-async function handleFlowboardCommand(params) {
+async function handleTaskfoldCommand(params) {
   const [action = "list", ...rest] = splitArgs(params.args);
   if (action === "help") {
     return {
       text: [
-        "/flowboard list",
-        "/flowboard show <card-id>",
-        "/flowboard create <title>",
-        "/flowboard move <card-id> --status <status>",
-        "/flowboard project list",
-        "/flowboard project create <id> <name> --milestone <title>",
-        "/flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
-        "/flowboard dispatch"
+        "/taskfold list",
+        "/taskfold show <card-id>",
+        "/taskfold create <title>",
+        "/taskfold move <card-id> --status <status>",
+        "/taskfold project list",
+        "/taskfold project create <id> <name> --milestone <title>",
+        "/taskfold project milestone move-card <card-id> --milestone <id|unassigned>",
+        "/taskfold dispatch"
       ].join("\n")
     };
   }
   if (action === "list") {
     const cards = (await params.store.list()).filter((card) => !card.metadata?.archivedAt);
     const rows = cards.slice(0, 12).map(formatCardLine);
-    return { text: rows.length ? rows.join("\n") : "No Flowboard cards." };
+    return { text: rows.length ? rows.join("\n") : "No Taskfold cards." };
   }
   if (action === "show" || action === "read") {
     const id = rest[0];
     if (!id) {
-      return { text: "Usage: /flowboard show <card-id>", isError: true };
+      return { text: "Usage: /taskfold show <card-id>", isError: true };
     }
     const cards = await params.store.list();
-    const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+    const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
     return card ? { text: formatCardDetails(card) } : { text: error, isError: true };
   }
   if (action === "create") {
@@ -10056,9 +10137,9 @@ async function handleFlowboardCommand(params) {
     const milestoneId = optionValue(rest, "--milestone");
     const title = normalizeTitle2(withoutOption(withoutOption(rest, "--board"), "--milestone"));
     if (!title) {
-      return { text: "Usage: /flowboard create <title>", isError: true };
+      return { text: "Usage: /taskfold create <title>", isError: true };
     }
-    const workspaceAccess = await canonicalizeFlowboardWorkspaceAccess(
+    const workspaceAccess = await canonicalizeTaskfoldWorkspaceAccess(
       params.workspaceAccess ?? { unrestricted: true }
     );
     const card = await params.store.create({ title, boardId, milestoneId, workspaceAccess });
@@ -10073,7 +10154,7 @@ async function handleFlowboardCommand(params) {
     if (projectAction === "list") {
       const projects = await params.store.listProjects();
       return {
-        text: projects.projects.length ? projects.projects.map((project) => `${project.id} ${project.name ?? project.id}`).join("\n") : "No Flowboard projects."
+        text: projects.projects.length ? projects.projects.map((project) => `${project.id} ${project.name ?? project.id}`).join("\n") : "No Taskfold projects."
       };
     }
     if (projectAction === "create") {
@@ -10082,7 +10163,7 @@ async function handleFlowboardCommand(params) {
       const name = normalizeTitle2(withoutOption(projectArgs.slice(1), "--milestone"));
       if (!id || !name || !milestoneTitle) {
         return {
-          text: "Usage: /flowboard project create <id> <name> --milestone <title>",
+          text: "Usage: /taskfold project create <id> <name> --milestone <title>",
           isError: true
         };
       }
@@ -10100,11 +10181,11 @@ async function handleFlowboardCommand(params) {
         const milestoneId = optionValue(milestoneArgs, "--milestone");
         if (!cardId || !milestoneId) {
           return {
-            text: "Usage: /flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
+            text: "Usage: /taskfold project milestone move-card <card-id> --milestone <id|unassigned>",
             isError: true
           };
         }
-        const { card, error } = resolveFlowboardCardByIdOrPrefix(
+        const { card, error } = resolveTaskfoldCardByIdOrPrefix(
           await params.store.list(),
           cardId
         );
@@ -10120,11 +10201,11 @@ async function handleFlowboardCommand(params) {
         };
       }
       return {
-        text: "Usage: /flowboard project milestone move-card <card-id> --milestone <id|unassigned>",
+        text: "Usage: /taskfold project milestone move-card <card-id> --milestone <id|unassigned>",
         isError: true
       };
     }
-    return { text: `Unknown Flowboard project action: ${projectAction}`, isError: true };
+    return { text: `Unknown Taskfold project action: ${projectAction}`, isError: true };
   }
   if (action === "move") {
     const accessError = requireWriteAccess(params);
@@ -10136,18 +10217,18 @@ async function handleFlowboardCommand(params) {
     const status = statusIndex >= 0 ? rest[statusIndex + 1] : void 0;
     if (!id || !status) {
       return {
-        text: "Usage: /flowboard move <card-id> --status <status>",
+        text: "Usage: /taskfold move <card-id> --status <status>",
         isError: true
       };
     }
-    if (!isFlowboardStatus(status)) {
+    if (!isTaskfoldStatus(status)) {
       return {
-        text: `status must be one of: ${FLOWBOARD_STATUSES.join(", ")}.`,
+        text: `status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`,
         isError: true
       };
     }
     const cards = await params.store.list();
-    const { card, error } = resolveFlowboardCardByIdOrPrefix(cards, id);
+    const { card, error } = resolveTaskfoldCardByIdOrPrefix(cards, id);
     if (!card) {
       return { text: error, isError: true };
     }
@@ -10159,7 +10240,7 @@ async function handleFlowboardCommand(params) {
       return accessError;
     }
     const workspaceAccess = params.workspaceAccess ?? { unrestricted: true };
-    const result = await dispatchAndStartFlowboardCards({
+    const result = await dispatchAndStartTaskfoldCards({
       store: params.store,
       subagent: params.api.runtime.subagent,
       worktrees: params.api.runtime.worktrees,
@@ -10180,23 +10261,23 @@ async function handleFlowboardCommand(params) {
       ].join("\n")
     };
   }
-  return { text: `Unknown Flowboard action: ${action}`, isError: true };
+  return { text: `Unknown Taskfold action: ${action}`, isError: true };
 }
-function registerFlowboardCommand(params) {
+function registerTaskfoldCommand(params) {
   const sandbox = params.api.runtime.sandbox;
   params.api.registerCommand({
-    name: "flowboard",
-    description: "List, create, inspect, and dispatch Flowboard cards.",
+    name: "taskfold",
+    description: "List, create, inspect, and dispatch Taskfold cards.",
     acceptsArgs: true,
     exposeSenderIsOwner: true,
-    handler: async (ctx) => await handleFlowboardCommand({
+    handler: async (ctx) => await handleTaskfoldCommand({
       api: params.api,
       store: params.store,
       args: ctx.args,
       senderIsOwner: ctx.senderIsOwner,
       gatewayClientScopes: ctx.gatewayClientScopes,
-      resolveAgentWorkspace: (agentId) => resolveFlowboardAgentWorkspace(ctx.config, agentId),
-      resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => resolveAgentFlowboardWorkspaceRuntime({
+      resolveAgentWorkspace: (agentId) => resolveTaskfoldAgentWorkspace(ctx.config, agentId),
+      resolveAgentWorkspaceRuntime: (agentId, sessionKey, workspaceDir, modelProvider, modelId) => resolveAgentTaskfoldWorkspaceRuntime({
         config: ctx.config,
         agentId,
         sessionKey,
@@ -10205,7 +10286,7 @@ function registerFlowboardCommand(params) {
         modelId,
         prepareSandboxWorkspaceAuthority: sandbox?.prepareWorkspaceAuthority
       }),
-      workspaceAccess: resolveCommandFlowboardWorkspaceAccess({
+      workspaceAccess: resolveCommandTaskfoldWorkspaceAccess({
         config: ctx.config,
         agentId: ctx.agentId,
         sessionKey: ctx.sessionKey,
@@ -10225,7 +10306,7 @@ function claimsRunning(card) {
   return card.status === "running" || card.execution?.status === "running" || Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running")) || Boolean(card.metadata?.claim);
 }
 var TERMINAL_EXECUTION_STATUSES = /* @__PURE__ */ new Set(["done", "review", "blocked"]);
-function flowboardRunEvidence(params) {
+function taskfoldRunEvidence(params) {
   const { card, now } = params;
   if (!claimsRunning(card) || !cardSessionKey(card)) {
     return "unlinked";
@@ -10234,29 +10315,29 @@ function flowboardRunEvidence(params) {
   if (executionStatus && TERMINAL_EXECUTION_STATUSES.has(executionStatus)) {
     return "finished";
   }
-  const silentFor = now - flowboardLastActivityAt(card);
+  const silentFor = now - taskfoldLastActivityAt(card);
   if (silentFor <= RUNNING_HEARTBEAT_STALE_MS) {
     return "live";
   }
   return silentFor <= RUNNING_HEARTBEAT_STALE_MS + ABANDONED_RUN_GRACE_MS ? "stale" : "abandoned";
 }
 function staleRunState(card, now) {
-  if (flowboardRunEvidence({ card, now }) !== "stale") {
+  if (taskfoldRunEvidence({ card, now }) !== "stale") {
     return void 0;
   }
   return {
     detectedAt: now,
-    lastSessionUpdatedAt: flowboardLastActivityAt(card),
+    lastSessionUpdatedAt: taskfoldLastActivityAt(card),
     reason: "Linked run has not reported recent activity."
   };
 }
-function getFlowboardLifecycle(params) {
+function getTaskfoldLifecycle(params) {
   const { card, now } = params;
-  const state = flowboardRunEvidence({ card, now });
+  const state = taskfoldRunEvidence({ card, now });
   if (state === "unlinked") {
     return { state };
   }
-  const sourceUpdatedAt = flowboardLastActivityAt(card);
+  const sourceUpdatedAt = taskfoldLastActivityAt(card);
   switch (state) {
     case "finished":
       return {
@@ -10287,7 +10368,7 @@ function executionStatusForLifecycle(lifecycle) {
   }
 }
 function shouldCloseOrphanedRun(params) {
-  return flowboardRunEvidence(params) === "abandoned";
+  return taskfoldRunEvidence(params) === "abandoned";
 }
 function shouldSyncCardStatus(card, targetStatus) {
   if (!targetStatus || card.status === targetStatus) {
@@ -10317,7 +10398,7 @@ function activeCards(cards) {
 }
 async function applyLifecycle(params) {
   const { store, card, now } = params;
-  const lifecycle = getFlowboardLifecycle({ card, now });
+  const lifecycle = getTaskfoldLifecycle({ card, now });
   const executionStatus = executionStatusForLifecycle(lifecycle);
   const patch = {};
   const metadataPatch = {};
@@ -10358,12 +10439,12 @@ async function finishOrphanedRun(params) {
     endedAt: now,
     reason: "Run stopped reporting and did not survive to report an outcome."
   });
-  await cleanupFlowboardRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
+  await cleanupTaskfoldRunWorktree({ store, worktrees: runtime.worktrees, runId }).catch(
     () => void 0
   );
   return true;
 }
-async function reconcileFlowboardCards(params) {
+async function reconcileTaskfoldCards(params) {
   const now = params.now ?? Date.now();
   const outcome = {
     checked: 0,
@@ -10382,9 +10463,9 @@ async function reconcileFlowboardCards(params) {
       if (await applyLifecycle({ ...params, card, now })) {
         outcome.updated += 1;
       }
-      if (isFlowboardClaimReclaimable(card.metadata?.claim, now)) {
+      if (isTaskfoldClaimReclaimable(card.metadata?.claim, now)) {
         const latest = await params.store.get(card.id);
-        if (latest && isFlowboardClaimReclaimable(latest.metadata?.claim, now)) {
+        if (latest && isTaskfoldClaimReclaimable(latest.metadata?.claim, now)) {
           await params.store.update(latest.id, {
             metadata: { ...latest.metadata, claim: void 0 }
           });
@@ -10393,19 +10474,19 @@ async function reconcileFlowboardCards(params) {
       }
     } catch (error) {
       outcome.skipped += 1;
-      if (!(error instanceof FlowboardRevisionConflictError)) {
+      if (!(error instanceof TaskfoldRevisionConflictError)) {
         params.onCardError?.(card.id, error);
       }
     }
   }
   return outcome;
 }
-function createFlowboardReconcilerService(params) {
+function createTaskfoldReconcilerService(params) {
   let timer;
   let running = false;
   let lastFailure = "";
   return {
-    id: "flowboard-reconciler",
+    id: "taskfold-reconciler",
     start(ctx) {
       if (timer) {
         return;
@@ -10416,23 +10497,23 @@ function createFlowboardReconcilerService(params) {
         }
         running = true;
         try {
-          const outcome = await reconcileFlowboardCards({
+          const outcome = await reconcileTaskfoldCards({
             ...params,
             onCardError: (cardId, error) => ctx.logger.warn(
-              `flowboard could not reconcile card ${cardId}: ${formatErrorMessage4(error)}`
+              `taskfold could not reconcile card ${cardId}: ${formatErrorMessage4(error)}`
             )
           });
           lastFailure = "";
           if (outcome.updated || outcome.finished || outcome.reclaimed) {
             ctx.logger.info(
-              `flowboard reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`
+              `taskfold reconciled ${outcome.checked} active cards: ${outcome.updated} updated, ${outcome.finished} orphaned runs closed, ${outcome.reclaimed} claims reclaimed, ${outcome.skipped} skipped.`
             );
           }
         } catch (error) {
           const message = formatErrorMessage4(error);
           if (message !== lastFailure) {
             lastFailure = message;
-            ctx.logger.warn(`flowboard reconcile failed: ${message}`);
+            ctx.logger.warn(`taskfold reconcile failed: ${message}`);
           }
         } finally {
           running = false;
@@ -14835,22 +14916,22 @@ init_card_redaction();
 init_contract();
 var ClaimTokenFieldName = "token";
 function cardIdField() {
-  return typebox_exports.String({ description: "Flowboard card id." });
+  return typebox_exports.String({ description: "Taskfold card id." });
 }
-function claimTokenField(description = "Claim token returned by flowboard_claim.") {
+function claimTokenField(description = "Claim token returned by taskfold_claim.") {
   return typebox_exports.Optional(typebox_exports.String({ description }));
 }
-function createFlowboardMoveTool(params) {
+function createTaskfoldMoveTool(params) {
   return {
-    name: "flowboard_move",
-    label: "Flowboard Move",
-    description: "Move a Flowboard card to another status. Claimed cards require matching claim scope.",
+    name: "taskfold_move",
+    label: "Taskfold Move",
+    description: "Move a Taskfold card to another status. Claimed cards require matching claim scope.",
     parameters: typebox_exports.Object(
       {
         id: cardIdField(),
         status: typebox_exports.Union(
-          FLOWBOARD_STATUSES.map((status) => typebox_exports.Literal(status)),
-          { description: "Target Flowboard status." }
+          TASKFOLD_STATUSES.map((status) => typebox_exports.Literal(status)),
+          { description: "Target Taskfold status." }
         ),
         [ClaimTokenFieldName]: claimTokenField("Claim token for claimed cards.")
       },
@@ -14982,8 +15063,8 @@ var CardIdSchema = typebox_exports.Object(
   },
   { additionalProperties: false }
 );
-function createFlowboardTools(params) {
-  const store = params.store ?? FlowboardStore.openSqlite();
+function createTaskfoldTools(params) {
+  const store = params.store ?? TaskfoldStore.openSqlite();
   const ownerId = contextOwner(params.context);
   const readScopedCardToolParams = async (rawParams) => {
     const input = readCardToolParams(rawParams, ownerId);
@@ -15003,9 +15084,9 @@ function createFlowboardTools(params) {
   const runClaimedCardMutation = (rawParams, mutate) => runCardMutation(rawParams, readClaimedCardToolParams, mutate);
   return [
     {
-      name: "flowboard_list",
-      label: "Flowboard List",
-      description: "List Flowboard cards with compact claim and diagnostic state. Use before choosing or routing board work.",
+      name: "taskfold_list",
+      label: "Taskfold List",
+      description: "List Taskfold cards with compact claim and diagnostic state. Use before choosing or routing board work.",
       parameters: typebox_exports.Object(
         {
           status: typebox_exports.Optional(typebox_exports.String({ description: "Optional card status filter." })),
@@ -15039,9 +15120,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_create",
-      label: "Flowboard Create",
-      description: "Create a Flowboard card, optionally with parent dependencies, tenant, skills, workspace, and idempotency key.",
+      name: "taskfold_create",
+      label: "Taskfold Create",
+      description: "Create a Taskfold card, optionally with parent dependencies, tenant, skills, workspace, and idempotency key.",
       parameters: typebox_exports.Object(
         {
           title: typebox_exports.String({ description: "Card title." }),
@@ -15091,8 +15172,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_link",
-      label: "Flowboard Link",
+      name: "taskfold_link",
+      label: "Taskfold Link",
       description: "Link a parent card to a child card so the child becomes ready only after parents are done.",
       parameters: typebox_exports.Object(
         {
@@ -15115,9 +15196,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_read",
-      label: "Flowboard Read",
-      description: "Read one Flowboard card and return bounded worker context with notes, attempts, comments, proof, links, and diagnostics.",
+      name: "taskfold_read",
+      label: "Taskfold Read",
+      description: "Read one Taskfold card and return bounded worker context with notes, attempts, comments, proof, links, and diagnostics.",
       parameters: CardIdSchema,
       execute: async (_toolCallId, rawParams) => {
         const record = rawParams;
@@ -15133,9 +15214,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_claim",
-      label: "Flowboard Claim",
-      description: "Claim a Flowboard card for this agent and move backlog/todo cards into running. Returns a claim token for heartbeats and release.",
+      name: "taskfold_claim",
+      label: "Taskfold Claim",
+      description: "Claim a Taskfold card for this agent and move backlog/todo cards into running. Returns a claim token for heartbeats and release.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15154,9 +15235,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_heartbeat",
-      label: "Flowboard Heartbeat",
-      description: "Refresh this agent's Flowboard claim heartbeat. Use during long-running card work so diagnostics do not mark it stale.",
+      name: "taskfold_heartbeat",
+      label: "Taskfold Heartbeat",
+      description: "Refresh this agent's Taskfold claim heartbeat. Use during long-running card work so diagnostics do not mark it stale.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15176,9 +15257,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_release",
-      label: "Flowboard Release",
-      description: "Release this agent's Flowboard claim after finishing, pausing, or handing off card work.",
+      name: "taskfold_release",
+      label: "Taskfold Release",
+      description: "Release this agent's Taskfold claim after finishing, pausing, or handing off card work.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15200,9 +15281,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_comment",
-      label: "Flowboard Comment",
-      description: "Append a compact comment to a Flowboard card.",
+      name: "taskfold_comment",
+      label: "Taskfold Comment",
+      description: "Append a compact comment to a Taskfold card.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15217,9 +15298,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_proof",
-      label: "Flowboard Proof",
-      description: "Attach proof or artifact metadata to a Flowboard card after running tests, checks, or producing screenshots/logs. Returns proofId; pass it to flowboard_complete when that call reports the terminal status for this proof.",
+      name: "taskfold_proof",
+      label: "Taskfold Proof",
+      description: "Attach proof or artifact metadata to a Taskfold card after running tests, checks, or producing screenshots/logs. Returns proofId; pass it to taskfold_complete when that call reports the terminal status for this proof.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15254,9 +15335,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_complete",
-      label: "Flowboard Complete",
-      description: "Complete a claimed Flowboard card with a structured summary, proof, artifacts, and created-card manifest.",
+      name: "taskfold_complete",
+      label: "Taskfold Complete",
+      description: "Complete a claimed Taskfold card with a structured summary, proof, artifacts, and created-card manifest.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15264,7 +15345,7 @@ function createFlowboardTools(params) {
           summary: typebox_exports.Optional(typebox_exports.String({ description: "Completion summary." })),
           proofId: typebox_exports.Optional(
             typebox_exports.String({
-              description: "Proof id returned by flowboard_proof when resolving that pending proof."
+              description: "Proof id returned by taskfold_proof when resolving that pending proof."
             })
           ),
           proof: typebox_exports.Optional(
@@ -15308,9 +15389,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_attachment_add",
-      label: "Flowboard Attachment Add",
-      description: "Store a small Flowboard attachment in plugin SQLite KV and link it to the card.",
+      name: "taskfold_attachment_add",
+      label: "Taskfold Attachment Add",
+      description: "Store a small Taskfold attachment in plugin SQLite KV and link it to the card.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15328,9 +15409,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_attachment_read",
-      label: "Flowboard Attachment Read",
-      description: "Read one Flowboard attachment from plugin SQLite KV.",
+      name: "taskfold_attachment_read",
+      label: "Taskfold Attachment Read",
+      description: "Read one Taskfold attachment from plugin SQLite KV.",
       parameters: typebox_exports.Object(
         {
           id: typebox_exports.String({ description: "Attachment id." })
@@ -15349,9 +15430,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_attachment_delete",
-      label: "Flowboard Attachment Delete",
-      description: "Delete one Flowboard attachment from plugin SQLite KV and the card index.",
+      name: "taskfold_attachment_delete",
+      label: "Taskfold Attachment Delete",
+      description: "Delete one Taskfold attachment from plugin SQLite KV and the card index.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15367,9 +15448,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_block",
-      label: "Flowboard Block",
-      description: "Block a claimed Flowboard card with a durable reason and release the claim.",
+      name: "taskfold_block",
+      label: "Taskfold Block",
+      description: "Block a claimed Taskfold card with a durable reason and release the claim.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15386,20 +15467,20 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_unblock",
-      label: "Flowboard Unblock",
-      description: "Move a blocked Flowboard card back to todo after adding enough context.",
+      name: "taskfold_unblock",
+      label: "Taskfold Unblock",
+      description: "Move a blocked Taskfold card back to todo after adding enough context.",
       parameters: CardIdSchema,
       execute: async (_toolCallId, rawParams) => {
         const { id, scope } = await readScopedCardToolParams(rawParams);
         return redactedRawCardResult(await store.unblock(id, scope));
       }
     },
-    createFlowboardMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
+    createTaskfoldMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
     {
-      name: "flowboard_projects",
-      label: "Flowboard Projects",
-      description: "List Flowboard projects and their card summaries.",
+      name: "taskfold_projects",
+      label: "Taskfold Projects",
+      description: "List Taskfold projects and their card summaries.",
       parameters: typebox_exports.Object(
         {
           includeArchived: typebox_exports.Optional(typebox_exports.Boolean())
@@ -15409,9 +15490,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult(await store.listProjects(rawParams))
     },
     {
-      name: "flowboard_project_create",
-      label: "Flowboard Project Create",
-      description: "Create a Flowboard project with its first milestone and standard documents.",
+      name: "taskfold_project_create",
+      label: "Taskfold Project Create",
+      description: "Create a Taskfold project with its first milestone and standard documents.",
       parameters: typebox_exports.Object(
         {
           id: typebox_exports.String({ description: "Stable project id." }),
@@ -15427,9 +15508,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult({ project: await store.createProject(rawParams) })
     },
     {
-      name: "flowboard_project_read",
-      label: "Flowboard Project Read",
-      description: "Read one Flowboard project's settings, milestones, and cards.",
+      name: "taskfold_project_read",
+      label: "Taskfold Project Read",
+      description: "Read one Taskfold project's settings, milestones, and cards.",
       parameters: typebox_exports.Object({ id: typebox_exports.String() }, { additionalProperties: false }),
       execute: async (_toolCallId, rawParams) => jsonResult({
         project: await store.getProject(readStringParam(rawParams, "id", {
@@ -15438,9 +15519,9 @@ function createFlowboardTools(params) {
       })
     },
     {
-      name: "flowboard_milestone_create",
-      label: "Flowboard Milestone Create",
-      description: "Create an active milestone column in a Flowboard project.",
+      name: "taskfold_milestone_create",
+      label: "Taskfold Milestone Create",
+      description: "Create an active milestone column in a Taskfold project.",
       parameters: typebox_exports.Object(
         {
           boardId: typebox_exports.String(),
@@ -15453,8 +15534,8 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult({ milestone: await store.createMilestone(rawParams) })
     },
     {
-      name: "flowboard_move_milestone",
-      label: "Flowboard Move Milestone",
+      name: "taskfold_move_milestone",
+      label: "Taskfold Move Milestone",
       description: "Move a card between milestone columns without changing its execution status.",
       parameters: typebox_exports.Object(
         {
@@ -15473,8 +15554,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_move_project",
-      label: "Flowboard Move Project",
+      name: "taskfold_move_project",
+      label: "Taskfold Move Project",
       description: "Move a card to another active project while retaining its execution history.",
       parameters: typebox_exports.Object(
         {
@@ -15492,8 +15573,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_project_documents",
-      label: "Flowboard Project Documents",
+      name: "taskfold_project_documents",
+      label: "Taskfold Project Documents",
       description: "List a project's long-lived context documents.",
       parameters: typebox_exports.Object(
         {
@@ -15512,8 +15593,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_project_document_create",
-      label: "Flowboard Project Document Create",
+      name: "taskfold_project_document_create",
+      label: "Taskfold Project Document Create",
       description: "Add a typed project document without reading files or secrets.",
       parameters: typebox_exports.Object(
         {
@@ -15533,16 +15614,16 @@ function createFlowboardTools(params) {
       })
     },
     {
-      name: "flowboard_boards",
-      label: "Flowboard Boards",
-      description: "List Flowboard board namespaces with active, archived, and status counts.",
+      name: "taskfold_boards",
+      label: "Taskfold Boards",
+      description: "List Taskfold board namespaces with active, archived, and status counts.",
       parameters: typebox_exports.Object({}, { additionalProperties: false }),
       execute: async () => jsonResult(await store.listBoards())
     },
     {
-      name: "flowboard_board_create",
-      label: "Flowboard Board Create",
-      description: "Create or update a Flowboard board namespace with persisted SQLite metadata.",
+      name: "taskfold_board_create",
+      label: "Taskfold Board Create",
+      description: "Create or update a Taskfold board namespace with persisted SQLite metadata.",
       parameters: typebox_exports.Object(
         {
           id: typebox_exports.String({ description: "Board id." }),
@@ -15583,9 +15664,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult({ board: await store.upsertBoard(rawParams) })
     },
     {
-      name: "flowboard_board_archive",
-      label: "Flowboard Board Archive",
-      description: "Archive or restore persisted Flowboard board metadata.",
+      name: "taskfold_board_archive",
+      label: "Taskfold Board Archive",
+      description: "Archive or restore persisted Taskfold board metadata.",
       parameters: typebox_exports.Object(
         {
           id: typebox_exports.String({ description: "Board id." }),
@@ -15599,9 +15680,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_board_delete",
-      label: "Flowboard Board Delete",
-      description: "Delete an empty non-default Flowboard board metadata record.",
+      name: "taskfold_board_delete",
+      label: "Taskfold Board Delete",
+      description: "Delete an empty non-default Taskfold board metadata record.",
       parameters: typebox_exports.Object(
         { id: typebox_exports.String({ description: "Board id." }) },
         { additionalProperties: false }
@@ -15609,9 +15690,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult(await store.deleteBoard(rawParams.id))
     },
     {
-      name: "flowboard_stats",
-      label: "Flowboard Stats",
-      description: "Summarize Flowboard counts by status and assignee for one board or all boards.",
+      name: "taskfold_stats",
+      label: "Taskfold Stats",
+      description: "Summarize Taskfold counts by status and assignee for one board or all boards.",
       parameters: typebox_exports.Object(
         {
           boardId: typebox_exports.Optional(typebox_exports.String({ description: "Optional board id filter." }))
@@ -15624,9 +15705,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_runs",
-      label: "Flowboard Runs",
-      description: "List persisted Flowboard run attempts for one card.",
+      name: "taskfold_runs",
+      label: "Taskfold Runs",
+      description: "List persisted Taskfold run attempts for one card.",
       parameters: CardIdSchema,
       execute: async (_toolCallId, rawParams) => {
         const id = readStringParam(rawParams, "id", { required: true });
@@ -15635,12 +15716,12 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_specify",
-      label: "Flowboard Specify",
-      description: "Turn a rough triage/backlog Flowboard card into a specified todo card after reasoning through the requirements.",
+      name: "taskfold_specify",
+      label: "Taskfold Specify",
+      description: "Turn a rough triage/backlog Taskfold card into a specified todo card after reasoning through the requirements.",
       parameters: typebox_exports.Object(
         {
-          id: typebox_exports.String({ description: "Flowboard card id." }),
+          id: typebox_exports.String({ description: "Taskfold card id." }),
           title: typebox_exports.Optional(typebox_exports.String({ description: "Clarified title." })),
           notes: typebox_exports.Optional(
             typebox_exports.String({ description: "Clarified notes or acceptance criteria." })
@@ -15678,12 +15759,12 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_decompose",
-      label: "Flowboard Decompose",
-      description: "Fan out a Flowboard card into linked child cards and optionally complete the parent orchestration card.",
+      name: "taskfold_decompose",
+      label: "Taskfold Decompose",
+      description: "Fan out a Taskfold card into linked child cards and optionally complete the parent orchestration card.",
       parameters: typebox_exports.Object(
         {
-          id: typebox_exports.String({ description: "Parent Flowboard card id." }),
+          id: typebox_exports.String({ description: "Parent Taskfold card id." }),
           token: typebox_exports.Optional(typebox_exports.String({ description: "Claim token for claimed cards." })),
           summary: typebox_exports.Optional(typebox_exports.String({ description: "Decomposition summary." })),
           completeParent: typebox_exports.Optional(
@@ -15738,9 +15819,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_notify_subscribe",
-      label: "Flowboard Notify Subscribe",
-      description: "Persist a Flowboard notification subscription in the plugin SQLite store.",
+      name: "taskfold_notify_subscribe",
+      label: "Taskfold Notify Subscribe",
+      description: "Persist a Taskfold notification subscription in the plugin SQLite store.",
       parameters: typebox_exports.Object(
         {
           boardId: typebox_exports.Optional(typebox_exports.String({ description: "Board id. Default default." })),
@@ -15759,9 +15840,9 @@ function createFlowboardTools(params) {
       })
     },
     {
-      name: "flowboard_notify_list",
-      label: "Flowboard Notify List",
-      description: "List persisted Flowboard notification subscriptions.",
+      name: "taskfold_notify_list",
+      label: "Taskfold Notify List",
+      description: "List persisted Taskfold notification subscriptions.",
       parameters: typebox_exports.Object(
         {
           boardId: typebox_exports.Optional(typebox_exports.String({ description: "Board id." })),
@@ -15772,9 +15853,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult(await store.listNotificationSubscriptions(rawParams))
     },
     {
-      name: "flowboard_notify_events",
-      label: "Flowboard Notify Events",
-      description: "Read replay-safe Flowboard notification events without advancing cursors.",
+      name: "taskfold_notify_events",
+      label: "Taskfold Notify Events",
+      description: "Read replay-safe Taskfold notification events without advancing cursors.",
       parameters: typebox_exports.Object(
         {
           subscriptionId: typebox_exports.Optional(typebox_exports.String({ description: "Subscription id." })),
@@ -15787,9 +15868,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult(await store.notificationEvents(rawParams))
     },
     {
-      name: "flowboard_notify_advance",
-      label: "Flowboard Notify Advance",
-      description: "Read Flowboard notification events and advance the subscription cursor.",
+      name: "taskfold_notify_advance",
+      label: "Taskfold Notify Advance",
+      description: "Read Taskfold notification events and advance the subscription cursor.",
       parameters: typebox_exports.Object(
         {
           subscriptionId: typebox_exports.String({ description: "Subscription id." }),
@@ -15800,9 +15881,9 @@ function createFlowboardTools(params) {
       execute: async (_toolCallId, rawParams) => jsonResult(await store.advanceNotificationEvents(rawParams))
     },
     {
-      name: "flowboard_notify_unsubscribe",
-      label: "Flowboard Notify Unsubscribe",
-      description: "Delete a persisted Flowboard notification subscription.",
+      name: "taskfold_notify_unsubscribe",
+      label: "Taskfold Notify Unsubscribe",
+      description: "Delete a persisted Taskfold notification subscription.",
       parameters: typebox_exports.Object(
         { id: typebox_exports.String({ description: "Subscription id." }) },
         { additionalProperties: false }
@@ -15813,8 +15894,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_promote",
-      label: "Flowboard Promote",
+      name: "taskfold_promote",
+      label: "Taskfold Promote",
       description: "Promote a dependency-ready card into ready, optionally forcing past holds for operator recovery.",
       parameters: typebox_exports.Object(
         {
@@ -15835,8 +15916,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_reassign",
-      label: "Flowboard Reassign",
+      name: "taskfold_reassign",
+      label: "Taskfold Reassign",
       description: "Change a card assignee and optionally reset failure state during recovery.",
       parameters: typebox_exports.Object(
         {
@@ -15857,8 +15938,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_reclaim",
-      label: "Flowboard Reclaim",
+      name: "taskfold_reclaim",
+      label: "Taskfold Reclaim",
       description: "Release a stale claim and stop running attempts so another agent can pick it up.",
       parameters: typebox_exports.Object(
         {
@@ -15877,8 +15958,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_dispatch",
-      label: "Flowboard Dispatch",
+      name: "taskfold_dispatch",
+      label: "Taskfold Dispatch",
       description: "Advance persisted board state without launching workers: promote unblocked cards, reclaim expired claims, and block timed-out runs.",
       parameters: typebox_exports.Object(
         {
@@ -15899,9 +15980,9 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_worker_log",
-      label: "Flowboard Worker Log",
-      description: "Append a persisted worker log entry to a Flowboard card.",
+      name: "taskfold_worker_log",
+      label: "Taskfold Worker Log",
+      description: "Append a persisted worker log entry to a Taskfold card.",
       parameters: typebox_exports.Object(
         {
           id: cardIdField(),
@@ -15919,8 +16000,8 @@ function createFlowboardTools(params) {
       }
     },
     {
-      name: "flowboard_protocol_violation",
-      label: "Flowboard Protocol Violation",
+      name: "taskfold_protocol_violation",
+      label: "Taskfold Protocol Violation",
       description: "Block a card and record a worker protocol violation when work stops without complete/block.",
       parameters: typebox_exports.Object(
         {
@@ -15944,7 +16025,7 @@ function createFlowboardTools(params) {
 import fs4 from "node:fs";
 import path5 from "node:path";
 import { fileURLToPath } from "node:url";
-var UI_PREFIX = "/flowboard/";
+var UI_PREFIX = "/taskfold/";
 var MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -15992,7 +16073,7 @@ function resolveUiFile(root, requestPath) {
   }
   return null;
 }
-function createFlowboardStaticUiHandler(uiRoot) {
+function createTaskfoldStaticUiHandler(uiRoot) {
   const root = path5.resolve(
     uiRoot ?? fileURLToPath(new URL("../ui/dist/", import.meta.url))
   );
@@ -16001,7 +16082,7 @@ function createFlowboardStaticUiHandler(uiRoot) {
       send(req, res, 405, { Allow: "GET, HEAD" });
       return true;
     }
-    const pathname = new URL(req.url ?? UI_PREFIX, "http://flowboard.local").pathname;
+    const pathname = new URL(req.url ?? UI_PREFIX, "http://taskfold.local").pathname;
     if (!pathname.startsWith(UI_PREFIX)) {
       send(req, res, 404, {});
       return true;
@@ -16034,46 +16115,46 @@ function createFlowboardStaticUiHandler(uiRoot) {
 }
 
 // src/backend/index.ts
-var FLOWBOARD_CLI_OPTIONS = {
+var TASKFOLD_CLI_OPTIONS = {
   descriptors: [
     {
-      name: "flowboard",
-      description: "Manage Flowboard cards and worker dispatch",
+      name: "taskfold",
+      description: "Manage Taskfold cards and worker dispatch",
       hasSubcommands: true
     }
   ]
 };
 var index_default = definePluginEntry({
-  id: "flowboard",
-  name: "Flowboard",
-  description: "Flowboard for agent-owned issues and sessions.",
+  id: "taskfold",
+  name: "Taskfold",
+  description: "Taskfold for agent-owned issues and sessions.",
   register(api) {
     if (api.registrationMode === "cli-metadata") {
       api.registerCli(() => {
-      }, FLOWBOARD_CLI_OPTIONS);
+      }, TASKFOLD_CLI_OPTIONS);
       return;
     }
-    const store = FlowboardStore.openSqlite();
+    const store = TaskfoldStore.openSqlite();
     api.session.controls.registerControlUiDescriptor({
       surface: "tab",
-      id: "flowboard",
-      label: "Flowboard",
+      id: "taskfold",
+      label: "Taskfold",
       description: "Gateway-local board for agent-owned work.",
       icon: "kanban",
       group: "control",
-      path: "/flowboard/",
+      path: "/taskfold/",
       requiredScopes: ["operator.write"]
     });
     api.registerHttpRoute({
-      path: "/flowboard/",
+      path: "/taskfold/",
       auth: "plugin",
       match: "prefix",
-      handler: createFlowboardStaticUiHandler()
+      handler: createTaskfoldStaticUiHandler()
     });
-    registerFlowboardGatewayMethods({ api, store });
-    registerFlowboardCommand({ api, store });
-    api.registerService(createFlowboardChangeEventService(store));
-    api.registerService(createFlowboardReconcilerService({ store, runtime: api.runtime }));
+    registerTaskfoldGatewayMethods({ api, store });
+    registerTaskfoldCommand({ api, store });
+    api.registerService(createTaskfoldChangeEventService(store));
+    api.registerService(createTaskfoldReconcilerService({ store, runtime: api.runtime }));
     api.on("subagent_ended", async (event) => {
       if (event.runId) {
         await store.finishExecutionForRun(event.runId, {
@@ -16081,7 +16162,7 @@ var index_default = definePluginEntry({
           endedAt: event.endedAt,
           reason: event.error ?? event.reason
         });
-        await cleanupFlowboardRunWorktree({
+        await cleanupTaskfoldRunWorktree({
           store,
           worktrees: api.runtime.worktrees,
           runId: event.runId
@@ -16090,19 +16171,19 @@ var index_default = definePluginEntry({
     });
     api.registerCli(
       async ({ program }) => {
-        const { registerFlowboardCli: registerFlowboardCli2 } = await Promise.resolve().then(() => (init_cli(), cli_exports));
-        registerFlowboardCli2({ program, store });
+        const { registerTaskfoldCli: registerTaskfoldCli2 } = await Promise.resolve().then(() => (init_cli(), cli_exports));
+        registerTaskfoldCli2({ program, store });
       },
-      FLOWBOARD_CLI_OPTIONS
+      TASKFOLD_CLI_OPTIONS
     );
     api.registerTool(
-      (context) => guardFlowboardToolsForWorkspaceAccess(
-        createFlowboardTools({ api, context, store }),
+      (context) => guardTaskfoldToolsForWorkspaceAccess(
+        createTaskfoldTools({ api, context, store }),
         context,
         void 0
       ),
       {
-        names: [...FLOWBOARD_TOOL_NAMES],
+        names: [...TASKFOLD_TOOL_NAMES],
         optional: true
       }
     );

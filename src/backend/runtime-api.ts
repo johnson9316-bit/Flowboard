@@ -1,10 +1,10 @@
-// Flowboard API module exposes the plugin public contract.
-export { registerFlowboardGatewayMethods } from "./src/gateway.js";
+// Taskfold API module exposes the plugin public contract.
+export { registerTaskfoldGatewayMethods } from "./src/gateway.js";
 export type {
-  FlowboardCard,
-  FlowboardClaim,
-  FlowboardDiagnostic,
-  FlowboardListResult,
-  FlowboardPriority,
-  FlowboardStatus,
+  TaskfoldCard,
+  TaskfoldClaim,
+  TaskfoldDiagnostic,
+  TaskfoldListResult,
+  TaskfoldPriority,
+  TaskfoldStatus,
 } from "../contract/index.js";

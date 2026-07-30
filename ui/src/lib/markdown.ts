@@ -15,11 +15,11 @@ function sanitizedMarkdownHtml(content: string): string {
   });
 }
 
-export function flowboardMarkdownToEditorHtml(content: string): string {
+export function taskfoldMarkdownToEditorHtml(content: string): string {
   return sanitizedMarkdownHtml(content);
 }
 
-export function flowboardEditorHtmlToMarkdown(content: string): string {
+export function taskfoldEditorHtmlToMarkdown(content: string): string {
   const turndown = new TurndownService({
     bulletListMarker: "-",
     codeBlockStyle: "fenced",
@@ -35,6 +35,6 @@ export function flowboardEditorHtmlToMarkdown(content: string): string {
     .trimEnd();
 }
 
-export function renderFlowboardMarkdown(content: string) {
+export function renderTaskfoldMarkdown(content: string) {
   return unsafeHTML(sanitizedMarkdownHtml(content));
 }

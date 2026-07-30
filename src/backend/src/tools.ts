@@ -1,13 +1,13 @@
-import type { FlowboardCard } from "../../contract/index.js";
-// Flowboard plugin module implements tools behavior.
+import type { TaskfoldCard } from "../../contract/index.js";
+// Taskfold plugin module implements tools behavior.
 import { jsonResult, readStringParam } from "openclaw/plugin-sdk/core";
 import type { AnyAgentTool, OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 import type { OpenClawPluginToolContext } from "openclaw/plugin-sdk/plugin-entry";
 import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import { Type } from "typebox";
 import { redactClaimToken } from "./card-redaction.js";
-import { FlowboardStore } from "./store.js";
-import { cardIdField, claimTokenField, createFlowboardMoveTool } from "./tools-card-mutations.js";
+import { TaskfoldStore } from "./store.js";
+import { cardIdField, claimTokenField, createTaskfoldMoveTool } from "./tools-card-mutations.js";
 
 function contextOwner(ctx: OpenClawPluginToolContext | undefined): string {
   const record = (ctx ?? {}) as Record<string, unknown>;
@@ -19,7 +19,7 @@ function contextOwner(ctx: OpenClawPluginToolContext | undefined): string {
   );
 }
 
-function canMutateCard(card: FlowboardCard, ownerId: string, token?: string): boolean {
+function canMutateCard(card: TaskfoldCard, ownerId: string, token?: string): boolean {
   const claim = card.metadata?.claim;
   return !claim || claim.ownerId === ownerId || safeEqualSecret(token, claim.token);
 }
@@ -54,11 +54,11 @@ function readParentIds(value: unknown): string[] {
 }
 
 async function requireScopedCard(
-  store: FlowboardStore,
+  store: TaskfoldStore,
   cardId: string,
   ownerId: string,
   token?: string,
-): Promise<FlowboardCard> {
+): Promise<TaskfoldCard> {
   const card = await store.get(cardId);
   if (!card) {
     throw new Error(`card not found: ${cardId}`);
@@ -70,11 +70,11 @@ async function requireScopedCard(
 }
 
 async function requireClaimedCard(
-  store: FlowboardStore,
+  store: TaskfoldStore,
   cardId: string,
   ownerId: string,
   token?: string,
-): Promise<FlowboardCard> {
+): Promise<TaskfoldCard> {
   const card = await requireScopedCard(store, cardId, ownerId, token);
   if (!card.metadata?.claim) {
     throw new Error("card must be claimed before lifecycle completion.");
@@ -82,7 +82,7 @@ async function requireClaimedCard(
   return card;
 }
 
-function summarizeCard(card: FlowboardCard) {
+function summarizeCard(card: TaskfoldCard) {
   return {
     id: card.id,
     title: card.title,
@@ -112,18 +112,18 @@ function summarizeCard(card: FlowboardCard) {
   };
 }
 
-type FlowboardToolCardParams = {
+type TaskfoldToolCardParams = {
   record: Record<string, unknown>;
   id: string;
   token?: string;
   scope: { ownerId: string; token?: string };
 };
-type FlowboardToolCardParamsReader = (rawParams: unknown) => Promise<FlowboardToolCardParams>;
-type FlowboardCardMutation = (
+type TaskfoldToolCardParamsReader = (rawParams: unknown) => Promise<TaskfoldToolCardParams>;
+type TaskfoldCardMutation = (
   id: string,
   record: Record<string, unknown>,
-  scope: FlowboardToolCardParams["scope"],
-) => Promise<FlowboardCard>;
+  scope: TaskfoldToolCardParams["scope"],
+) => Promise<TaskfoldCard>;
 
 const ScopedClaimTokenField = claimTokenField("Claim token for claimed cards.");
 const OptionalNextStatusField = Type.Optional(
@@ -133,7 +133,7 @@ const OptionalOperatorNoteField = Type.Optional(
   Type.String({ description: "Optional operator note." }),
 );
 
-function readCardToolParams(rawParams: unknown, ownerId: string): FlowboardToolCardParams {
+function readCardToolParams(rawParams: unknown, ownerId: string): TaskfoldToolCardParams {
   const record = rawParams as Record<string, unknown>;
   const id = readStringParam(record, "id", { required: true });
   const token = record.token as string | undefined;
@@ -145,15 +145,15 @@ function readCardToolParams(rawParams: unknown, ownerId: string): FlowboardToolC
   };
 }
 
-function redactedCardResult(card: FlowboardCard) {
+function redactedCardResult(card: TaskfoldCard) {
   return jsonResult({ card: redactClaimToken(card) });
 }
 
-function redactedRawCardResult(card: FlowboardCard) {
+function redactedRawCardResult(card: TaskfoldCard) {
   return jsonResult(redactClaimToken(card));
 }
 
-function redactedProofResult(card: FlowboardCard) {
+function redactedProofResult(card: TaskfoldCard) {
   const proofId = card.metadata?.proof?.at(-1)?.id;
   if (!proofId) {
     throw new Error("proof was not retained in card metadata.");
@@ -172,43 +172,43 @@ const CardIdSchema = Type.Object(
   { additionalProperties: false },
 );
 
-export function createFlowboardTools(params: {
+export function createTaskfoldTools(params: {
   api: OpenClawPluginApi;
   context?: OpenClawPluginToolContext;
-  store?: FlowboardStore;
+  store?: TaskfoldStore;
 }): AnyAgentTool[] {
-  const store = params.store ?? FlowboardStore.openSqlite();
+  const store = params.store ?? TaskfoldStore.openSqlite();
   const ownerId = contextOwner(params.context);
-  const readScopedCardToolParams = async (rawParams: unknown): Promise<FlowboardToolCardParams> => {
+  const readScopedCardToolParams = async (rawParams: unknown): Promise<TaskfoldToolCardParams> => {
     const input = readCardToolParams(rawParams, ownerId);
     await requireScopedCard(store, input.id, ownerId, input.token);
     return input;
   };
   const readClaimedCardToolParams = async (
     rawParams: unknown,
-  ): Promise<FlowboardToolCardParams> => {
+  ): Promise<TaskfoldToolCardParams> => {
     const input = readCardToolParams(rawParams, ownerId);
     await requireClaimedCard(store, input.id, ownerId, input.token);
     return input;
   };
   const runCardMutation = async (
     rawParams: unknown,
-    readParams: FlowboardToolCardParamsReader,
-    mutate: FlowboardCardMutation,
+    readParams: TaskfoldToolCardParamsReader,
+    mutate: TaskfoldCardMutation,
   ) => {
     const { record, id, scope } = await readParams(rawParams);
     return redactedCardResult(await mutate(id, record, scope));
   };
-  const runScopedCardMutation = (rawParams: unknown, mutate: FlowboardCardMutation) =>
+  const runScopedCardMutation = (rawParams: unknown, mutate: TaskfoldCardMutation) =>
     runCardMutation(rawParams, readScopedCardToolParams, mutate);
-  const runClaimedCardMutation = (rawParams: unknown, mutate: FlowboardCardMutation) =>
+  const runClaimedCardMutation = (rawParams: unknown, mutate: TaskfoldCardMutation) =>
     runCardMutation(rawParams, readClaimedCardToolParams, mutate);
   return [
     {
-      name: "flowboard_list",
-      label: "Flowboard List",
+      name: "taskfold_list",
+      label: "Taskfold List",
       description:
-        "List Flowboard cards with compact claim and diagnostic state. Use before choosing or routing board work.",
+        "List Taskfold cards with compact claim and diagnostic state. Use before choosing or routing board work.",
       parameters: Type.Object(
         {
           status: Type.Optional(Type.String({ description: "Optional card status filter." })),
@@ -251,10 +251,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_create",
-      label: "Flowboard Create",
+      name: "taskfold_create",
+      label: "Taskfold Create",
       description:
-        "Create a Flowboard card, optionally with parent dependencies, tenant, skills, workspace, and idempotency key.",
+        "Create a Taskfold card, optionally with parent dependencies, tenant, skills, workspace, and idempotency key.",
       parameters: Type.Object(
         {
           title: Type.String({ description: "Card title." }),
@@ -304,8 +304,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_link",
-      label: "Flowboard Link",
+      name: "taskfold_link",
+      label: "Taskfold Link",
       description:
         "Link a parent card to a child card so the child becomes ready only after parents are done.",
       parameters: Type.Object(
@@ -329,10 +329,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_read",
-      label: "Flowboard Read",
+      name: "taskfold_read",
+      label: "Taskfold Read",
       description:
-        "Read one Flowboard card and return bounded worker context with notes, attempts, comments, proof, links, and diagnostics.",
+        "Read one Taskfold card and return bounded worker context with notes, attempts, comments, proof, links, and diagnostics.",
       parameters: CardIdSchema,
       execute: async (_toolCallId, rawParams) => {
         const record = rawParams as Record<string, unknown>;
@@ -348,10 +348,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_claim",
-      label: "Flowboard Claim",
+      name: "taskfold_claim",
+      label: "Taskfold Claim",
       description:
-        "Claim a Flowboard card for this agent and move backlog/todo cards into running. Returns a claim token for heartbeats and release.",
+        "Claim a Taskfold card for this agent and move backlog/todo cards into running. Returns a claim token for heartbeats and release.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -370,10 +370,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_heartbeat",
-      label: "Flowboard Heartbeat",
+      name: "taskfold_heartbeat",
+      label: "Taskfold Heartbeat",
       description:
-        "Refresh this agent's Flowboard claim heartbeat. Use during long-running card work so diagnostics do not mark it stale.",
+        "Refresh this agent's Taskfold claim heartbeat. Use during long-running card work so diagnostics do not mark it stale.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -393,10 +393,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_release",
-      label: "Flowboard Release",
+      name: "taskfold_release",
+      label: "Taskfold Release",
       description:
-        "Release this agent's Flowboard claim after finishing, pausing, or handing off card work.",
+        "Release this agent's Taskfold claim after finishing, pausing, or handing off card work.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -418,9 +418,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_comment",
-      label: "Flowboard Comment",
-      description: "Append a compact comment to a Flowboard card.",
+      name: "taskfold_comment",
+      label: "Taskfold Comment",
+      description: "Append a compact comment to a Taskfold card.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -435,10 +435,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_proof",
-      label: "Flowboard Proof",
+      name: "taskfold_proof",
+      label: "Taskfold Proof",
       description:
-        "Attach proof or artifact metadata to a Flowboard card after running tests, checks, or producing screenshots/logs. Returns proofId; pass it to flowboard_complete when that call reports the terminal status for this proof.",
+        "Attach proof or artifact metadata to a Taskfold card after running tests, checks, or producing screenshots/logs. Returns proofId; pass it to taskfold_complete when that call reports the terminal status for this proof.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -477,10 +477,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_complete",
-      label: "Flowboard Complete",
+      name: "taskfold_complete",
+      label: "Taskfold Complete",
       description:
-        "Complete a claimed Flowboard card with a structured summary, proof, artifacts, and created-card manifest.",
+        "Complete a claimed Taskfold card with a structured summary, proof, artifacts, and created-card manifest.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -489,7 +489,7 @@ export function createFlowboardTools(params: {
           proofId: Type.Optional(
             Type.String({
               description:
-                "Proof id returned by flowboard_proof when resolving that pending proof.",
+                "Proof id returned by taskfold_proof when resolving that pending proof.",
             }),
           ),
           proof: Type.Optional(
@@ -532,10 +532,10 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_attachment_add",
-      label: "Flowboard Attachment Add",
+      name: "taskfold_attachment_add",
+      label: "Taskfold Attachment Add",
       description:
-        "Store a small Flowboard attachment in plugin SQLite KV and link it to the card.",
+        "Store a small Taskfold attachment in plugin SQLite KV and link it to the card.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -553,9 +553,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_attachment_read",
-      label: "Flowboard Attachment Read",
-      description: "Read one Flowboard attachment from plugin SQLite KV.",
+      name: "taskfold_attachment_read",
+      label: "Taskfold Attachment Read",
+      description: "Read one Taskfold attachment from plugin SQLite KV.",
       parameters: Type.Object(
         {
           id: Type.String({ description: "Attachment id." }),
@@ -574,9 +574,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_attachment_delete",
-      label: "Flowboard Attachment Delete",
-      description: "Delete one Flowboard attachment from plugin SQLite KV and the card index.",
+      name: "taskfold_attachment_delete",
+      label: "Taskfold Attachment Delete",
+      description: "Delete one Taskfold attachment from plugin SQLite KV and the card index.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -592,9 +592,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_block",
-      label: "Flowboard Block",
-      description: "Block a claimed Flowboard card with a durable reason and release the claim.",
+      name: "taskfold_block",
+      label: "Taskfold Block",
+      description: "Block a claimed Taskfold card with a durable reason and release the claim.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -610,20 +610,20 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_unblock",
-      label: "Flowboard Unblock",
-      description: "Move a blocked Flowboard card back to todo after adding enough context.",
+      name: "taskfold_unblock",
+      label: "Taskfold Unblock",
+      description: "Move a blocked Taskfold card back to todo after adding enough context.",
       parameters: CardIdSchema,
       execute: async (_toolCallId, rawParams) => {
         const { id, scope } = await readScopedCardToolParams(rawParams);
         return redactedRawCardResult(await store.unblock(id, scope));
       },
     },
-    createFlowboardMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
+    createTaskfoldMoveTool({ store, readScopedCardToolParams, redactedCardResult }),
     {
-      name: "flowboard_projects",
-      label: "Flowboard Projects",
-      description: "List Flowboard projects and their card summaries.",
+      name: "taskfold_projects",
+      label: "Taskfold Projects",
+      description: "List Taskfold projects and their card summaries.",
       parameters: Type.Object(
         {
           includeArchived: Type.Optional(Type.Boolean()),
@@ -634,9 +634,9 @@ export function createFlowboardTools(params: {
         jsonResult(await store.listProjects(rawParams as Record<string, unknown>)),
     },
     {
-      name: "flowboard_project_create",
-      label: "Flowboard Project Create",
-      description: "Create a Flowboard project with its first milestone and standard documents.",
+      name: "taskfold_project_create",
+      label: "Taskfold Project Create",
+      description: "Create a Taskfold project with its first milestone and standard documents.",
       parameters: Type.Object(
         {
           id: Type.String({ description: "Stable project id." }),
@@ -653,9 +653,9 @@ export function createFlowboardTools(params: {
         jsonResult({ project: await store.createProject(rawParams as Record<string, unknown>) }),
     },
     {
-      name: "flowboard_project_read",
-      label: "Flowboard Project Read",
-      description: "Read one Flowboard project's settings, milestones, and cards.",
+      name: "taskfold_project_read",
+      label: "Taskfold Project Read",
+      description: "Read one Taskfold project's settings, milestones, and cards.",
       parameters: Type.Object({ id: Type.String() }, { additionalProperties: false }),
       execute: async (_toolCallId, rawParams) =>
         jsonResult({
@@ -665,9 +665,9 @@ export function createFlowboardTools(params: {
         }),
     },
     {
-      name: "flowboard_milestone_create",
-      label: "Flowboard Milestone Create",
-      description: "Create an active milestone column in a Flowboard project.",
+      name: "taskfold_milestone_create",
+      label: "Taskfold Milestone Create",
+      description: "Create an active milestone column in a Taskfold project.",
       parameters: Type.Object(
         {
           boardId: Type.String(),
@@ -681,8 +681,8 @@ export function createFlowboardTools(params: {
         jsonResult({ milestone: await store.createMilestone(rawParams as Record<string, unknown>) }),
     },
     {
-      name: "flowboard_move_milestone",
-      label: "Flowboard Move Milestone",
+      name: "taskfold_move_milestone",
+      label: "Taskfold Move Milestone",
       description: "Move a card between milestone columns without changing its execution status.",
       parameters: Type.Object(
         {
@@ -701,8 +701,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_move_project",
-      label: "Flowboard Move Project",
+      name: "taskfold_move_project",
+      label: "Taskfold Move Project",
       description: "Move a card to another active project while retaining its execution history.",
       parameters: Type.Object(
         {
@@ -720,8 +720,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_project_documents",
-      label: "Flowboard Project Documents",
+      name: "taskfold_project_documents",
+      label: "Taskfold Project Documents",
       description: "List a project's long-lived context documents.",
       parameters: Type.Object(
         {
@@ -740,8 +740,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_project_document_create",
-      label: "Flowboard Project Document Create",
+      name: "taskfold_project_document_create",
+      label: "Taskfold Project Document Create",
       description: "Add a typed project document without reading files or secrets.",
       parameters: Type.Object(
         {
@@ -762,16 +762,16 @@ export function createFlowboardTools(params: {
         }),
     },
     {
-      name: "flowboard_boards",
-      label: "Flowboard Boards",
-      description: "List Flowboard board namespaces with active, archived, and status counts.",
+      name: "taskfold_boards",
+      label: "Taskfold Boards",
+      description: "List Taskfold board namespaces with active, archived, and status counts.",
       parameters: Type.Object({}, { additionalProperties: false }),
       execute: async () => jsonResult(await store.listBoards()),
     },
     {
-      name: "flowboard_board_create",
-      label: "Flowboard Board Create",
-      description: "Create or update a Flowboard board namespace with persisted SQLite metadata.",
+      name: "taskfold_board_create",
+      label: "Taskfold Board Create",
+      description: "Create or update a Taskfold board namespace with persisted SQLite metadata.",
       parameters: Type.Object(
         {
           id: Type.String({ description: "Board id." }),
@@ -813,9 +813,9 @@ export function createFlowboardTools(params: {
         jsonResult({ board: await store.upsertBoard(rawParams as Record<string, unknown>) }),
     },
     {
-      name: "flowboard_board_archive",
-      label: "Flowboard Board Archive",
-      description: "Archive or restore persisted Flowboard board metadata.",
+      name: "taskfold_board_archive",
+      label: "Taskfold Board Archive",
+      description: "Archive or restore persisted Taskfold board metadata.",
       parameters: Type.Object(
         {
           id: Type.String({ description: "Board id." }),
@@ -829,9 +829,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_board_delete",
-      label: "Flowboard Board Delete",
-      description: "Delete an empty non-default Flowboard board metadata record.",
+      name: "taskfold_board_delete",
+      label: "Taskfold Board Delete",
+      description: "Delete an empty non-default Taskfold board metadata record.",
       parameters: Type.Object(
         { id: Type.String({ description: "Board id." }) },
         { additionalProperties: false },
@@ -840,9 +840,9 @@ export function createFlowboardTools(params: {
         jsonResult(await store.deleteBoard((rawParams as Record<string, unknown>).id)),
     },
     {
-      name: "flowboard_stats",
-      label: "Flowboard Stats",
-      description: "Summarize Flowboard counts by status and assignee for one board or all boards.",
+      name: "taskfold_stats",
+      label: "Taskfold Stats",
+      description: "Summarize Taskfold counts by status and assignee for one board or all boards.",
       parameters: Type.Object(
         {
           boardId: Type.Optional(Type.String({ description: "Optional board id filter." })),
@@ -855,9 +855,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_runs",
-      label: "Flowboard Runs",
-      description: "List persisted Flowboard run attempts for one card.",
+      name: "taskfold_runs",
+      label: "Taskfold Runs",
+      description: "List persisted Taskfold run attempts for one card.",
       parameters: CardIdSchema,
       execute: async (_toolCallId, rawParams) => {
         const id = readStringParam(rawParams as Record<string, unknown>, "id", { required: true });
@@ -866,13 +866,13 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_specify",
-      label: "Flowboard Specify",
+      name: "taskfold_specify",
+      label: "Taskfold Specify",
       description:
-        "Turn a rough triage/backlog Flowboard card into a specified todo card after reasoning through the requirements.",
+        "Turn a rough triage/backlog Taskfold card into a specified todo card after reasoning through the requirements.",
       parameters: Type.Object(
         {
-          id: Type.String({ description: "Flowboard card id." }),
+          id: Type.String({ description: "Taskfold card id." }),
           title: Type.Optional(Type.String({ description: "Clarified title." })),
           notes: Type.Optional(
             Type.String({ description: "Clarified notes or acceptance criteria." }),
@@ -910,13 +910,13 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_decompose",
-      label: "Flowboard Decompose",
+      name: "taskfold_decompose",
+      label: "Taskfold Decompose",
       description:
-        "Fan out a Flowboard card into linked child cards and optionally complete the parent orchestration card.",
+        "Fan out a Taskfold card into linked child cards and optionally complete the parent orchestration card.",
       parameters: Type.Object(
         {
-          id: Type.String({ description: "Parent Flowboard card id." }),
+          id: Type.String({ description: "Parent Taskfold card id." }),
           token: Type.Optional(Type.String({ description: "Claim token for claimed cards." })),
           summary: Type.Optional(Type.String({ description: "Decomposition summary." })),
           completeParent: Type.Optional(
@@ -971,9 +971,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_notify_subscribe",
-      label: "Flowboard Notify Subscribe",
-      description: "Persist a Flowboard notification subscription in the plugin SQLite store.",
+      name: "taskfold_notify_subscribe",
+      label: "Taskfold Notify Subscribe",
+      description: "Persist a Taskfold notification subscription in the plugin SQLite store.",
       parameters: Type.Object(
         {
           boardId: Type.Optional(Type.String({ description: "Board id. Default default." })),
@@ -993,9 +993,9 @@ export function createFlowboardTools(params: {
         }),
     },
     {
-      name: "flowboard_notify_list",
-      label: "Flowboard Notify List",
-      description: "List persisted Flowboard notification subscriptions.",
+      name: "taskfold_notify_list",
+      label: "Taskfold Notify List",
+      description: "List persisted Taskfold notification subscriptions.",
       parameters: Type.Object(
         {
           boardId: Type.Optional(Type.String({ description: "Board id." })),
@@ -1007,9 +1007,9 @@ export function createFlowboardTools(params: {
         jsonResult(await store.listNotificationSubscriptions(rawParams as Record<string, unknown>)),
     },
     {
-      name: "flowboard_notify_events",
-      label: "Flowboard Notify Events",
-      description: "Read replay-safe Flowboard notification events without advancing cursors.",
+      name: "taskfold_notify_events",
+      label: "Taskfold Notify Events",
+      description: "Read replay-safe Taskfold notification events without advancing cursors.",
       parameters: Type.Object(
         {
           subscriptionId: Type.Optional(Type.String({ description: "Subscription id." })),
@@ -1023,9 +1023,9 @@ export function createFlowboardTools(params: {
         jsonResult(await store.notificationEvents(rawParams as Record<string, unknown>)),
     },
     {
-      name: "flowboard_notify_advance",
-      label: "Flowboard Notify Advance",
-      description: "Read Flowboard notification events and advance the subscription cursor.",
+      name: "taskfold_notify_advance",
+      label: "Taskfold Notify Advance",
+      description: "Read Taskfold notification events and advance the subscription cursor.",
       parameters: Type.Object(
         {
           subscriptionId: Type.String({ description: "Subscription id." }),
@@ -1037,9 +1037,9 @@ export function createFlowboardTools(params: {
         jsonResult(await store.advanceNotificationEvents(rawParams as Record<string, unknown>)),
     },
     {
-      name: "flowboard_notify_unsubscribe",
-      label: "Flowboard Notify Unsubscribe",
-      description: "Delete a persisted Flowboard notification subscription.",
+      name: "taskfold_notify_unsubscribe",
+      label: "Taskfold Notify Unsubscribe",
+      description: "Delete a persisted Taskfold notification subscription.",
       parameters: Type.Object(
         { id: Type.String({ description: "Subscription id." }) },
         { additionalProperties: false },
@@ -1050,8 +1050,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_promote",
-      label: "Flowboard Promote",
+      name: "taskfold_promote",
+      label: "Taskfold Promote",
       description:
         "Promote a dependency-ready card into ready, optionally forcing past holds for operator recovery.",
       parameters: Type.Object(
@@ -1072,8 +1072,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_reassign",
-      label: "Flowboard Reassign",
+      name: "taskfold_reassign",
+      label: "Taskfold Reassign",
       description: "Change a card assignee and optionally reset failure state during recovery.",
       parameters: Type.Object(
         {
@@ -1093,8 +1093,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_reclaim",
-      label: "Flowboard Reclaim",
+      name: "taskfold_reclaim",
+      label: "Taskfold Reclaim",
       description:
         "Release a stale claim and stop running attempts so another agent can pick it up.",
       parameters: Type.Object(
@@ -1113,8 +1113,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_dispatch",
-      label: "Flowboard Dispatch",
+      name: "taskfold_dispatch",
+      label: "Taskfold Dispatch",
       description:
         "Advance persisted board state without launching workers: promote unblocked cards, reclaim expired claims, and block timed-out runs.",
       parameters: Type.Object(
@@ -1139,9 +1139,9 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_worker_log",
-      label: "Flowboard Worker Log",
-      description: "Append a persisted worker log entry to a Flowboard card.",
+      name: "taskfold_worker_log",
+      label: "Taskfold Worker Log",
+      description: "Append a persisted worker log entry to a Taskfold card.",
       parameters: Type.Object(
         {
           id: cardIdField(),
@@ -1159,8 +1159,8 @@ export function createFlowboardTools(params: {
       },
     },
     {
-      name: "flowboard_protocol_violation",
-      label: "Flowboard Protocol Violation",
+      name: "taskfold_protocol_violation",
+      label: "Taskfold Protocol Violation",
       description:
         "Block a card and record a worker protocol violation when work stops without complete/block.",
       parameters: Type.Object(

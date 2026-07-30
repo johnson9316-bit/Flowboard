@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { FlowboardCoreStore } from "../src/backend/src/store-core.js";
+import { TaskfoldCoreStore } from "../src/backend/src/store-core.js";
 import type {
-  FlowboardKeyedStore,
-  PersistedFlowboardCard,
+  TaskfoldKeyedStore,
+  PersistedTaskfoldCard,
 } from "../src/backend/src/persistence-types.js";
 
-function createStore(): FlowboardKeyedStore<PersistedFlowboardCard> {
-  const values = new Map<string, PersistedFlowboardCard>();
+function createStore(): TaskfoldKeyedStore<PersistedTaskfoldCard> {
+  const values = new Map<string, PersistedTaskfoldCard>();
   return {
-    async register(key: string, value: PersistedFlowboardCard) {
+    async register(key: string, value: PersistedTaskfoldCard) {
       values.set(key, value);
     },
     async lookup(key: string) {
@@ -23,9 +23,9 @@ function createStore(): FlowboardKeyedStore<PersistedFlowboardCard> {
   };
 }
 
-describe("flowboard change wait", () => {
+describe("taskfold change wait", () => {
   it("returns immediately for a cursor from a different change epoch", async () => {
-    const store = new FlowboardCoreStore(createStore());
+    const store = new TaskfoldCoreStore(createStore());
     store.announceChangeEpoch();
     const current = store.currentChange();
 
@@ -37,7 +37,7 @@ describe("flowboard change wait", () => {
   it("keeps a caller's cursor usable across a restart of the same database", async () => {
     const backing = createStore();
     const epoch = "database-scoped-epoch";
-    // Stands in for the durable counter the SQLite store keeps in flowboard_meta.
+    // Stands in for the durable counter the SQLite store keeps in taskfold_meta.
     let reserved = 0;
     const reserveChangeRevisions = (count: number) => {
       const base = reserved;
@@ -45,7 +45,7 @@ describe("flowboard change wait", () => {
       return base;
     };
     const openStore = () =>
-      new FlowboardCoreStore(backing, { changeEpoch: epoch, reserveChangeRevisions });
+      new TaskfoldCoreStore(backing, { changeEpoch: epoch, reserveChangeRevisions });
 
     const before = openStore();
     before.announceChangeEpoch();
@@ -67,7 +67,7 @@ describe("flowboard change wait", () => {
   });
 
   it("waits until a new revision is announced", async () => {
-    const store = new FlowboardCoreStore(createStore());
+    const store = new TaskfoldCoreStore(createStore());
     store.announceChangeEpoch();
     const cursor = store.currentChange();
     if (!cursor) {

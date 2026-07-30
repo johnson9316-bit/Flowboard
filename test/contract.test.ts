@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { isValidFlowboardBoardId } from "../src/contract/index.js";
+import { isValidTaskfoldBoardId } from "../src/contract/index.js";
 
-describe("flowboard board IDs", () => {
+describe("taskfold board IDs", () => {
   it("accepts the persisted board namespace format", () => {
-    expect(isValidFlowboardBoardId("default")).toBe(true);
-    expect(isValidFlowboardBoardId("release_2026.07")).toBe(true);
+    expect(isValidTaskfoldBoardId("default")).toBe(true);
+    expect(isValidTaskfoldBoardId("release_2026.07")).toBe(true);
   });
 
   it("rejects unsafe board identifiers", () => {
-    expect(isValidFlowboardBoardId("../native")).toBe(false);
-    expect(isValidFlowboardBoardId("UPPERCASE")).toBe(false);
+    expect(isValidTaskfoldBoardId("../native")).toBe(false);
+    expect(isValidTaskfoldBoardId("UPPERCASE")).toBe(false);
   });
 });

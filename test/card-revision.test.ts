@@ -2,10 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createFlowboardSqliteStores } from "../src/backend/src/sqlite-store.js";
-import { FlowboardRevisionConflictError } from "../src/backend/src/store-core.js";
-import { FlowboardStore } from "../src/backend/src/store.js";
-import { FLOWBOARD_PROMPT_VERSION } from "../src/backend/src/worker-prompt.js";
+import { createTaskfoldSqliteStores } from "../src/backend/src/sqlite-store.js";
+import { TaskfoldRevisionConflictError } from "../src/backend/src/store-core.js";
+import { TaskfoldStore } from "../src/backend/src/store.js";
+import { TASKFOLD_PROMPT_VERSION } from "../src/backend/src/worker-prompt.js";
 
 const roots: string[] = [];
 const closers: Array<() => void> = [];
@@ -24,21 +24,21 @@ afterEach(() => {
  * share no in-process mutation queue, so only a database-level guard can keep
  * them from both winning.
  */
-function openSharedDatabase(): { dbPath: string; open: () => FlowboardStore } {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-revision-"));
+function openSharedDatabase(): { dbPath: string; open: () => TaskfoldStore } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-revision-"));
   roots.push(root);
-  const dbPath = path.join(root, "flowboard.sqlite");
+  const dbPath = path.join(root, "taskfold.sqlite");
   return {
     dbPath,
     open: () => {
-      const stores = createFlowboardSqliteStores({ dbPath });
+      const stores = createTaskfoldSqliteStores({ dbPath });
       closers.push(stores.close);
-      return FlowboardStore.fromSqliteStores(stores);
+      return TaskfoldStore.fromSqliteStores(stores);
     },
   };
 }
 
-describe("Flowboard card revision", () => {
+describe("Taskfold card revision", () => {
   it("advances monotonically on every persisted write and survives reopen", async () => {
     const { open } = openSharedDatabase();
     const store = open();
@@ -96,7 +96,7 @@ describe("Flowboard card revision", () => {
 
     await expect(
       store.claimExecution(card.id, { ownerId: "owner-a", expectedRevision: staleRevision }),
-    ).rejects.toThrow(FlowboardRevisionConflictError);
+    ).rejects.toThrow(TaskfoldRevisionConflictError);
   });
 
   it("keeps the change cursor comparable and advancing across a reopen", async () => {
@@ -137,11 +137,11 @@ describe("Flowboard card revision", () => {
       },
     });
     const attempt = started.metadata?.attempts?.at(-1);
-    expect(attempt?.promptVersion).toBe(FLOWBOARD_PROMPT_VERSION);
+    expect(attempt?.promptVersion).toBe(TASKFOLD_PROMPT_VERSION);
 
     // Survives a reopen, so the attribution is persisted rather than in-memory.
     expect((await open().get(card.id))?.metadata?.attempts?.at(-1)?.promptVersion).toBe(
-      FLOWBOARD_PROMPT_VERSION,
+      TASKFOLD_PROMPT_VERSION,
     );
   });
 
@@ -161,7 +161,7 @@ describe("Flowboard card revision", () => {
     try {
       const readOwner = () =>
         (
-          db.prepare("SELECT claim_owner_id FROM flowboard_cards WHERE id = ?").get(card.id) as
+          db.prepare("SELECT claim_owner_id FROM taskfold_cards WHERE id = ?").get(card.id) as
             | { claim_owner_id: string | null }
             | undefined
         )?.claim_owner_id ?? null;

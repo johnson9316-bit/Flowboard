@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
-import type { FlowboardCard } from "../../contract/index.js";
+import type { TaskfoldCard } from "../../contract/index.js";
 import { assertCanMutateClaimedCard } from "./store-card-helpers.js";
 import { MAX_CARD_COMMENTS } from "./store-constants.js";
-import { FlowboardEnrichmentStore } from "./store-enrichment.js";
-import type { FlowboardMutationScope, FlowboardPromoteInput } from "./store-inputs.js";
+import { TaskfoldEnrichmentStore } from "./store-enrichment.js";
+import type { TaskfoldMutationScope, TaskfoldPromoteInput } from "./store-inputs.js";
 import { clearDiagnostics, normalizeBoundedString } from "./store-normalizers.js";
 
-export class FlowboardPromoteStore extends FlowboardEnrichmentStore {
-  async promoteReady(now = Date.now()): Promise<{ cards: FlowboardCard[]; count: number }> {
+export class TaskfoldPromoteStore extends TaskfoldEnrichmentStore {
+  async promoteReady(now = Date.now()): Promise<{ cards: TaskfoldCard[]; count: number }> {
     return await this.enqueueMutation(async () => {
-      const promoted: FlowboardCard[] = [];
+      const promoted: TaskfoldCard[] = [];
       for (const card of await this.list()) {
         const next = await this.promoteDependencyReady(card.id, now);
         if (next.status !== card.status) {
@@ -24,8 +24,8 @@ export class FlowboardPromoteStore extends FlowboardEnrichmentStore {
     id: string,
     status: unknown,
     position: unknown,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -47,9 +47,9 @@ export class FlowboardPromoteStore extends FlowboardEnrichmentStore {
 
   async promote(
     id: string,
-    input: FlowboardPromoteInput = {},
-    scope?: FlowboardMutationScope | null,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldPromoteInput = {},
+    scope?: TaskfoldMutationScope | null,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {

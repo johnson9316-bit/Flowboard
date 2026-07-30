@@ -1,4 +1,4 @@
-// Flowboard plugin module decides whether a card's recorded run is still alive.
+// Taskfold plugin module decides whether a card's recorded run is still alive.
 //
 // These are pure decisions: given a card and the current time, say whether the run
 // it claims to be executing is live, stuck, or gone, and what the card's status and
@@ -11,7 +11,7 @@
 //   - `runtime.gateway.request("sessions.list")` is refused for any plugin that is
 //     not bundled or trusted-official.
 //   - `runtime.tasks.runs.bindSession({sessionKey})` scopes every lookup to
-//     `task.ownerKey`, which for a Flowboard run is the *requester* session that
+//     `task.ownerKey`, which for a Taskfold run is the *requester* session that
 //     spawned the subagent, not the card's own session, and the dispatch path never
 //     learns it.
 //   - `runtime.subagent.waitForRun({runId})` answers "timeout" for any run not live
@@ -25,12 +25,12 @@
 // a literal comparison between the two never matches, and the previous version of
 // this module made exactly that comparison to decide a run was orphaned.
 import type {
-  FlowboardCard,
-  FlowboardExecutionStatus,
-  FlowboardStaleState,
-  FlowboardStatus,
+  TaskfoldCard,
+  TaskfoldExecutionStatus,
+  TaskfoldStaleState,
+  TaskfoldStatus,
 } from "../../contract/index.js";
-import { cardSessionKey, flowboardLastActivityAt } from "./store-card-helpers.js";
+import { cardSessionKey, taskfoldLastActivityAt } from "./store-card-helpers.js";
 import { RUNNING_HEARTBEAT_STALE_MS } from "./store-constants.js";
 
 /**
@@ -40,7 +40,7 @@ import { RUNNING_HEARTBEAT_STALE_MS } from "./store-constants.js";
  */
 const ABANDONED_RUN_GRACE_MS = 10 * 60 * 1000;
 
-export type FlowboardRunEvidence =
+export type TaskfoldRunEvidence =
   /** The card records no run to judge. */
   | "unlinked"
   /** The run already recorded an outcome; only the card status may be lagging. */
@@ -52,11 +52,11 @@ export type FlowboardRunEvidence =
   /** Silent long past the grace window. Nothing is left to report an outcome. */
   | "abandoned";
 
-export type FlowboardLifecycleState = FlowboardRunEvidence;
+export type TaskfoldLifecycleState = TaskfoldRunEvidence;
 
-export type FlowboardLifecycle = {
-  state: FlowboardLifecycleState;
-  targetStatus?: FlowboardStatus;
+export type TaskfoldLifecycle = {
+  state: TaskfoldLifecycleState;
+  targetStatus?: TaskfoldStatus;
   /**
    * When the evidence behind this verdict was last refreshed. Used to reject a
    * verdict that is older than the card's current status provenance.
@@ -65,7 +65,7 @@ export type FlowboardLifecycle = {
 };
 
 /** Whether the card claims work is in flight at all. */
-function claimsRunning(card: FlowboardCard): boolean {
+function claimsRunning(card: TaskfoldCard): boolean {
   return (
     card.status === "running" ||
     card.execution?.status === "running" ||
@@ -75,12 +75,12 @@ function claimsRunning(card: FlowboardCard): boolean {
 }
 
 /** Execution statuses that record an outcome, so no liveness question remains. */
-const TERMINAL_EXECUTION_STATUSES = new Set<FlowboardExecutionStatus>(["done", "review", "blocked"]);
+const TERMINAL_EXECUTION_STATUSES = new Set<TaskfoldExecutionStatus>(["done", "review", "blocked"]);
 
-export function flowboardRunEvidence(params: {
-  card: FlowboardCard;
+export function taskfoldRunEvidence(params: {
+  card: TaskfoldCard;
   now: number;
-}): FlowboardRunEvidence {
+}): TaskfoldRunEvidence {
   const { card, now } = params;
   if (!claimsRunning(card) || !cardSessionKey(card)) {
     return "unlinked";
@@ -92,7 +92,7 @@ export function flowboardRunEvidence(params: {
     // touches `updatedAt`, which would otherwise read as a fresh sign of life.
     return "finished";
   }
-  const silentFor = now - flowboardLastActivityAt(card);
+  const silentFor = now - taskfoldLastActivityAt(card);
   if (silentFor <= RUNNING_HEARTBEAT_STALE_MS) {
     return "live";
   }
@@ -105,29 +105,29 @@ export function flowboardRunEvidence(params: {
  * live run destroys real work while leaving a dead one open only delays cleanup.
  */
 export function staleRunState(
-  card: FlowboardCard,
+  card: TaskfoldCard,
   now: number,
-): FlowboardStaleState | undefined {
-  if (flowboardRunEvidence({ card, now }) !== "stale") {
+): TaskfoldStaleState | undefined {
+  if (taskfoldRunEvidence({ card, now }) !== "stale") {
     return undefined;
   }
   return {
     detectedAt: now,
-    lastSessionUpdatedAt: flowboardLastActivityAt(card),
+    lastSessionUpdatedAt: taskfoldLastActivityAt(card),
     reason: "Linked run has not reported recent activity.",
   };
 }
 
-export function getFlowboardLifecycle(params: {
-  card: FlowboardCard;
+export function getTaskfoldLifecycle(params: {
+  card: TaskfoldCard;
   now: number;
-}): FlowboardLifecycle {
+}): TaskfoldLifecycle {
   const { card, now } = params;
-  const state = flowboardRunEvidence({ card, now });
+  const state = taskfoldRunEvidence({ card, now });
   if (state === "unlinked") {
     return { state };
   }
-  const sourceUpdatedAt = flowboardLastActivityAt(card);
+  const sourceUpdatedAt = taskfoldLastActivityAt(card);
   switch (state) {
     case "finished":
       // Let the card catch up to the outcome its own execution already recorded.
@@ -150,8 +150,8 @@ export function getFlowboardLifecycle(params: {
 }
 
 export function executionStatusForLifecycle(
-  lifecycle: FlowboardLifecycle,
-): FlowboardExecutionStatus | undefined {
+  lifecycle: TaskfoldLifecycle,
+): TaskfoldExecutionStatus | undefined {
   switch (lifecycle.state) {
     case "live":
     case "stale":
@@ -170,8 +170,8 @@ export function executionStatusForLifecycle(
  * Whether a run should be closed out because nothing is left alive to report its
  * outcome. Only an abandoned run qualifies; everything else is left alone.
  */
-export function shouldCloseOrphanedRun(params: { card: FlowboardCard; now: number }): boolean {
-  return flowboardRunEvidence(params) === "abandoned";
+export function shouldCloseOrphanedRun(params: { card: TaskfoldCard; now: number }): boolean {
+  return taskfoldRunEvidence(params) === "abandoned";
 }
 
 /**
@@ -180,8 +180,8 @@ export function shouldCloseOrphanedRun(params: { card: FlowboardCard; now: numbe
  * triage) or walk a finished card backwards.
  */
 export function shouldSyncCardStatus(
-  card: FlowboardCard,
-  targetStatus: FlowboardStatus | undefined,
+  card: TaskfoldCard,
+  targetStatus: TaskfoldStatus | undefined,
 ): boolean {
   if (!targetStatus || card.status === targetStatus) {
     return false;
@@ -196,8 +196,8 @@ export function shouldSyncCardStatus(
 }
 
 export function shouldSyncExecutionStatus(
-  card: FlowboardCard,
-  targetStatus: FlowboardExecutionStatus | undefined,
+  card: TaskfoldCard,
+  targetStatus: TaskfoldExecutionStatus | undefined,
 ): boolean {
   return Boolean(card.execution && targetStatus && card.execution.status !== targetStatus);
 }

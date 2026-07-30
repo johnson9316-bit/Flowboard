@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type {
-  FlowboardBoardMetadata,
-  FlowboardCard,
-  FlowboardMilestone,
-  FlowboardProjectDocument,
-  FlowboardProjectDocumentSection,
-  FlowboardProjectDocumentType,
-  FlowboardProjectView,
+  TaskfoldBoardMetadata,
+  TaskfoldCard,
+  TaskfoldMilestone,
+  TaskfoldProjectDocument,
+  TaskfoldProjectDocumentSection,
+  TaskfoldProjectDocumentType,
+  TaskfoldProjectView,
 } from "../../contract/index.js";
 import {
-  FLOWBOARD_MILESTONE_STATES,
-  FLOWBOARD_PROJECT_DOCUMENT_SECTIONS,
-  FLOWBOARD_PROJECT_DOCUMENT_TYPES,
+  TASKFOLD_MILESTONE_STATES,
+  TASKFOLD_PROJECT_DOCUMENT_SECTIONS,
+  TASKFOLD_PROJECT_DOCUMENT_TYPES,
 } from "../../contract/index.js";
 import {
   appendEvent,
@@ -20,19 +20,19 @@ import {
 } from "./store-card-helpers.js";
 import { POSITION_STEP } from "./store-constants.js";
 import type {
-  FlowboardBoardInput,
-  FlowboardCardPatch,
-  FlowboardLinkedCreateInput,
-  FlowboardMilestoneCreateInput,
-  FlowboardMilestoneReorderInput,
-  FlowboardMilestoneUpdateInput,
-  FlowboardMoveMilestoneInput,
-  FlowboardMoveProjectInput,
-  FlowboardMutationScope,
-  FlowboardProjectCreateInput,
-  FlowboardProjectDocumentCreateInput,
-  FlowboardProjectDocumentReorderInput,
-  FlowboardProjectDocumentUpdateInput,
+  TaskfoldBoardInput,
+  TaskfoldCardPatch,
+  TaskfoldLinkedCreateInput,
+  TaskfoldMilestoneCreateInput,
+  TaskfoldMilestoneReorderInput,
+  TaskfoldMilestoneUpdateInput,
+  TaskfoldMoveMilestoneInput,
+  TaskfoldMoveProjectInput,
+  TaskfoldMutationScope,
+  TaskfoldProjectCreateInput,
+  TaskfoldProjectDocumentCreateInput,
+  TaskfoldProjectDocumentReorderInput,
+  TaskfoldProjectDocumentUpdateInput,
 } from "./store-inputs.js";
 import {
   normalizeBoardId,
@@ -44,17 +44,17 @@ import {
   normalizePosition,
   normalizeTitle,
 } from "./store-normalizers.js";
-import { FlowboardNotificationStore } from "./store-notifications.js";
+import { TaskfoldNotificationStore } from "./store-notifications.js";
 import {
-  discoverFlowboardProjectDocuments,
-  isFlowboardProjectDocumentDiscoveryPath,
-  resolveFlowboardProjectDocumentWorkspacePath,
+  discoverTaskfoldProjectDocuments,
+  isTaskfoldProjectDocumentDiscoveryPath,
+  resolveTaskfoldProjectDocumentWorkspacePath,
 } from "./project-document-discovery.js";
 
 const RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES = ["file.", "ai."] as const;
 
-function presentProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
-  const next: FlowboardProjectDocument = {
+function presentProjectDocument(document: TaskfoldProjectDocument): TaskfoldProjectDocument {
+  const next: TaskfoldProjectDocument = {
     ...document,
     source: document.source ?? "project",
   };
@@ -62,17 +62,17 @@ function presentProjectDocument(document: FlowboardProjectDocument): FlowboardPr
   return next;
 }
 
-function isDocumentSection(value: unknown): value is FlowboardProjectDocumentSection {
+function isDocumentSection(value: unknown): value is TaskfoldProjectDocumentSection {
   return (
     typeof value === "string" &&
-    (FLOWBOARD_PROJECT_DOCUMENT_SECTIONS as readonly string[]).includes(value)
+    (TASKFOLD_PROJECT_DOCUMENT_SECTIONS as readonly string[]).includes(value)
   );
 }
 
-function isDocumentType(value: unknown): value is FlowboardProjectDocumentType {
+function isDocumentType(value: unknown): value is TaskfoldProjectDocumentType {
   return (
     typeof value === "string" &&
-    (FLOWBOARD_PROJECT_DOCUMENT_TYPES as readonly string[]).includes(value)
+    (TASKFOLD_PROJECT_DOCUMENT_TYPES as readonly string[]).includes(value)
   );
 }
 
@@ -88,47 +88,47 @@ function hasReservedAutomaticDocumentKeyPrefix(key: string): boolean {
   return RESERVED_AUTOMATIC_DOCUMENT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
-function isAutomaticProjectDocument(document: FlowboardProjectDocument): boolean {
+function isAutomaticProjectDocument(document: TaskfoldProjectDocument): boolean {
   return document.system === true || hasReservedAutomaticDocumentKeyPrefix(document.key);
 }
 
 function normalizeDocumentSection(
   value: unknown,
-  fallback?: FlowboardProjectDocumentSection,
-): FlowboardProjectDocumentSection {
+  fallback?: TaskfoldProjectDocumentSection,
+): TaskfoldProjectDocumentSection {
   if (value === undefined) {
     if (fallback) {
       return fallback;
     }
-    throw new Error(`document section must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
+    throw new Error(`document section must be one of: ${TASKFOLD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
   }
   if (!isDocumentSection(value)) {
-    throw new Error(`document section must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
+    throw new Error(`document section must be one of: ${TASKFOLD_PROJECT_DOCUMENT_SECTIONS.join(", ")}.`);
   }
   return value;
 }
 
 function normalizeDocumentType(
   value: unknown,
-  fallback?: FlowboardProjectDocumentType,
-): FlowboardProjectDocumentType {
+  fallback?: TaskfoldProjectDocumentType,
+): TaskfoldProjectDocumentType {
   if (value === undefined) {
     if (fallback) {
       return fallback;
     }
-    throw new Error(`document type must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
+    throw new Error(`document type must be one of: ${TASKFOLD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
   }
   if (!isDocumentType(value)) {
-    throw new Error(`document type must be one of: ${FLOWBOARD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
+    throw new Error(`document type must be one of: ${TASKFOLD_PROJECT_DOCUMENT_TYPES.join(", ")}.`);
   }
   return value;
 }
 
 function normalizeDocumentBody(
-  input: Pick<FlowboardProjectDocumentCreateInput, "type" | "target" | "content">,
-  type: FlowboardProjectDocumentType,
-  fallback?: FlowboardProjectDocument,
-): Pick<FlowboardProjectDocument, "target" | "content"> {
+  input: Pick<TaskfoldProjectDocumentCreateInput, "type" | "target" | "content">,
+  type: TaskfoldProjectDocumentType,
+  fallback?: TaskfoldProjectDocument,
+): Pick<TaskfoldProjectDocument, "target" | "content"> {
   const target =
     type === "link"
       ? normalizeExternalUrl(input.target, fallback?.target, "document URL")
@@ -161,7 +161,7 @@ function normalizeDocumentBody(
   };
 }
 
-function boardRunningCards(cards: FlowboardCard[]): FlowboardCard[] {
+function boardRunningCards(cards: TaskfoldCard[]): TaskfoldCard[] {
   return cards.filter(
     (card) =>
       card.status === "running" ||
@@ -170,8 +170,8 @@ function boardRunningCards(cards: FlowboardCard[]): FlowboardCard[] {
   );
 }
 
-export class FlowboardProjectStore extends FlowboardNotificationStore {
-  private async ensureBoardDirect(boardId: string, now = Date.now()): Promise<FlowboardBoardMetadata> {
+export class TaskfoldProjectStore extends TaskfoldNotificationStore {
+  private async ensureBoardDirect(boardId: string, now = Date.now()): Promise<TaskfoldBoardMetadata> {
     const existing = await this.boardStore.lookup(boardId);
     if (existing?.version === 1) {
       return existing.board;
@@ -182,7 +182,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   }
 
   private async removeLegacyGeneratedProjectDocumentsDirect(
-    board: FlowboardBoardMetadata,
+    board: TaskfoldBoardMetadata,
   ): Promise<void> {
     if (
       !board.defaultWorkspace?.path ||
@@ -204,7 +204,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   }
 
   private async discoverProjectDocumentsDirect(
-    board: FlowboardBoardMetadata,
+    board: TaskfoldBoardMetadata,
     now = Date.now(),
   ): Promise<void> {
     const workspacePath = board.defaultWorkspace?.path;
@@ -215,10 +215,10 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       return;
     }
     let workspaceRoot: string;
-    let candidates: Awaited<ReturnType<typeof discoverFlowboardProjectDocuments>>;
+    let candidates: Awaited<ReturnType<typeof discoverTaskfoldProjectDocuments>>;
     try {
-      workspaceRoot = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
-      candidates = await discoverFlowboardProjectDocuments(workspaceRoot);
+      workspaceRoot = await resolveTaskfoldProjectDocumentWorkspacePath(workspacePath);
+      candidates = await discoverTaskfoldProjectDocuments(workspaceRoot);
     } catch {
       // A stale optional workspace must not make the document library unavailable.
       return;
@@ -228,7 +228,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       if (
         document?.boardId === board.id &&
         isAutomaticProjectDocument(document) &&
-        !isFlowboardProjectDocumentDiscoveryPath(workspaceRoot, document.target)
+        !isTaskfoldProjectDocumentDiscoveryPath(workspaceRoot, document.target)
       ) {
         await this.documentStore.delete(entry.key);
       }
@@ -236,7 +236,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     const existing = (await this.documentStore.entries())
       .map((entry) => entry.value)
       .filter(
-        (entry): entry is { version: 1; document: FlowboardProjectDocument } =>
+        (entry): entry is { version: 1; document: TaskfoldProjectDocument } =>
           entry?.version === 1 && entry.document?.boardId === board.id,
       )
       .map((entry) => presentProjectDocument(entry.document));
@@ -246,7 +246,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         .map((document) => document.target)
         .filter((target): target is string => Boolean(target)),
     );
-    const nextPositionBySection = new Map<FlowboardProjectDocumentSection, number>();
+    const nextPositionBySection = new Map<TaskfoldProjectDocumentSection, number>();
     for (const candidate of candidates) {
       if (existingKeys.has(candidate.key) || existingTargets.has(candidate.target)) {
         continue;
@@ -260,7 +260,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
               .map((document) => document.position),
           )) + POSITION_STEP;
       nextPositionBySection.set(candidate.section, position);
-      const document: FlowboardProjectDocument = {
+      const document: TaskfoldProjectDocument = {
         id: randomUUID(),
         boardId: board.id,
         key: candidate.key,
@@ -281,7 +281,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     }
   }
 
-  private async ensureProjectDirect(boardId: string, now = Date.now()): Promise<FlowboardBoardMetadata> {
+  private async ensureProjectDirect(boardId: string, now = Date.now()): Promise<TaskfoldBoardMetadata> {
     return await this.ensureBoardDirect(boardId, now);
   }
 
@@ -311,7 +311,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     };
   }
 
-  async getProject(id: unknown): Promise<FlowboardProjectView> {
+  async getProject(id: unknown): Promise<TaskfoldProjectView> {
     const boardId = normalizeBoardIdRequired(id);
     return await this.enqueueMutation(async () => {
       const board = await this.ensureProjectDirect(boardId);
@@ -321,7 +321,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async createProject(input: FlowboardProjectCreateInput): Promise<FlowboardProjectView> {
+  async createProject(input: TaskfoldProjectCreateInput): Promise<TaskfoldProjectView> {
     return await this.enqueueMutation(async () => {
       const boardId = normalizeBoardIdRequired(input.id);
       if (await this.boardStore.lookup(boardId)) {
@@ -377,7 +377,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async updateProject(input: FlowboardBoardInput): Promise<FlowboardBoardMetadata> {
+  async updateProject(input: TaskfoldBoardInput): Promise<TaskfoldBoardMetadata> {
     return await this.enqueueMutation(async () => {
       const boardId = normalizeBoardIdRequired(input.id);
       const existing = await this.boardStore.lookup(boardId);
@@ -393,13 +393,13 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async reorderProjects(ids: unknown): Promise<{ projects: FlowboardBoardMetadata[] }> {
+  async reorderProjects(ids: unknown): Promise<{ projects: TaskfoldBoardMetadata[] }> {
     if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== "string")) {
       throw new Error("project ids are required.");
     }
     return await this.enqueueMutation(async () => {
       const seen = new Set<string>();
-      const boards: FlowboardBoardMetadata[] = [];
+      const boards: TaskfoldBoardMetadata[] = [];
       for (const rawId of ids) {
         const boardId = normalizeBoardIdRequired(rawId);
         if (seen.has(boardId)) {
@@ -430,7 +430,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   async archiveProject(
     id: unknown,
     archived: unknown = true,
-  ): Promise<{ board: FlowboardBoardMetadata; runningCards: FlowboardCard[] }> {
+  ): Promise<{ board: TaskfoldBoardMetadata; runningCards: TaskfoldCard[] }> {
     const boardId = normalizeBoardIdRequired(id);
     return await this.enqueueMutation(async () => {
       const existing = await this.boardStore.lookup(boardId);
@@ -446,15 +446,15 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async listMilestones(boardId: unknown): Promise<{ milestones: FlowboardMilestone[] }> {
+  async listMilestones(boardId: unknown): Promise<{ milestones: TaskfoldMilestone[] }> {
     return { milestones: await this.listMilestonesDirect(normalizeBoardIdRequired(boardId)) };
   }
 
-  private async listMilestonesDirect(boardId: string): Promise<FlowboardMilestone[]> {
+  private async listMilestonesDirect(boardId: string): Promise<TaskfoldMilestone[]> {
     return (await this.milestoneStore.entries())
       .map((entry) => entry.value)
       .filter(
-        (entry): entry is { version: 1; milestone: FlowboardMilestone } =>
+        (entry): entry is { version: 1; milestone: TaskfoldMilestone } =>
           entry?.version === 1 && entry.milestone?.boardId === boardId,
       )
       .map((entry) => entry.milestone)
@@ -463,9 +463,9 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
 
   private createMilestoneRecord(
     boardId: string,
-    input: Pick<FlowboardMilestoneCreateInput, "title" | "description" | "color" | "position">,
+    input: Pick<TaskfoldMilestoneCreateInput, "title" | "description" | "color" | "position">,
     now: number,
-  ): FlowboardMilestone {
+  ): TaskfoldMilestone {
     const title = normalizeTitle(input.title);
     const description = normalizeBoundedString(input.description, undefined, 2000, "milestone description");
     const color = normalizeBoundedString(input.color, undefined, 40, "milestone color");
@@ -482,7 +482,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     };
   }
 
-  async createMilestone(input: FlowboardMilestoneCreateInput): Promise<FlowboardMilestone> {
+  async createMilestone(input: TaskfoldMilestoneCreateInput): Promise<TaskfoldMilestone> {
     return await this.enqueueMutation(async () => {
       const boardId = normalizeBoardIdRequired(input.boardId);
       await this.assertProjectCanReceiveCards(boardId);
@@ -498,7 +498,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async updateMilestone(id: string, input: FlowboardMilestoneUpdateInput): Promise<FlowboardMilestone> {
+  async updateMilestone(id: string, input: TaskfoldMilestoneUpdateInput): Promise<TaskfoldMilestone> {
     return await this.enqueueMutation(async () => {
       const existing = await this.milestoneStore.lookup(id.trim());
       if (!existing?.milestone) {
@@ -514,7 +514,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         input.color === undefined
           ? milestone.color
           : normalizeBoundedString(input.color, undefined, 40, "milestone color");
-      const next: FlowboardMilestone = {
+      const next: TaskfoldMilestone = {
         ...milestone,
         title,
         updatedAt: Date.now(),
@@ -532,7 +532,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async reorderMilestones(input: FlowboardMilestoneReorderInput): Promise<{ milestones: FlowboardMilestone[] }> {
+  async reorderMilestones(input: TaskfoldMilestoneReorderInput): Promise<{ milestones: TaskfoldMilestone[] }> {
     const boardId = normalizeBoardIdRequired(input.boardId);
     if (
       !Array.isArray(input.milestoneIds) ||
@@ -563,7 +563,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async completeMilestone(id: string): Promise<FlowboardMilestone> {
+  async completeMilestone(id: string): Promise<TaskfoldMilestone> {
     return await this.enqueueMutation(async () => {
       const entry = await this.milestoneStore.lookup(id.trim());
       if (!entry?.milestone) {
@@ -585,7 +585,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         );
       }
       const now = Date.now();
-      const next: FlowboardMilestone = {
+      const next: TaskfoldMilestone = {
         ...milestone,
         state: "completed",
         completedAt: now,
@@ -596,20 +596,20 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async archiveMilestone(id: string): Promise<FlowboardMilestone> {
+  async archiveMilestone(id: string): Promise<TaskfoldMilestone> {
     return await this.setMilestoneState(id, "archived");
   }
 
-  async restoreMilestone(id: string): Promise<FlowboardMilestone> {
+  async restoreMilestone(id: string): Promise<TaskfoldMilestone> {
     return await this.setMilestoneState(id, "active");
   }
 
   private async setMilestoneState(
     id: string,
-    state: FlowboardMilestone["state"],
-  ): Promise<FlowboardMilestone> {
+    state: TaskfoldMilestone["state"],
+  ): Promise<TaskfoldMilestone> {
     return await this.enqueueMutation(async () => {
-      if (!(FLOWBOARD_MILESTONE_STATES as readonly string[]).includes(state)) {
+      if (!(TASKFOLD_MILESTONE_STATES as readonly string[]).includes(state)) {
         throw new Error("invalid milestone state.");
       }
       const entry = await this.milestoneStore.lookup(id.trim());
@@ -617,7 +617,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
         throw new Error(`milestone not found: ${id}`);
       }
       const now = Date.now();
-      const next: FlowboardMilestone = {
+      const next: TaskfoldMilestone = {
         ...entry.milestone,
         state,
         updatedAt: now,
@@ -632,7 +632,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async moveMilestone(id: string, input: FlowboardMoveMilestoneInput): Promise<FlowboardCard> {
+  async moveMilestone(id: string, input: TaskfoldMoveMilestoneInput): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const card = await this.get(id);
       if (!card) {
@@ -681,7 +681,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async moveProject(id: string, input: FlowboardMoveProjectInput): Promise<FlowboardCard> {
+  async moveProject(id: string, input: TaskfoldMoveProjectInput): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const card = await this.get(id);
       if (!card) {
@@ -747,7 +747,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   async listProjectDocuments(
     boardId: unknown,
     options: { includeHidden?: unknown } = {},
-  ): Promise<{ documents: FlowboardProjectDocument[] }> {
+  ): Promise<{ documents: TaskfoldProjectDocument[] }> {
     const normalizedBoardId = normalizeBoardIdRequired(boardId);
     return await this.enqueueMutation(async () => {
       const board = await this.ensureProjectDirect(normalizedBoardId);
@@ -756,7 +756,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       const documents = (await this.documentStore.entries())
         .map((entry) => entry.value)
         .filter(
-          (entry): entry is { version: 1; document: FlowboardProjectDocument } =>
+          (entry): entry is { version: 1; document: TaskfoldProjectDocument } =>
             entry?.version === 1 && entry.document?.boardId === normalizedBoardId,
         )
         .map((entry) => presentProjectDocument(entry.document))
@@ -771,7 +771,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async getProjectDocument(id: string): Promise<FlowboardProjectDocument> {
+  async getProjectDocument(id: string): Promise<TaskfoldProjectDocument> {
     const entry = await this.documentStore.lookup(id.trim());
     if (!entry?.document) {
       throw new Error(`project document not found: ${id}`);
@@ -780,8 +780,8 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   }
 
   async createProjectDocument(
-    input: FlowboardProjectDocumentCreateInput,
-  ): Promise<FlowboardProjectDocument> {
+    input: TaskfoldProjectDocumentCreateInput,
+  ): Promise<TaskfoldProjectDocument> {
     return await this.enqueueMutation(async () => {
       const boardId = normalizeBoardIdRequired(input.boardId);
       await this.assertProjectCanReceiveCards(boardId);
@@ -809,13 +809,13 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
       const sameSection = entries
         .map((entry) => entry.value)
         .filter(
-          (entry): entry is { version: 1; document: FlowboardProjectDocument } =>
+          (entry): entry is { version: 1; document: TaskfoldProjectDocument } =>
             entry?.version === 1 &&
             entry.document.boardId === boardId &&
             entry.document.section === section,
         );
       const now = Date.now();
-      const document: FlowboardProjectDocument = {
+      const document: TaskfoldProjectDocument = {
         id: randomUUID(),
         boardId,
         key,
@@ -839,8 +839,8 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
 
   async updateProjectDocument(
     id: string,
-    input: FlowboardProjectDocumentUpdateInput,
-  ): Promise<FlowboardProjectDocument> {
+    input: TaskfoldProjectDocumentUpdateInput,
+  ): Promise<TaskfoldProjectDocument> {
     return await this.enqueueMutation(async () => {
       const entry = await this.documentStore.lookup(id.trim());
       if (!entry?.document) {
@@ -855,7 +855,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
           ? existing.summary
           : normalizeBoundedString(input.summary, undefined, 1000, "document summary");
       const body = normalizeDocumentBody(input, type, existing);
-      const next: FlowboardProjectDocument = {
+      const next: TaskfoldProjectDocument = {
         ...existing,
         type,
         title,
@@ -877,7 +877,7 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
     });
   }
 
-  async hideProjectDocument(id: string, hidden: unknown = true): Promise<FlowboardProjectDocument> {
+  async hideProjectDocument(id: string, hidden: unknown = true): Promise<TaskfoldProjectDocument> {
     return await this.enqueueMutation(async () => {
       const entry = await this.documentStore.lookup(id.trim());
       if (!entry?.document) {
@@ -907,8 +907,8 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   }
 
   async reorderProjectDocuments(
-    input: FlowboardProjectDocumentReorderInput,
-  ): Promise<{ documents: FlowboardProjectDocument[] }> {
+    input: TaskfoldProjectDocumentReorderInput,
+  ): Promise<{ documents: TaskfoldProjectDocument[] }> {
     const boardId = normalizeBoardIdRequired(input.boardId);
     if (
       !Array.isArray(input.documentIds) ||
@@ -948,9 +948,9 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
 
   override async update(
     id: string,
-    patch: FlowboardCardPatch,
+    patch: TaskfoldCardPatch,
     options: { expectedRevision?: number } = {},
-  ): Promise<FlowboardCard> {
+  ): Promise<TaskfoldCard> {
     const raw = patch as Record<string, unknown>;
     if (
       Object.hasOwn(raw, "boardId") ||
@@ -976,9 +976,9 @@ export class FlowboardProjectStore extends FlowboardNotificationStore {
   }
 
   protected override async createDirect(
-    input: FlowboardLinkedCreateInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldLinkedCreateInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const parentId =
       normalizeOptionalString(input.createdByCardId) ??
       (Array.isArray(input.parents)

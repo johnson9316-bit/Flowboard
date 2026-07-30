@@ -1,20 +1,20 @@
 import type { OpenClawPluginApi } from "../api.js";
-import type { FlowboardCard } from "../../contract/index.js";
+import type { TaskfoldCard } from "../../contract/index.js";
 import {
   readId,
-  resolveGatewayFlowboardWorkspaceAccess,
+  resolveGatewayTaskfoldWorkspaceAccess,
   respondError,
   type GatewayMethodContext,
 } from "./gateway-helpers.js";
-import type { FlowboardStore } from "./store.js";
+import type { TaskfoldStore } from "./store.js";
 import {
-  assertFlowboardWorkspaceMutationAccess,
-  assertFlowboardWorkspaceSourceAccess,
-  canonicalizeFlowboardWorkspaceAccess,
+  assertTaskfoldWorkspaceMutationAccess,
+  assertTaskfoldWorkspaceSourceAccess,
+  canonicalizeTaskfoldWorkspaceAccess,
 } from "./workspace-access.js";
 import {
-  readFlowboardProjectDocument,
-  writeFlowboardProjectDocumentPath,
+  readTaskfoldProjectDocument,
+  writeTaskfoldProjectDocumentPath,
 } from "./project-document-reader.js";
 
 const READ_SCOPE = "operator.read" as const;
@@ -24,20 +24,20 @@ async function assertProjectWorkspaceAccess(
   request: GatewayMethodContext,
   value: unknown,
 ): Promise<void> {
-  const access = await canonicalizeFlowboardWorkspaceAccess(
-    resolveGatewayFlowboardWorkspaceAccess({
+  const access = await canonicalizeTaskfoldWorkspaceAccess(
+    resolveGatewayTaskfoldWorkspaceAccess({
       context: request.context,
       client: request.client,
     }),
   );
-  await assertFlowboardWorkspaceMutationAccess(value, access);
+  await assertTaskfoldWorkspaceMutationAccess(value, access);
 }
 
 async function resolveProjectWorkspaceReadAccess(
   request: GatewayMethodContext,
 ) {
-  return await canonicalizeFlowboardWorkspaceAccess(
-    resolveGatewayFlowboardWorkspaceAccess({
+  return await canonicalizeTaskfoldWorkspaceAccess(
+    resolveGatewayTaskfoldWorkspaceAccess({
       context: request.context,
       client: request.client,
     }),
@@ -52,14 +52,14 @@ async function resolveProjectWorkspaceWriteAccess(request: GatewayMethodContext)
   return access;
 }
 
-export function registerFlowboardProjectGatewayMethods(params: {
+export function registerTaskfoldProjectGatewayMethods(params: {
   api: OpenClawPluginApi;
-  store: FlowboardStore;
-  redactCard: (card: FlowboardCard) => FlowboardCard;
+  store: TaskfoldStore;
+  redactCard: (card: TaskfoldCard) => TaskfoldCard;
 }): void {
   const { api, store, redactCard } = params;
   api.registerGatewayMethod(
-    "flowboard.projects.list",
+    "taskfold.projects.list",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.listProjects(requestParams));
@@ -70,7 +70,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.get",
+    "taskfold.projects.get",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { project: await store.getProject(requestParams.id) });
@@ -81,7 +81,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.create",
+    "taskfold.projects.create",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
@@ -94,7 +94,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.update",
+    "taskfold.projects.update",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
@@ -107,7 +107,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.reorder",
+    "taskfold.projects.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.reorderProjects(requestParams.ids));
@@ -118,7 +118,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.archive",
+    "taskfold.projects.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -132,7 +132,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.restore",
+    "taskfold.projects.restore",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.archiveProject(requestParams.id, false));
@@ -144,7 +144,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.list",
+    "taskfold.projects.milestones.list",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.listMilestones(requestParams.boardId));
@@ -155,7 +155,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.create",
+    "taskfold.projects.milestones.create",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.createMilestone(requestParams) });
@@ -166,7 +166,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.update",
+    "taskfold.projects.milestones.update",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.updateMilestone(readId(requestParams), requestParams) });
@@ -177,7 +177,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.reorder",
+    "taskfold.projects.milestones.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.reorderMilestones(requestParams));
@@ -188,7 +188,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.complete",
+    "taskfold.projects.milestones.complete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.completeMilestone(readId(requestParams)) });
@@ -199,7 +199,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.archive",
+    "taskfold.projects.milestones.archive",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.archiveMilestone(readId(requestParams)) });
@@ -210,7 +210,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.milestones.restore",
+    "taskfold.projects.milestones.restore",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { milestone: await store.restoreMilestone(readId(requestParams)) });
@@ -222,14 +222,14 @@ export function registerFlowboardProjectGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.projects.documents.list",
+    "taskfold.projects.documents.list",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
         const access = await resolveProjectWorkspaceReadAccess(request);
         const project = await store.getProject(requestParams.boardId);
         if (project.board.defaultWorkspace?.path) {
-          await assertFlowboardWorkspaceSourceAccess(project.board.defaultWorkspace, access);
+          await assertTaskfoldWorkspaceSourceAccess(project.board.defaultWorkspace, access);
         }
         respond(
           true,
@@ -244,14 +244,14 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.read",
+    "taskfold.projects.documents.read",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
         const access = await resolveProjectWorkspaceReadAccess(request);
         const document = await store.getProjectDocument(readId(requestParams));
         respond(true, {
-          preview: await readFlowboardProjectDocument({ document, access }),
+          preview: await readTaskfoldProjectDocument({ document, access }),
         });
       } catch (error) {
         respondError(respond, error);
@@ -260,14 +260,14 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: READ_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.write",
+    "taskfold.projects.documents.write",
     async (request) => {
       const { params: requestParams, respond } = request;
       try {
         const access = await resolveProjectWorkspaceWriteAccess(request);
         const document = await store.getProjectDocument(readId(requestParams));
         if (document.type === "markdown") {
-          const preview = await readFlowboardProjectDocument({ document, access });
+          const preview = await readTaskfoldProjectDocument({ document, access });
           if (
             typeof requestParams.expectedRevision !== "string" ||
             requestParams.expectedRevision !== preview.revision
@@ -278,12 +278,12 @@ export function registerFlowboardProjectGatewayMethods(params: {
             content: requestParams.content,
           });
           respond(true, {
-            preview: await readFlowboardProjectDocument({ document: updated, access }),
+            preview: await readTaskfoldProjectDocument({ document: updated, access }),
           });
           return;
         }
         respond(true, {
-          preview: await writeFlowboardProjectDocumentPath({
+          preview: await writeTaskfoldProjectDocumentPath({
             document,
             content: requestParams.content,
             expectedRevision: requestParams.expectedRevision,
@@ -297,7 +297,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.create",
+    "taskfold.projects.documents.create",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, { document: await store.createProjectDocument(requestParams) });
@@ -308,7 +308,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.update",
+    "taskfold.projects.documents.update",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -322,7 +322,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.reorder",
+    "taskfold.projects.documents.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.reorderProjectDocuments(requestParams));
@@ -333,7 +333,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.hide",
+    "taskfold.projects.documents.hide",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -347,7 +347,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.restore",
+    "taskfold.projects.documents.restore",
     async ({ params: requestParams, respond }) => {
       try {
         respond(
@@ -361,7 +361,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.projects.documents.delete",
+    "taskfold.projects.documents.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, await store.deleteProjectDocument(readId(requestParams)));
@@ -373,7 +373,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.sources.create",
+    "taskfold.cards.sources.create",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -386,7 +386,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.update",
+    "taskfold.cards.sources.update",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -399,7 +399,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.delete",
+    "taskfold.cards.sources.delete",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -412,7 +412,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.cards.sources.reorder",
+    "taskfold.cards.sources.reorder",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -426,7 +426,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
-    "flowboard.cards.moveMilestone",
+    "taskfold.cards.moveMilestone",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {
@@ -439,7 +439,7 @@ export function registerFlowboardProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
-    "flowboard.cards.moveProject",
+    "taskfold.cards.moveProject",
     async ({ params: requestParams, respond }) => {
       try {
         respond(true, {

@@ -4,23 +4,23 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
-  FlowboardKeyedStore,
-  PersistedFlowboardAttachment,
-  PersistedFlowboardBoard,
-  PersistedFlowboardCard,
-  PersistedFlowboardMilestone,
-  PersistedFlowboardNotificationSubscription,
-  PersistedFlowboardProjectDocument,
+  TaskfoldKeyedStore,
+  PersistedTaskfoldAttachment,
+  PersistedTaskfoldBoard,
+  PersistedTaskfoldCard,
+  PersistedTaskfoldMilestone,
+  PersistedTaskfoldNotificationSubscription,
+  PersistedTaskfoldProjectDocument,
 } from "../src/backend/src/persistence-types.js";
 import {
-  abortFlowboardCardExecution,
-  inspectFlowboardCardExecution,
-  prepareFlowboardCardExecution,
-  startFlowboardCardExecution,
-  steerFlowboardCardExecution,
-  type FlowboardCardExecutionOptions,
+  abortTaskfoldCardExecution,
+  inspectTaskfoldCardExecution,
+  prepareTaskfoldCardExecution,
+  startTaskfoldCardExecution,
+  steerTaskfoldCardExecution,
+  type TaskfoldCardExecutionOptions,
 } from "../src/backend/src/card-execution.js";
-import { FlowboardStore } from "../src/backend/src/store.js";
+import { TaskfoldStore } from "../src/backend/src/store.js";
 
 const roots: string[] = [];
 
@@ -30,7 +30,7 @@ afterEach(() => {
   }
 });
 
-function keyedStore<T>(): FlowboardKeyedStore<T> {
+function keyedStore<T>(): TaskfoldKeyedStore<T> {
   const values = new Map<string, T>();
   return {
     async register(key, value) {
@@ -48,26 +48,26 @@ function keyedStore<T>(): FlowboardKeyedStore<T> {
   };
 }
 
-function createStore(): FlowboardStore {
-  return new FlowboardStore(keyedStore<PersistedFlowboardCard>(), {
-    boards: keyedStore<PersistedFlowboardBoard>(),
-    milestones: keyedStore<PersistedFlowboardMilestone>(),
-    documents: keyedStore<PersistedFlowboardProjectDocument>(),
-    subscriptions: keyedStore<PersistedFlowboardNotificationSubscription>(),
-    attachments: keyedStore<PersistedFlowboardAttachment>(),
+function createStore(): TaskfoldStore {
+  return new TaskfoldStore(keyedStore<PersistedTaskfoldCard>(), {
+    boards: keyedStore<PersistedTaskfoldBoard>(),
+    milestones: keyedStore<PersistedTaskfoldMilestone>(),
+    documents: keyedStore<PersistedTaskfoldProjectDocument>(),
+    subscriptions: keyedStore<PersistedTaskfoldNotificationSubscription>(),
+    attachments: keyedStore<PersistedTaskfoldAttachment>(),
   });
 }
 
 function createGitCheckout(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-card-execution-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-card-execution-"));
   roots.push(root);
   fs.writeFileSync(path.join(root, "README.md"), "# Test checkout\n");
   execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
-  execFileSync("git", ["config", "user.email", "flowboard@example.test"], {
+  execFileSync("git", ["config", "user.email", "taskfold@example.test"], {
     cwd: root,
     stdio: "ignore",
   });
-  execFileSync("git", ["config", "user.name", "Flowboard Test"], {
+  execFileSync("git", ["config", "user.name", "Taskfold Test"], {
     cwd: root,
     stdio: "ignore",
   });
@@ -81,11 +81,11 @@ function executionOptions(params: {
   run?: ReturnType<typeof vi.fn>;
   sessionMessages?: () => unknown[];
   taskRunId: () => string;
-}): FlowboardCardExecutionOptions {
+}): TaskfoldCardExecutionOptions {
   const createWorktree = vi.fn(async ({ name }: { name: string }) => {
     const worktreePath = path.join(params.worktreeRoot, name);
     fs.mkdirSync(worktreePath, { recursive: true });
-    return { path: worktreePath, branch: `flowboard/${name}` };
+    return { path: worktreePath, branch: `taskfold/${name}` };
   });
   return {
     runtime: {
@@ -106,7 +106,7 @@ function executionOptions(params: {
   };
 }
 
-async function createProjectCard(store: FlowboardStore, checkout: string) {
+async function createProjectCard(store: TaskfoldStore, checkout: string) {
   await store.createProject({
     id: "alpha",
     name: "Alpha",
@@ -120,18 +120,18 @@ async function createProjectCard(store: FlowboardStore, checkout: string) {
   });
 }
 
-describe("Flowboard native card execution", () => {
+describe("Taskfold native card execution", () => {
   it("prepares without writing and rejects a stale confirmation before a Worktree is created", async () => {
     const store = createStore();
     const checkout = createGitCheckout();
     const card = await createProjectCard(store, checkout);
     let runId = "run-1";
     const options = executionOptions({
-      worktreeRoot: path.join(checkout, ".flowboard-worktrees"),
+      worktreeRoot: path.join(checkout, ".taskfold-worktrees"),
       taskRunId: () => runId,
     });
 
-    const prepared = await prepareFlowboardCardExecution({ store, id: card.id, options });
+    const prepared = await prepareTaskfoldCardExecution({ store, id: card.id, options });
     const untouched = await store.get(card.id);
 
     expect(prepared).toMatchObject({
@@ -147,7 +147,7 @@ describe("Flowboard native card execution", () => {
 
     const changed = await store.update(card.id, { notes: "Changed after preparing." });
     await expect(
-      startFlowboardCardExecution({
+      startTaskfoldCardExecution({
         store,
         id: card.id,
         expectedRevision: prepared.expectedRevision,
@@ -167,13 +167,13 @@ describe("Flowboard native card execution", () => {
     let claimToken = "";
     const run = vi.fn(async () => ({ runId: currentRunId }));
     const options = executionOptions({
-      worktreeRoot: path.join(checkout, ".flowboard-worktrees"),
+      worktreeRoot: path.join(checkout, ".taskfold-worktrees"),
       run,
       sessionMessages: () => [{ role: "assistant", text: `Claim token: ${claimToken}` }],
       taskRunId: () => currentRunId,
     });
-    const prepared = await prepareFlowboardCardExecution({ store, id: card.id, options });
-    const started = await startFlowboardCardExecution({
+    const prepared = await prepareTaskfoldCardExecution({ store, id: card.id, options });
+    const started = await startTaskfoldCardExecution({
       store,
       id: card.id,
       expectedRevision: prepared.expectedRevision,
@@ -201,7 +201,7 @@ describe("Flowboard native card execution", () => {
         message: expect.stringContaining(`Claim token: ${claimToken}`),
       }),
     );
-    const activePreparation = await prepareFlowboardCardExecution({
+    const activePreparation = await prepareTaskfoldCardExecution({
       store,
       id: card.id,
       options,
@@ -211,7 +211,7 @@ describe("Flowboard native card execution", () => {
       sourceCheckout: checkout,
     });
     await expect(
-      startFlowboardCardExecution({
+      startTaskfoldCardExecution({
         store,
         id: card.id,
         expectedRevision: activePreparation.expectedRevision,
@@ -219,7 +219,7 @@ describe("Flowboard native card execution", () => {
       }),
     ).rejects.toThrow("already has an active execution");
 
-    const inspected = await inspectFlowboardCardExecution({
+    const inspected = await inspectTaskfoldCardExecution({
       store,
       id: card.id,
       runtime: options.runtime,
@@ -236,14 +236,14 @@ describe("Flowboard native card execution", () => {
     });
 
     currentRunId = "run-2";
-    const steered = await steerFlowboardCardExecution({
+    const steered = await steerTaskfoldCardExecution({
       store,
       id: card.id,
       nextRunId: currentRunId,
     });
     expect(steered.card.execution).toMatchObject({ status: "running", runId: "run-2" });
 
-    const stopped = await abortFlowboardCardExecution({
+    const stopped = await abortTaskfoldCardExecution({
       store,
       id: card.id,
       expectedRunId: currentRunId,
@@ -274,11 +274,11 @@ describe("Flowboard native card execution", () => {
       status: "todo",
     });
     const options = executionOptions({
-      worktreeRoot: path.join(checkout, ".flowboard-worktrees"),
+      worktreeRoot: path.join(checkout, ".taskfold-worktrees"),
       taskRunId: () => "run-1",
     });
-    const prepared = await prepareFlowboardCardExecution({ store, id: card.id, options });
-    await startFlowboardCardExecution({
+    const prepared = await prepareTaskfoldCardExecution({ store, id: card.id, options });
+    await startTaskfoldCardExecution({
       store,
       id: card.id,
       expectedRevision: prepared.expectedRevision,

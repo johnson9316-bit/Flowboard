@@ -1,32 +1,32 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type {
-  FlowboardBoardMetadata,
-  FlowboardBoardSummary,
-  FlowboardCard,
-  FlowboardDeliveryImplementationState,
-  FlowboardDeliveryReleaseState,
-  FlowboardDeliveryVerificationState,
-  FlowboardExecution,
-  FlowboardMilestone,
-  FlowboardPriority,
-  FlowboardProjectDocument,
-  FlowboardProjectDocumentRead,
-  FlowboardProjectDocumentSection,
-  FlowboardProjectDocumentSource,
-  FlowboardProjectDocumentType,
-  FlowboardProjectView,
-  FlowboardStatus,
+  TaskfoldBoardMetadata,
+  TaskfoldBoardSummary,
+  TaskfoldCard,
+  TaskfoldDeliveryImplementationState,
+  TaskfoldDeliveryReleaseState,
+  TaskfoldDeliveryVerificationState,
+  TaskfoldExecution,
+  TaskfoldMilestone,
+  TaskfoldPriority,
+  TaskfoldProjectDocument,
+  TaskfoldProjectDocumentRead,
+  TaskfoldProjectDocumentSection,
+  TaskfoldProjectDocumentSource,
+  TaskfoldProjectDocumentType,
+  TaskfoldProjectView,
+  TaskfoldStatus,
 } from "../../../../src/contract/index.ts";
 import "../../components/modal-dialog.ts";
-import { t, type FlowboardLocale } from "../../i18n/index.ts";
+import { t, type TaskfoldLocale } from "../../i18n/index.ts";
 import {
-  flowboardEditorHtmlToMarkdown,
-  flowboardMarkdownToEditorHtml,
-  renderFlowboardMarkdown,
+  taskfoldEditorHtmlToMarkdown,
+  taskfoldMarkdownToEditorHtml,
+  renderTaskfoldMarkdown,
 } from "../../lib/markdown.ts";
-import "../../styles/flowboard-project.css";
+import "../../styles/taskfold-project.css";
 
-const STATUSES: readonly FlowboardStatus[] = [
+const STATUSES: readonly TaskfoldStatus[] = [
   "triage",
   "backlog",
   "todo",
@@ -37,29 +37,29 @@ const STATUSES: readonly FlowboardStatus[] = [
   "blocked",
   "done",
 ];
-const PRIORITIES: readonly FlowboardPriority[] = ["low", "normal", "high", "urgent"];
-const DOCUMENT_SECTIONS: readonly FlowboardProjectDocumentSection[] = [
+const PRIORITIES: readonly TaskfoldPriority[] = ["low", "normal", "high", "urgent"];
+const DOCUMENT_SECTIONS: readonly TaskfoldProjectDocumentSection[] = [
   "project",
   "codebase",
   "environment",
   "knowledge",
 ];
-const DOCUMENT_TYPES: readonly FlowboardProjectDocumentType[] = [
+const DOCUMENT_TYPES: readonly TaskfoldProjectDocumentType[] = [
   "markdown",
   "json",
   "link",
   "path",
   "secret_ref",
 ];
-const DOCUMENT_SOURCES: readonly FlowboardProjectDocumentSource[] = ["project", "ai_system"];
-const IMPLEMENTATION_STATES: readonly FlowboardDeliveryImplementationState[] = [
+const DOCUMENT_SOURCES: readonly TaskfoldProjectDocumentSource[] = ["project", "ai_system"];
+const IMPLEMENTATION_STATES: readonly TaskfoldDeliveryImplementationState[] = [
   "not_started",
   "in_progress",
   "code_complete",
   "not_applicable",
   "unknown",
 ];
-const VERIFICATION_STATES: readonly FlowboardDeliveryVerificationState[] = [
+const VERIFICATION_STATES: readonly TaskfoldDeliveryVerificationState[] = [
   "not_started",
   "partial",
   "passed",
@@ -68,7 +68,7 @@ const VERIFICATION_STATES: readonly FlowboardDeliveryVerificationState[] = [
   "not_required",
   "unknown",
 ];
-const RELEASE_STATES: readonly FlowboardDeliveryReleaseState[] = [
+const RELEASE_STATES: readonly TaskfoldDeliveryReleaseState[] = [
   "not_started",
   "pending",
   "released",
@@ -76,11 +76,11 @@ const RELEASE_STATES: readonly FlowboardDeliveryReleaseState[] = [
   "unknown",
 ];
 
-export type FlowboardProjectModal =
+export type TaskfoldProjectModal =
   | { kind: "project" }
   | { kind: "card"; milestoneId?: string }
-  | { kind: "milestone"; milestone?: FlowboardMilestone }
-  | { kind: "document"; document?: FlowboardProjectDocument }
+  | { kind: "milestone"; milestone?: TaskfoldMilestone }
+  | { kind: "document"; document?: TaskfoldProjectDocument }
   | { kind: "card-detail"; cardId: string }
   | { kind: "execution-start"; cardId: string }
   | {
@@ -88,10 +88,10 @@ export type FlowboardProjectModal =
       cardId: string;
       boardId?: string;
       milestoneId?: string;
-      targetProject?: FlowboardProjectView;
+      targetProject?: TaskfoldProjectView;
     };
 
-export type FlowboardCardExecutionPreparation = {
+export type TaskfoldCardExecutionPreparation = {
   cardId: string;
   expectedRevision: number;
   active: boolean;
@@ -102,70 +102,70 @@ export type FlowboardCardExecutionPreparation = {
   baseBranch?: string;
   worktreeName: string;
   promptPreview: string;
-  execution: FlowboardExecution | null;
+  execution: TaskfoldExecution | null;
 };
 
-export type FlowboardCardExecutionInspection = {
-  card: FlowboardCard;
+export type TaskfoldCardExecutionInspection = {
+  card: TaskfoldCard;
   active: boolean;
-  execution: FlowboardExecution | null;
+  execution: TaskfoldExecution | null;
   sessionKey?: string;
   runId?: string;
   session?: unknown;
   preview?: unknown;
 };
 
-export type FlowboardProjectUiState = {
+export type TaskfoldProjectUiState = {
   loading: boolean;
   loaded: boolean;
   busy: boolean;
   error: string | null;
   languageSwitching: boolean;
   languageError: string | null;
-  projects: FlowboardBoardSummary[];
-  project: FlowboardProjectView | null;
-  documents: FlowboardProjectDocument[];
+  projects: TaskfoldBoardSummary[];
+  project: TaskfoldProjectView | null;
+  documents: TaskfoldProjectDocument[];
   selectedDocumentId: string | null;
-  documentPreview: FlowboardProjectDocumentRead | null;
+  documentPreview: TaskfoldProjectDocumentRead | null;
   documentPreviewLoading: boolean;
   documentPreviewError: string | null;
   documentEditing: boolean;
   documentDraft: string | null;
   documentQuery: string;
-  documentSourceFilter: "all" | FlowboardProjectDocumentSource;
+  documentSourceFilter: "all" | TaskfoldProjectDocumentSource;
   executionPreparationCardId: string | null;
-  executionPreparation: FlowboardCardExecutionPreparation | null;
+  executionPreparation: TaskfoldCardExecutionPreparation | null;
   executionPreparationLoading: boolean;
   executionPreparationError: string | null;
   executionInspectionCardId: string | null;
-  executionInspection: FlowboardCardExecutionInspection | null;
+  executionInspection: TaskfoldCardExecutionInspection | null;
   executionInspectionLoading: boolean;
   executionInspectionError: string | null;
   selectedProjectId: string | null;
   screen: "overview" | "board" | "settings" | "documents";
-  modal: FlowboardProjectModal | null;
+  modal: TaskfoldProjectModal | null;
   draggedCardId: string | null;
   showArchivedProjects: boolean;
   showHiddenDocuments: boolean;
   query: string;
 };
 
-export type FlowboardProjectViewController = {
-  state: FlowboardProjectUiState;
+export type TaskfoldProjectViewController = {
+  state: TaskfoldProjectUiState;
   connected: boolean;
-  locale: FlowboardLocale;
+  locale: TaskfoldLocale;
   requestUpdate: () => void;
   refresh: () => void;
-  setLocale: (locale: FlowboardLocale) => void;
+  setLocale: (locale: TaskfoldLocale) => void;
   selectProject: (id: string) => void;
-  setScreen: (screen: FlowboardProjectUiState["screen"]) => void;
-  openModal: (modal: FlowboardProjectModal) => void;
+  setScreen: (screen: TaskfoldProjectUiState["screen"]) => void;
+  openModal: (modal: TaskfoldProjectModal) => void;
   closeModal: () => void;
   createProject: (data: Record<string, string>) => void;
   updateProject: (data: Record<string, string>) => void;
   archiveProject: (archived: boolean) => void;
   createCard: (data: Record<string, string>) => void;
-  updateCardStatus: (id: string, status: FlowboardStatus) => void;
+  updateCardStatus: (id: string, status: TaskfoldStatus) => void;
   archiveCard: (id: string, archived: boolean) => void;
   moveCardMilestone: (id: string, milestoneId?: string, position?: number) => void;
   moveCardProject: (id: string, boardId: string, milestoneId: string) => void;
@@ -202,7 +202,7 @@ export type FlowboardProjectViewController = {
   deleteArtifact: (id: string, artifactId: string) => void;
 };
 
-export function createFlowboardProjectUiState(): FlowboardProjectUiState {
+export function createTaskfoldProjectUiState(): TaskfoldProjectUiState {
   return {
     loading: false,
     loaded: false,
@@ -239,19 +239,19 @@ export function createFlowboardProjectUiState(): FlowboardProjectUiState {
   };
 }
 
-function boardName(board: Pick<FlowboardBoardSummary | FlowboardBoardMetadata, "id" | "name">): string {
+function boardName(board: Pick<TaskfoldBoardSummary | TaskfoldBoardMetadata, "id" | "name">): string {
   return board.name || board.id;
 }
 
-function boardId(card: FlowboardCard): string {
+function boardId(card: TaskfoldCard): string {
   return card.metadata?.automation?.boardId ?? "default";
 }
 
-function isArchivedCard(card: FlowboardCard): boolean {
+function isArchivedCard(card: TaskfoldCard): boolean {
   return Boolean(card.metadata?.archivedAt);
 }
 
-function hasActiveCardExecution(card: FlowboardCard): boolean {
+function hasActiveCardExecution(card: TaskfoldCard): boolean {
   return (
     card.execution?.status === "running" ||
     Boolean(card.metadata?.attempts?.some((attempt) => attempt.status === "running"))
@@ -259,9 +259,9 @@ function hasActiveCardExecution(card: FlowboardCard): boolean {
 }
 
 function inspectionForCard(
-  state: FlowboardProjectUiState,
+  state: TaskfoldProjectUiState,
   cardId: string,
-): FlowboardCardExecutionInspection | null {
+): TaskfoldCardExecutionInspection | null {
   return state.executionInspectionCardId === cardId ? state.executionInspection : null;
 }
 
@@ -279,7 +279,7 @@ function executionValue(value: unknown): string {
   }
 }
 
-export function flowboardNativeChatHref(sessionKey: string, pathname?: string): string {
+export function taskfoldNativeChatHref(sessionKey: string, pathname?: string): string {
   let currentPath = "/";
   if (typeof window !== "undefined") {
     currentPath = window.location.pathname;
@@ -297,32 +297,32 @@ export function flowboardNativeChatHref(sessionKey: string, pathname?: string): 
   return `${basePath || ""}/chat?session=${encodeURIComponent(sessionKey)}`;
 }
 
-function milestoneLabel(milestone: FlowboardMilestone): string {
+function milestoneLabel(milestone: TaskfoldMilestone): string {
   const key =
     milestone.state === "active"
-      ? "flowboardProject.active"
+      ? "taskfoldProject.active"
       : milestone.state === "completed"
-        ? "flowboardProject.completed"
-        : "flowboardProject.archived";
+        ? "taskfoldProject.completed"
+        : "taskfoldProject.archived";
   return t(key);
 }
 
-function sectionLabel(section: FlowboardProjectDocumentSection): string {
+function sectionLabel(section: TaskfoldProjectDocumentSection): string {
   return t(
-    `flowboardProject.section${section[0]?.toUpperCase() ?? ""}${section.slice(1)}`,
+    `taskfoldProject.section${section[0]?.toUpperCase() ?? ""}${section.slice(1)}`,
   );
 }
 
-function documentTypeLabel(type: FlowboardProjectDocumentType): string {
+function documentTypeLabel(type: TaskfoldProjectDocumentType): string {
   const key =
     type === "secret_ref"
       ? "SecretRef"
       : `${type[0]?.toUpperCase() ?? ""}${type.slice(1)}`;
-  return t(`flowboardProject.type${key}`);
+  return t(`taskfoldProject.type${key}`);
 }
 
-function documentSourceLabel(source: FlowboardProjectDocumentSource): string {
-  return t(`flowboardProject.source${source === "ai_system" ? "AiSystem" : "Project"}`);
+function documentSourceLabel(source: TaskfoldProjectDocumentSource): string {
+  return t(`taskfoldProject.source${source === "ai_system" ? "AiSystem" : "Project"}`);
 }
 
 function documentPathLabel(
@@ -344,7 +344,7 @@ function documentPathLabel(
   return normalizedTarget.split("/").at(-1) || target;
 }
 
-function projectCardCount(project: FlowboardBoardSummary): number {
+function projectCardCount(project: TaskfoldBoardSummary): number {
   return project.active;
 }
 
@@ -376,14 +376,14 @@ export function reorderVisibleItemIds<T extends { id: string }>(
   return ids;
 }
 
-function renderStatusOptions(selected: FlowboardStatus) {
+function renderStatusOptions(selected: TaskfoldStatus) {
   return STATUSES.map(
     (status) =>
       html`<option value=${status} ?selected=${status === selected}>${t(`workboard.status.${status}`)}</option>`,
   );
 }
 
-function renderPriorityOptions(selected: FlowboardPriority) {
+function renderPriorityOptions(selected: TaskfoldPriority) {
   return PRIORITIES.map(
     (priority) =>
       html`<option value=${priority} ?selected=${priority === selected}>${priority}</option>`,
@@ -398,7 +398,7 @@ function deliveryStateKey(
     .split("_")
     .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
     .join("");
-  return `flowboardProject.delivery${prefix[0]?.toUpperCase() ?? ""}${prefix.slice(1)}${suffix}`;
+  return `taskfoldProject.delivery${prefix[0]?.toUpperCase() ?? ""}${prefix.slice(1)}${suffix}`;
 }
 
 function renderDeliveryOptions(
@@ -407,7 +407,7 @@ function renderDeliveryOptions(
   prefix: "implementation" | "verification" | "release",
 ) {
   return [
-    html`<option value="">${t("flowboardProject.deliveryNotRecorded")}</option>`,
+    html`<option value="">${t("taskfoldProject.deliveryNotRecorded")}</option>`,
     ...states.map(
       (state) =>
         html`<option value=${state} ?selected=${state === selected}>${t(
@@ -421,7 +421,7 @@ function deliveryStateLabel(
   prefix: "implementation" | "verification" | "release",
   state: string | undefined,
 ): string {
-  return state ? t(deliveryStateKey(prefix, state)) : t("flowboardProject.deliveryNotRecorded");
+  return state ? t(deliveryStateKey(prefix, state)) : t("taskfoldProject.deliveryNotRecorded");
 }
 
 function renderOrderControls(params: {
@@ -431,20 +431,20 @@ function renderOrderControls(params: {
   onMoveDown: () => void;
 }) {
   return html`
-    <div class="flowboard-project__order-actions">
+    <div class="taskfold-project__order-actions">
       <button
-        class="flowboard-project__icon-button flowboard-project__order-button"
+        class="taskfold-project__icon-button taskfold-project__order-button"
         type="button"
-        title=${t("flowboardProject.moveUp")}
-        aria-label=${t("flowboardProject.moveUp")}
+        title=${t("taskfoldProject.moveUp")}
+        aria-label=${t("taskfoldProject.moveUp")}
         ?disabled=${!params.canMoveUp}
         @click=${params.onMoveUp}
       >&#8593;</button>
       <button
-        class="flowboard-project__icon-button flowboard-project__order-button"
+        class="taskfold-project__icon-button taskfold-project__order-button"
         type="button"
-        title=${t("flowboardProject.moveDown")}
-        aria-label=${t("flowboardProject.moveDown")}
+        title=${t("taskfoldProject.moveDown")}
+        aria-label=${t("taskfoldProject.moveDown")}
         ?disabled=${!params.canMoveDown}
         @click=${params.onMoveDown}
       >&#8595;</button>
@@ -452,7 +452,7 @@ function renderOrderControls(params: {
   `;
 }
 
-function renderProjectToolbar(controller: FlowboardProjectViewController) {
+function renderProjectToolbar(controller: TaskfoldProjectViewController) {
   const { state } = controller;
   const query = state.query.trim().toLocaleLowerCase();
   const projects = state.projects.filter((project) => {
@@ -462,12 +462,12 @@ function renderProjectToolbar(controller: FlowboardProjectViewController) {
     return !query || `${project.name ?? ""} ${project.id}`.toLocaleLowerCase().includes(query);
   });
   return html`
-    <nav class="flowboard-project__project-toolbar" aria-label=${t("flowboardProject.allProjects")}>
-      <label class="flowboard-project__search">
-        <span class="flowboard-project__sr-only">${t("flowboardProject.searchProjects")}</span>
+    <nav class="taskfold-project__project-toolbar" aria-label=${t("taskfoldProject.allProjects")}>
+      <label class="taskfold-project__search">
+        <span class="taskfold-project__sr-only">${t("taskfoldProject.searchProjects")}</span>
         <input
           type="search"
-          placeholder=${t("flowboardProject.searchProjects")}
+          placeholder=${t("taskfoldProject.searchProjects")}
           .value=${state.query}
           @input=${(event: InputEvent) => {
             state.query = (event.currentTarget as HTMLInputElement).value;
@@ -475,7 +475,7 @@ function renderProjectToolbar(controller: FlowboardProjectViewController) {
           }}
         />
       </label>
-      <label class="flowboard-project__checkbox">
+      <label class="taskfold-project__checkbox">
         <input
           type="checkbox"
           .checked=${state.showArchivedProjects}
@@ -484,27 +484,27 @@ function renderProjectToolbar(controller: FlowboardProjectViewController) {
             controller.requestUpdate();
           }}
         />
-        ${t("flowboardProject.includeArchived")}
+        ${t("taskfoldProject.includeArchived")}
       </label>
-      <div class="flowboard-project__project-list" role="list">
+      <div class="taskfold-project__project-list" role="list">
         ${projects.length
           ? projects.map(
               (project) => {
                 const moveUp = reorderVisibleItemIds(state.projects, projects, project.id, -1);
                 const moveDown = reorderVisibleItemIds(state.projects, projects, project.id, 1);
                 return html`
-                  <div class="flowboard-project__project-row" role="listitem">
+                  <div class="taskfold-project__project-row" role="listitem">
                     <button
-                      class="flowboard-project__nav-project ${state.selectedProjectId === project.id
+                      class="taskfold-project__nav-project ${state.selectedProjectId === project.id
                         ? "is-selected"
                         : ""}"
                       type="button"
                       @click=${() => controller.selectProject(project.id)}
                     >
-                      <span class="flowboard-project__project-color" style=${project.color ? `--project-color:${project.color}` : ""}></span>
-                      <span class="flowboard-project__nav-project-name">${boardName(project)}</span>
+                      <span class="taskfold-project__project-color" style=${project.color ? `--project-color:${project.color}` : ""}></span>
+                      <span class="taskfold-project__nav-project-name">${boardName(project)}</span>
                       ${project.archivedAt
-                        ? html`<small>${t("flowboardProject.archived")}</small>`
+                        ? html`<small>${t("taskfoldProject.archived")}</small>`
                         : html`<small>${projectCardCount(project)}</small>`}
                     </button>
                     ${renderOrderControls({
@@ -517,23 +517,23 @@ function renderProjectToolbar(controller: FlowboardProjectViewController) {
                 `;
               },
             )
-          : html`<p class="flowboard-project__empty-side">${t("flowboardProject.emptyProject")}</p>`}
+          : html`<p class="taskfold-project__empty-side">${t("taskfoldProject.emptyProject")}</p>`}
       </div>
     </nav>
   `;
 }
 
-function renderOverview(controller: FlowboardProjectViewController) {
+function renderOverview(controller: TaskfoldProjectViewController) {
   const { state } = controller;
   const projects = state.projects.filter(
     (project) => state.showArchivedProjects || !project.archivedAt,
   );
   return html`
-    <section class="flowboard-project__overview" aria-label=${t("flowboardProject.overview")}>
-      <div class="flowboard-project__section-heading">
+    <section class="taskfold-project__overview" aria-label=${t("taskfoldProject.overview")}>
+      <div class="taskfold-project__section-heading">
         <div>
-          <h1>${t("flowboardProject.allProjects")}</h1>
-          <p>${t("flowboardProject.title")}</p>
+          <h1>${t("taskfoldProject.allProjects")}</h1>
+          <p>${t("taskfoldProject.title")}</p>
         </div>
         <button
           class="btn btn--primary"
@@ -541,29 +541,29 @@ function renderOverview(controller: FlowboardProjectViewController) {
           ?disabled=${!controller.connected}
           @click=${() => controller.openModal({ kind: "project" })}
         >
-          ${t("flowboardProject.newProject")}
+          ${t("taskfoldProject.newProject")}
         </button>
       </div>
       ${projects.length
         ? html`
-            <div class="flowboard-project__overview-grid">
+            <div class="taskfold-project__overview-grid">
               ${projects.map(
                 (project) => html`
                   <article
-                    class="flowboard-project__overview-item ${project.archivedAt ? "is-archived" : ""}"
+                    class="taskfold-project__overview-item ${project.archivedAt ? "is-archived" : ""}"
                     @click=${() => controller.selectProject(project.id)}
                   >
-                    <div class="flowboard-project__overview-item-top">
-                      <span class="flowboard-project__project-color" style=${project.color ? `--project-color:${project.color}` : ""}></span>
-                      <span class="flowboard-project__overview-item-id">${project.id}</span>
+                    <div class="taskfold-project__overview-item-top">
+                      <span class="taskfold-project__project-color" style=${project.color ? `--project-color:${project.color}` : ""}></span>
+                      <span class="taskfold-project__overview-item-id">${project.id}</span>
                       ${project.archivedAt
-                        ? html`<span class="flowboard-project__badge">${t("flowboardProject.archived")}</span>`
+                        ? html`<span class="taskfold-project__badge">${t("taskfoldProject.archived")}</span>`
                         : nothing}
                     </div>
                     <h2>${boardName(project)}</h2>
                     <p>${project.currentObjective || project.description || "\u00a0"}</p>
                     <footer>
-                      <span>${t("flowboardProject.cards", { count: String(project.active) })}</span>
+                      <span>${t("taskfoldProject.cards", { count: String(project.active) })}</span>
                       <span>${project.version || ""}</span>
                     </footer>
                   </article>
@@ -572,15 +572,15 @@ function renderOverview(controller: FlowboardProjectViewController) {
             </div>
           `
         : html`
-            <div class="flowboard-project__blank">
-              <p>${t("flowboardProject.emptyOverview")}</p>
+            <div class="taskfold-project__blank">
+              <p>${t("taskfoldProject.emptyOverview")}</p>
               <button
                 class="btn btn--primary"
                 type="button"
                 ?disabled=${!controller.connected}
                 @click=${() => controller.openModal({ kind: "project" })}
               >
-                ${t("flowboardProject.newProject")}
+                ${t("taskfoldProject.newProject")}
               </button>
             </div>
           `}
@@ -589,10 +589,10 @@ function renderOverview(controller: FlowboardProjectViewController) {
 }
 
 function renderCard(
-  controller: FlowboardProjectViewController,
-  card: FlowboardCard,
+  controller: TaskfoldProjectViewController,
+  card: TaskfoldCard,
   milestoneId: string | undefined,
-  cards: readonly FlowboardCard[],
+  cards: readonly TaskfoldCard[],
 ) {
   const { state } = controller;
   const project = state.project;
@@ -606,7 +606,7 @@ function renderCard(
   const nextCard = cards[cardIndex + 1];
   return html`
     <article
-      class="flowboard-project__card ${archived ? "is-archived" : ""}"
+      class="taskfold-project__card ${archived ? "is-archived" : ""}"
       draggable=${!isProjectArchived}
       @dragstart=${(event: DragEvent) => {
         state.draggedCardId = card.id;
@@ -629,16 +629,16 @@ function renderCard(
       }}
     >
       <button
-        class="flowboard-project__card-main"
+        class="taskfold-project__card-main"
         type="button"
         @click=${() => controller.openModal({ kind: "card-detail", cardId: card.id })}
       >
-        <span class="flowboard-project__priority priority-${card.priority}"></span>
-        <span class="flowboard-project__card-title">${card.title}</span>
-        ${card.notes ? html`<span class="flowboard-project__card-notes">${card.notes}</span>` : nothing}
+        <span class="taskfold-project__priority priority-${card.priority}"></span>
+        <span class="taskfold-project__card-title">${card.title}</span>
+        ${card.notes ? html`<span class="taskfold-project__card-notes">${card.notes}</span>` : nothing}
         ${card.delivery
           ? html`
-              <span class="flowboard-project__delivery-badges">
+              <span class="taskfold-project__delivery-badges">
                 ${card.delivery.implementationState
                   ? html`<small>${deliveryStateLabel(
                       "implementation",
@@ -658,22 +658,22 @@ function renderCard(
             `
           : nothing}
       </button>
-      <div class="flowboard-project__card-footer">
+      <div class="taskfold-project__card-footer">
         <select
-          class="flowboard-project__compact-select"
-          aria-label=${t("flowboardProject.status")}
+          class="taskfold-project__compact-select"
+          aria-label=${t("taskfoldProject.status")}
           .value=${card.status}
           @change=${(event: Event) =>
             controller.updateCardStatus(
               card.id,
-              (event.currentTarget as HTMLSelectElement).value as FlowboardStatus,
+              (event.currentTarget as HTMLSelectElement).value as TaskfoldStatus,
             )}
         >
           ${renderStatusOptions(card.status)}
         </select>
         <select
-          class="flowboard-project__compact-select flowboard-project__move-card"
-          aria-label=${t("flowboardProject.moveTo")}
+          class="taskfold-project__compact-select taskfold-project__move-card"
+          aria-label=${t("taskfoldProject.moveTo")}
           ?disabled=${isProjectArchived}
           .value=${card.milestoneId ?? ""}
           @change=${(event: Event) =>
@@ -682,7 +682,7 @@ function renderCard(
               (event.currentTarget as HTMLSelectElement).value || undefined,
             )}
         >
-          <option value="">${t("flowboardProject.unassigned")}</option>
+          <option value="">${t("taskfoldProject.unassigned")}</option>
           ${project.milestones
             .filter((milestone) => milestone.state === "active")
             .map(
@@ -706,20 +706,20 @@ function renderCard(
             controller.moveCardMilestone(card.id, milestoneId, nextCard.position + 1),
         })}
       </div>
-      ${archived ? html`<span class="flowboard-project__card-archived">${t("flowboardProject.archived")}</span>` : nothing}
+      ${archived ? html`<span class="taskfold-project__card-archived">${t("taskfoldProject.archived")}</span>` : nothing}
     </article>
   `;
 }
 
 function renderColumn(
-  controller: FlowboardProjectViewController,
+  controller: TaskfoldProjectViewController,
   params: {
     id?: string;
     title: string;
     subtitle?: string;
-    state?: FlowboardMilestone["state"];
-    cards: FlowboardCard[];
-    milestone?: FlowboardMilestone;
+    state?: TaskfoldMilestone["state"];
+    cards: TaskfoldCard[];
+    milestone?: TaskfoldMilestone;
   },
 ) {
   const { state } = controller;
@@ -734,7 +734,7 @@ function renderColumn(
     : undefined;
   return html`
     <section
-      class="flowboard-project__column ${params.state ? `is-${params.state}` : "is-unassigned"}"
+      class="taskfold-project__column ${params.state ? `is-${params.state}` : "is-unassigned"}"
       @dragover=${(event: DragEvent) => event.preventDefault()}
       @drop=${(event: DragEvent) => {
         event.preventDefault();
@@ -744,12 +744,12 @@ function renderColumn(
         }
       }}
     >
-      <header class="flowboard-project__column-header">
+      <header class="taskfold-project__column-header">
         <div>
           <h2>${params.title}</h2>
-          <span>${params.subtitle || t("flowboardProject.cards", { count: String(params.cards.length) })}</span>
+          <span>${params.subtitle || t("taskfoldProject.cards", { count: String(params.cards.length) })}</span>
         </div>
-        <div class="flowboard-project__column-actions">
+        <div class="taskfold-project__column-actions">
           ${milestone
             ? html`
                 ${renderOrderControls({
@@ -760,62 +760,62 @@ function renderColumn(
                     moveMilestoneDown && controller.reorderMilestones(moveMilestoneDown),
                 })}
                 <button
-                  class="flowboard-project__icon-button"
+                  class="taskfold-project__icon-button"
                   type="button"
-                  title=${t("flowboardProject.editMilestone")}
+                  title=${t("taskfoldProject.editMilestone")}
                   @click=${() => controller.openModal({ kind: "milestone", milestone })}
                 >...</button>
                 ${milestone.state === "active"
                   ? html`
                       <button
-                        class="flowboard-project__icon-button"
+                        class="taskfold-project__icon-button"
                         type="button"
-                        title=${t("flowboardProject.completeMilestone")}
+                        title=${t("taskfoldProject.completeMilestone")}
                         @click=${() => controller.completeMilestone(milestone.id)}
                       >&#10003;</button>
                       <button
-                        class="flowboard-project__icon-button"
+                        class="taskfold-project__icon-button"
                         type="button"
-                        title=${t("flowboardProject.archiveMilestone")}
+                        title=${t("taskfoldProject.archiveMilestone")}
                         @click=${() => controller.archiveMilestone(milestone.id, true)}
                       >&#8942;</button>
                     `
                   : html`
                       <button
-                        class="flowboard-project__icon-button"
+                        class="taskfold-project__icon-button"
                         type="button"
-                        title=${t("flowboardProject.restoreMilestone")}
+                        title=${t("taskfoldProject.restoreMilestone")}
                         @click=${() => controller.archiveMilestone(milestone.id, false)}
                       >&#8635;</button>
                     `}
               `
             : nothing}
           <button
-            class="flowboard-project__icon-button"
+            class="taskfold-project__icon-button"
             type="button"
-            title=${t("flowboardProject.newCard")}
+            title=${t("taskfoldProject.newCard")}
             ?disabled=${!controller.connected || projectArchived || (milestone && milestone.state !== "active")}
             @click=${() => controller.openModal({ kind: "card", ...(params.id ? { milestoneId: params.id } : {}) })}
           >+</button>
         </div>
       </header>
-      <div class="flowboard-project__card-list">
+      <div class="taskfold-project__card-list">
         ${params.cards.length
           ? params.cards.map((card) => renderCard(controller, card, params.id, params.cards))
-          : html`<p class="flowboard-project__empty-column">${t("flowboardProject.emptyColumn")}</p>`}
+          : html`<p class="taskfold-project__empty-column">${t("taskfoldProject.emptyColumn")}</p>`}
       </div>
     </section>
   `;
 }
 
-function renderBoard(controller: FlowboardProjectViewController) {
+function renderBoard(controller: TaskfoldProjectViewController) {
   const { state } = controller;
   const project = state.project;
   if (!project) {
     return nothing;
   }
   const cards = project.cards.filter((card) => !isArchivedCard(card));
-  const byMilestone = new Map<string | undefined, FlowboardCard[]>();
+  const byMilestone = new Map<string | undefined, TaskfoldCard[]>();
   for (const card of cards) {
     const key = card.milestoneId;
     const current = byMilestone.get(key) ?? [];
@@ -826,17 +826,17 @@ function renderBoard(controller: FlowboardProjectViewController) {
     columnCards.sort((left, right) => left.position - right.position || left.createdAt - right.createdAt);
   }
   return html`
-    <section class="flowboard-project__board">
-      <div class="flowboard-project__section-heading">
+    <section class="taskfold-project__board">
+      <div class="taskfold-project__section-heading">
         <div>
           <h1>${boardName(project.board)}</h1>
           <p>${project.board.currentObjective || project.board.description || project.board.id}</p>
         </div>
-        <div class="flowboard-project__heading-actions">
+        <div class="taskfold-project__heading-actions">
           ${project.board.archivedAt
             ? html`
                 <button class="btn" type="button" @click=${() => controller.archiveProject(false)}>
-                  ${t("flowboardProject.restoreProject")}
+                  ${t("taskfoldProject.restoreProject")}
                 </button>
               `
             : html`
@@ -846,7 +846,7 @@ function renderBoard(controller: FlowboardProjectViewController) {
                   ?disabled=${!controller.connected}
                   @click=${() => controller.openModal({ kind: "milestone" })}
                 >
-                  ${t("flowboardProject.newMilestone")}
+                  ${t("taskfoldProject.newMilestone")}
                 </button>
                 <button
                   class="btn btn--primary"
@@ -854,18 +854,18 @@ function renderBoard(controller: FlowboardProjectViewController) {
                   ?disabled=${!controller.connected}
                   @click=${() => controller.openModal({ kind: "card" })}
                 >
-                  ${t("flowboardProject.newCard")}
+                  ${t("taskfoldProject.newCard")}
                 </button>
               `}
         </div>
       </div>
       ${project.board.archivedAt
-        ? html`<div class="callout">${t("flowboardProject.projectArchived")}</div>`
+        ? html`<div class="callout">${t("taskfoldProject.projectArchived")}</div>`
         : nothing}
-      <div class="flowboard-project__kanban" aria-label=${t("flowboardProject.board")}>
+      <div class="taskfold-project__kanban" aria-label=${t("taskfoldProject.board")}>
         ${renderColumn(controller, {
-          title: t("flowboardProject.unassigned"),
-          subtitle: t("flowboardProject.unassignedHelp"),
+          title: t("taskfoldProject.unassigned"),
+          subtitle: t("taskfoldProject.unassignedHelp"),
           cards: byMilestone.get(undefined) ?? [],
         })}
         ${project.milestones.map((milestone) =>
@@ -883,78 +883,78 @@ function renderBoard(controller: FlowboardProjectViewController) {
   `;
 }
 
-function renderSettings(controller: FlowboardProjectViewController) {
+function renderSettings(controller: TaskfoldProjectViewController) {
   const project = controller.state.project;
   if (!project) {
     return nothing;
   }
   const workspacePath = project.board.defaultWorkspace?.path ?? "";
   return html`
-    <section class="flowboard-project__settings">
-      <div class="flowboard-project__section-heading">
+    <section class="taskfold-project__settings">
+      <div class="taskfold-project__section-heading">
         <div>
-          <h1>${t("flowboardProject.projectSettings")}</h1>
+          <h1>${t("taskfoldProject.projectSettings")}</h1>
           <p>${project.board.id}</p>
         </div>
         ${project.board.archivedAt
           ? html`
               <button class="btn" type="button" @click=${() => controller.archiveProject(false)}>
-                ${t("flowboardProject.restoreProject")}
+                ${t("taskfoldProject.restoreProject")}
               </button>
             `
           : html`
               <button class="btn btn--danger" type="button" @click=${() => controller.archiveProject(true)}>
-                ${t("flowboardProject.archiveProject")}
+                ${t("taskfoldProject.archiveProject")}
               </button>
             `}
       </div>
       <form
-        class="flowboard-project__settings-form"
+        class="taskfold-project__settings-form"
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           controller.updateProject(readForm(event));
         }}
       >
         <label>
-          ${t("flowboardProject.projectName")}
+          ${t("taskfoldProject.projectName")}
           <input name="name" required .value=${project.board.name ?? ""} />
         </label>
         <label>
-          ${t("flowboardProject.version")}
+          ${t("taskfoldProject.version")}
           <input name="version" .value=${project.board.version ?? ""} />
         </label>
-        <label class="flowboard-project__wide-field">
-          ${t("flowboardProject.currentObjective")}
+        <label class="taskfold-project__wide-field">
+          ${t("taskfoldProject.currentObjective")}
           <textarea name="currentObjective" .value=${project.board.currentObjective ?? ""}></textarea>
         </label>
-        <label class="flowboard-project__wide-field">
-          ${t("flowboardProject.coreValue")}
+        <label class="taskfold-project__wide-field">
+          ${t("taskfoldProject.coreValue")}
           <textarea name="coreValue" .value=${project.board.coreValue ?? ""}></textarea>
         </label>
         <label>
-          ${t("flowboardProject.sourceOfTruth")}
+          ${t("taskfoldProject.sourceOfTruth")}
           <input name="sourceOfTruth" type="url" .value=${project.board.sourceOfTruth ?? ""} />
         </label>
         <label>
-          ${t("flowboardProject.repositoryUrl")}
+          ${t("taskfoldProject.repositoryUrl")}
           <input name="repositoryUrl" type="url" .value=${project.board.repositoryUrl ?? ""} />
         </label>
         <label>
-          ${t("flowboardProject.planningPath")}
+          ${t("taskfoldProject.planningPath")}
           <input name="planningPath" .value=${project.board.planningPath ?? ""} />
         </label>
         <label>
-          ${t("flowboardProject.homepageUrl")}
+          ${t("taskfoldProject.homepageUrl")}
           <input name="homepageUrl" type="url" .value=${project.board.homepageUrl ?? ""} />
         </label>
-        <label class="flowboard-project__wide-field">
-          ${t("flowboardProject.defaultWorkspace")}
+        <label class="taskfold-project__wide-field">
+          ${t("taskfoldProject.defaultWorkspace")}
           <input name="workspacePath" .value=${workspacePath} />
-          <small>${t("flowboardProject.defaultWorkspaceHelp")}</small>
+          <small>${t("taskfoldProject.defaultWorkspaceHelp")}</small>
         </label>
-        <div class="flowboard-project__form-actions">
+        <div class="taskfold-project__form-actions">
           <button class="btn btn--primary" type="submit" ?disabled=${controller.state.busy}>
-            ${t("flowboardProject.updateProject")}
+            ${t("taskfoldProject.updateProject")}
           </button>
         </div>
       </form>
@@ -965,23 +965,23 @@ function renderSettings(controller: FlowboardProjectViewController) {
 type DocumentIndexGroup = {
   id: string;
   label: string;
-  documents: FlowboardProjectDocument[];
+  documents: TaskfoldProjectDocument[];
 };
 
 function documentIndexGroups(
-  documents: FlowboardProjectDocument[],
+  documents: TaskfoldProjectDocument[],
 ): DocumentIndexGroup[] {
   return [
     {
       id: "project",
-      label: t("flowboardProject.groupProject"),
+      label: t("taskfoldProject.groupProject"),
       documents: documents.filter(
         (document) => document.source === "project" && document.section === "project",
       ),
     },
     {
       id: "ai-system",
-      label: t("flowboardProject.groupAiSystem"),
+      label: t("taskfoldProject.groupAiSystem"),
       documents: documents.filter((document) => document.source === "ai_system"),
     },
     {
@@ -1009,24 +1009,24 @@ function documentIndexGroups(
 }
 
 function renderDocumentIndex(
-  controller: FlowboardProjectViewController,
-  documents: FlowboardProjectDocument[],
+  controller: TaskfoldProjectViewController,
+  documents: TaskfoldProjectDocument[],
 ) {
   const { state } = controller;
   const workspacePath = state.project?.board.defaultWorkspace?.path;
   return html`
-    <div class="flowboard-project__document-index" role="list">
+    <div class="taskfold-project__document-index" role="list">
       ${documentIndexGroups(documents).map(
         (group) => html`
-          <section class="flowboard-project__document-group">
+          <section class="taskfold-project__document-group">
             <h2>${group.label}</h2>
             ${group.documents.length
               ? html`
-                  <div class="flowboard-project__document-list">
+                  <div class="taskfold-project__document-list">
                     ${group.documents.map(
                       (document) => html`
                         <button
-                          class="flowboard-project__document-index-item ${document.hiddenAt
+                          class="taskfold-project__document-index-item ${document.hiddenAt
                             ? "is-hidden"
                             : ""} ${document.id === state.selectedDocumentId ? "is-selected" : ""}"
                           type="button"
@@ -1043,8 +1043,8 @@ function renderDocumentIndex(
                     )}
                   </div>
                 `
-              : html`<p class="flowboard-project__empty-column">${t(
-                  "flowboardProject.noDocuments",
+              : html`<p class="taskfold-project__empty-column">${t(
+                  "taskfoldProject.noDocuments",
                 )}</p>`}
           </section>
         `,
@@ -1053,7 +1053,7 @@ function renderDocumentIndex(
   `;
 }
 
-function renderDocuments(controller: FlowboardProjectViewController) {
+function renderDocuments(controller: TaskfoldProjectViewController) {
   const { state } = controller;
   const project = state.project;
   if (!project) {
@@ -1075,18 +1075,18 @@ function renderDocuments(controller: FlowboardProjectViewController) {
     );
   });
   return html`
-    <section class="flowboard-project__documents">
-      <div class="flowboard-project__section-heading">
+    <section class="taskfold-project__documents">
+      <div class="taskfold-project__section-heading">
         <div>
-          <h1>${t("flowboardProject.documentLibrary")}</h1>
+          <h1>${t("taskfoldProject.documentLibrary")}</h1>
           <p>${boardName(project.board)}</p>
         </div>
-        <div class="flowboard-project__heading-actions">
-          <label class="flowboard-project__document-search">
-            <span class="flowboard-project__sr-only">${t("flowboardProject.searchDocuments")}</span>
+        <div class="taskfold-project__heading-actions">
+          <label class="taskfold-project__document-search">
+            <span class="taskfold-project__sr-only">${t("taskfoldProject.searchDocuments")}</span>
             <input
               type="search"
-              placeholder=${t("flowboardProject.searchDocuments")}
+              placeholder=${t("taskfoldProject.searchDocuments")}
               .value=${state.documentQuery}
               @input=${(event: InputEvent) => {
                 state.documentQuery = (event.currentTarget as HTMLInputElement).value;
@@ -1095,22 +1095,22 @@ function renderDocuments(controller: FlowboardProjectViewController) {
             />
           </label>
           <select
-            class="flowboard-project__document-source-filter"
-            aria-label=${t("flowboardProject.documentSource")}
+            class="taskfold-project__document-source-filter"
+            aria-label=${t("taskfoldProject.documentSource")}
             .value=${state.documentSourceFilter}
             @change=${(event: Event) => {
               state.documentSourceFilter = (event.currentTarget as HTMLSelectElement)
-                .value as FlowboardProjectUiState["documentSourceFilter"];
+                .value as TaskfoldProjectUiState["documentSourceFilter"];
               controller.requestUpdate();
             }}
           >
-            <option value="all">${t("flowboardProject.allDocumentSources")}</option>
+            <option value="all">${t("taskfoldProject.allDocumentSources")}</option>
             ${DOCUMENT_SOURCES.map(
               (source) =>
                 html`<option value=${source}>${documentSourceLabel(source)}</option>`,
             )}
           </select>
-          <label class="flowboard-project__checkbox">
+          <label class="taskfold-project__checkbox">
             <input
               type="checkbox"
               .checked=${state.showHiddenDocuments}
@@ -1119,14 +1119,14 @@ function renderDocuments(controller: FlowboardProjectViewController) {
                 controller.requestUpdate();
               }}
             />
-            ${t("flowboardProject.showHidden")}
+            ${t("taskfoldProject.showHidden")}
           </label>
           <button
             class="btn btn--primary"
             type="button"
             @click=${() => controller.openModal({ kind: "document" })}
           >
-            ${t("flowboardProject.addDocument")}
+            ${t("taskfoldProject.addDocument")}
           </button>
         </div>
       </div>
@@ -1136,14 +1136,14 @@ function renderDocuments(controller: FlowboardProjectViewController) {
   `;
 }
 
-function renderDocumentPreview(controller: FlowboardProjectViewController) {
+function renderDocumentPreview(controller: TaskfoldProjectViewController) {
   const { state } = controller;
   const document =
     state.documents.find((candidate) => candidate.id === state.selectedDocumentId) ?? null;
   if (!document) {
     return html`
-      <section class="flowboard-project__document-reader is-empty">
-        <p>${t("flowboardProject.selectDocument")}</p>
+      <section class="taskfold-project__document-reader is-empty">
+        <p>${t("taskfoldProject.selectDocument")}</p>
       </section>
     `;
   }
@@ -1166,26 +1166,26 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
     state.project?.board.defaultWorkspace?.path,
   );
   return html`
-    <section class="flowboard-project__document-reader">
+    <section class="taskfold-project__document-reader">
       <header>
-        <div class="flowboard-project__document-reader-title">
-          <div class="flowboard-project__document-reader-heading">
+        <div class="taskfold-project__document-reader-title">
+          <div class="taskfold-project__document-reader-heading">
             <h2>${document.title}</h2>
-            <span class="flowboard-project__document-source-tag">${documentSourceLabel(
+            <span class="taskfold-project__document-source-tag">${documentSourceLabel(
               document.source,
             )}</span>
             ${dirty
-              ? html`<span class="flowboard-project__document-unsaved">${t(
-                  "flowboardProject.unsavedDocument",
+              ? html`<span class="taskfold-project__document-unsaved">${t(
+                  "taskfoldProject.unsavedDocument",
                 )}</span>`
               : nothing}
           </div>
           <small>${displayPath ?? documentTypeLabel(document.type)}</small>
           ${displayPath && preview?.path && displayPath !== preview.path
-            ? html`<small class="flowboard-project__document-full-path">${preview.path}</small>`
+            ? html`<small class="taskfold-project__document-full-path">${preview.path}</small>`
             : nothing}
         </div>
-        <div class="flowboard-project__document-reader-actions">
+        <div class="taskfold-project__document-reader-actions">
           ${editable
             ? html`
                 <button
@@ -1193,7 +1193,7 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
                   type="button"
                   ?disabled=${state.documentPreviewLoading || state.busy}
                   @click=${controller.startDocumentEdit}
-                >${t("flowboardProject.editDocumentContent")}</button>
+                >${t("taskfoldProject.editDocumentContent")}</button>
               `
             : nothing}
           ${dirty
@@ -1209,14 +1209,14 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
                   type="button"
                   ?disabled=${state.busy || !preview}
                   @click=${controller.saveDocumentContent}
-                >${t("flowboardProject.saveDocument")}</button>
+                >${t("taskfoldProject.saveDocument")}</button>
               `
             : nothing}
           <button
-            class="flowboard-project__icon-button"
+            class="taskfold-project__icon-button"
             type="button"
-            title=${t("flowboardProject.editDocument")}
-            aria-label=${t("flowboardProject.editDocument")}
+            title=${t("taskfoldProject.editDocument")}
+            aria-label=${t("taskfoldProject.editDocument")}
             ?disabled=${state.busy}
             @click=${() => controller.openModal({ kind: "document", document })}
           >...</button>
@@ -1227,92 +1227,92 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
             onMoveDown: () => moveDown && controller.reorderDocuments(moveDown),
           })}
           <button
-            class="flowboard-project__icon-button"
+            class="taskfold-project__icon-button"
             type="button"
-            title=${document.hiddenAt ? t("flowboardProject.restoreDocument") : t("flowboardProject.hideDocument")}
-            aria-label=${document.hiddenAt ? t("flowboardProject.restoreDocument") : t("flowboardProject.hideDocument")}
+            title=${document.hiddenAt ? t("taskfoldProject.restoreDocument") : t("taskfoldProject.hideDocument")}
+            aria-label=${document.hiddenAt ? t("taskfoldProject.restoreDocument") : t("taskfoldProject.hideDocument")}
             ?disabled=${state.busy}
             @click=${() => controller.hideDocument(document.id, !document.hiddenAt)}
           >${document.hiddenAt ? "Restore" : "-"}</button>
           ${!document.system
             ? html`
                 <button
-                  class="flowboard-project__icon-button"
+                  class="taskfold-project__icon-button"
                   type="button"
-                  title=${t("flowboardProject.deleteDocument")}
-                  aria-label=${t("flowboardProject.deleteDocument")}
+                  title=${t("taskfoldProject.deleteDocument")}
+                  aria-label=${t("taskfoldProject.deleteDocument")}
                   ?disabled=${state.busy}
                   @click=${() => controller.deleteDocument(document.id)}
                 >x</button>
               `
             : nothing}
           <button
-            class="flowboard-project__icon-button"
+            class="taskfold-project__icon-button"
             type="button"
-            title=${t("flowboardProject.refreshDocument")}
-            aria-label=${t("flowboardProject.refreshDocument")}
+            title=${t("taskfoldProject.refreshDocument")}
+            aria-label=${t("taskfoldProject.refreshDocument")}
             ?disabled=${state.documentPreviewLoading || state.documentDraft !== null}
             @click=${controller.refreshDocument}
           >&#8635;</button>
         </div>
       </header>
       ${state.documentPreviewLoading
-        ? html`<p class="flowboard-project__document-reader-message">${t(
-            "flowboardProject.readingDocument",
+        ? html`<p class="taskfold-project__document-reader-message">${t(
+            "taskfoldProject.readingDocument",
           )}</p>`
         : state.documentEditing
             ? html`
-                <div class="flowboard-project__document-editor">
+                <div class="taskfold-project__document-editor">
                   ${state.documentPreviewError
-                    ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
+                    ? html`<p class="taskfold-project__document-reader-message is-error">${state.documentPreviewError}</p>`
                     : nothing}
                   <div
-                    class="flowboard-project__document-editor-toolbar"
+                    class="taskfold-project__document-editor-toolbar"
                     role="toolbar"
-                    aria-label=${t("flowboardProject.richTextToolbar")}
+                    aria-label=${t("taskfoldProject.richTextToolbar")}
                   >
                     <button
-                      class="flowboard-project__editor-button"
+                      class="taskfold-project__editor-button"
                       type="button"
-                      title=${t("flowboardProject.formatBold")}
-                      aria-label=${t("flowboardProject.formatBold")}
+                      title=${t("taskfoldProject.formatBold")}
+                      aria-label=${t("taskfoldProject.formatBold")}
                       @mousedown=${(event: MouseEvent) => event.preventDefault()}
                       @click=${() => controller.formatDocument("bold")}
                     ><strong>B</strong></button>
                     <button
-                      class="flowboard-project__editor-button"
+                      class="taskfold-project__editor-button"
                       type="button"
-                      title=${t("flowboardProject.formatItalic")}
-                      aria-label=${t("flowboardProject.formatItalic")}
+                      title=${t("taskfoldProject.formatItalic")}
+                      aria-label=${t("taskfoldProject.formatItalic")}
                       @mousedown=${(event: MouseEvent) => event.preventDefault()}
                       @click=${() => controller.formatDocument("italic")}
                     ><em>I</em></button>
                     <button
-                      class="flowboard-project__editor-button"
+                      class="taskfold-project__editor-button"
                       type="button"
-                      title=${t("flowboardProject.formatHeading")}
-                      aria-label=${t("flowboardProject.formatHeading")}
+                      title=${t("taskfoldProject.formatHeading")}
+                      aria-label=${t("taskfoldProject.formatHeading")}
                       @mousedown=${(event: MouseEvent) => event.preventDefault()}
                       @click=${() => controller.formatDocument("formatBlock")}
                     >H</button>
                     <button
-                      class="flowboard-project__editor-button"
+                      class="taskfold-project__editor-button"
                       type="button"
-                      title=${t("flowboardProject.formatList")}
-                      aria-label=${t("flowboardProject.formatList")}
+                      title=${t("taskfoldProject.formatList")}
+                      aria-label=${t("taskfoldProject.formatList")}
                       @mousedown=${(event: MouseEvent) => event.preventDefault()}
                       @click=${() => controller.formatDocument("insertUnorderedList")}
-                    >${t("flowboardProject.formatList")}</button>
+                    >${t("taskfoldProject.formatList")}</button>
                   </div>
                   <div
-                    class="flowboard-project__rich-editor"
+                    class="taskfold-project__rich-editor"
                     contenteditable="true"
                     role="textbox"
                     aria-multiline="true"
-                    aria-label=${t("flowboardProject.documentContent")}
-                    .innerHTML=${flowboardMarkdownToEditorHtml(content)}
+                    aria-label=${t("taskfoldProject.documentContent")}
+                    .innerHTML=${taskfoldMarkdownToEditorHtml(content)}
                     @input=${(event: InputEvent) => {
-                      state.documentDraft = flowboardEditorHtmlToMarkdown(
+                      state.documentDraft = taskfoldEditorHtmlToMarkdown(
                         (event.currentTarget as HTMLElement).innerHTML,
                       );
                     }}
@@ -1323,34 +1323,34 @@ function renderDocumentPreview(controller: FlowboardProjectViewController) {
                       }
                     }}
                   ></div>
-                  <div class="flowboard-project__document-editor-actions">
+                  <div class="taskfold-project__document-editor-actions">
                     <button class="btn" type="button" @click=${controller.cancelDocumentEdit}>
                       ${t("common.cancel")}
                     </button>
                     <button class="btn" type="button" @click=${controller.previewDocumentDraft}>
-                      ${t("flowboardProject.previewDocument")}
+                      ${t("taskfoldProject.previewDocument")}
                     </button>
                     <button
                       class="btn btn--primary"
                       type="button"
                       ?disabled=${state.busy}
                       @click=${controller.saveDocumentContent}
-                    >${t("flowboardProject.saveDocument")}</button>
+                    >${t("taskfoldProject.saveDocument")}</button>
                   </div>
                 </div>
               `
             : state.documentPreviewError
-              ? html`<p class="flowboard-project__document-reader-message is-error">${state.documentPreviewError}</p>`
+              ? html`<p class="taskfold-project__document-reader-message is-error">${state.documentPreviewError}</p>`
             : preview
-              ? html`<article class="flowboard-markdown">${renderFlowboardMarkdown(content)}</article>`
-              : html`<p class="flowboard-project__document-reader-message">${t(
-                  "flowboardProject.noDocumentContent",
+              ? html`<article class="taskfold-markdown">${renderTaskfoldMarkdown(content)}</article>`
+              : html`<p class="taskfold-project__document-reader-message">${t(
+                  "taskfoldProject.noDocumentContent",
                 )}</p>`}
     </section>
   `;
 }
 
-function renderCardDetail(controller: FlowboardProjectViewController, card: FlowboardCard) {
+function renderCardDetail(controller: TaskfoldProjectViewController, card: TaskfoldCard) {
   const project = controller.state.project;
   if (!project) {
     return nothing;
@@ -1359,38 +1359,38 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
     (candidate) => candidate.id !== boardId(card) && !candidate.archivedAt,
   );
   return html`
-    <div class="flowboard-project__modal-panel flowboard-project__detail-panel">
+    <div class="taskfold-project__modal-panel taskfold-project__detail-panel">
       <header>
         <div>
           <small>${boardName(project.board)}</small>
-          <h2>${t("flowboardProject.details")}</h2>
+          <h2>${t("taskfoldProject.details")}</h2>
         </div>
-        <button class="flowboard-project__icon-button" type="button" @click=${controller.closeModal}>&times;</button>
+        <button class="taskfold-project__icon-button" type="button" @click=${controller.closeModal}>&times;</button>
       </header>
-      <div class="flowboard-project__detail-body">
+      <div class="taskfold-project__detail-body">
         <h3>${card.title}</h3>
-        ${card.notes ? html`<p class="flowboard-project__detail-notes">${card.notes}</p>` : nothing}
+        ${card.notes ? html`<p class="taskfold-project__detail-notes">${card.notes}</p>` : nothing}
         <dl>
-          <div><dt>${t("flowboardProject.status")}</dt><dd>${t(`workboard.status.${card.status}`)}</dd></div>
-          <div><dt>${t("flowboardProject.priority")}</dt><dd>${card.priority}</dd></div>
-          <div><dt>${t("flowboardProject.assignee")}</dt><dd>${card.agentId || t("flowboardProject.unassigned")}</dd></div>
-          <div><dt>${t("flowboardProject.viewProject")}</dt><dd>${boardId(card)}</dd></div>
+          <div><dt>${t("taskfoldProject.status")}</dt><dd>${t(`workboard.status.${card.status}`)}</dd></div>
+          <div><dt>${t("taskfoldProject.priority")}</dt><dd>${card.priority}</dd></div>
+          <div><dt>${t("taskfoldProject.assignee")}</dt><dd>${card.agentId || t("taskfoldProject.unassigned")}</dd></div>
+          <div><dt>${t("taskfoldProject.viewProject")}</dt><dd>${boardId(card)}</dd></div>
         </dl>
         <label>
-          ${t("flowboardProject.status")}
+          ${t("taskfoldProject.status")}
           <select
             .value=${card.status}
             @change=${(event: Event) =>
               controller.updateCardStatus(
                 card.id,
-                (event.currentTarget as HTMLSelectElement).value as FlowboardStatus,
+                (event.currentTarget as HTMLSelectElement).value as TaskfoldStatus,
               )}
           >
             ${renderStatusOptions(card.status)}
           </select>
         </label>
         <label>
-          ${t("flowboardProject.moveTo")}
+          ${t("taskfoldProject.moveTo")}
           <select
             .value=${card.milestoneId ?? ""}
             ?disabled=${Boolean(project.board.archivedAt)}
@@ -1400,7 +1400,7 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
                 (event.currentTarget as HTMLSelectElement).value || undefined,
               )}
           >
-            <option value="">${t("flowboardProject.unassigned")}</option>
+            <option value="">${t("taskfoldProject.unassigned")}</option>
             ${project.milestones
               .filter((milestone) => milestone.state === "active")
               .map(
@@ -1421,7 +1421,7 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
                 ?disabled=${Boolean(project.board.archivedAt)}
                 @click=${() => controller.openModal({ kind: "move-project", cardId: card.id })}
               >
-                ${t("flowboardProject.moveToProject")}
+                ${t("taskfoldProject.moveToProject")}
               </button>
             `
           : nothing}
@@ -1435,24 +1435,24 @@ function renderCardDetail(controller: FlowboardProjectViewController, card: Flow
             controller.selectProject(boardId(card));
           }}
         >
-          ${t("flowboardProject.viewProject")}
+          ${t("taskfoldProject.viewProject")}
         </button>
         <button
           class="btn"
           type="button"
           @click=${() => controller.archiveCard(card.id, !isArchivedCard(card))}
         >
-          ${isArchivedCard(card) ? t("flowboardProject.restoreCard") : t("flowboardProject.archiveCard")}
+          ${isArchivedCard(card) ? t("taskfoldProject.restoreCard") : t("taskfoldProject.archiveCard")}
         </button>
         <button class="btn btn--primary" type="button" @click=${controller.closeModal}>
-          ${t("flowboardProject.close")}
+          ${t("taskfoldProject.close")}
         </button>
       </footer>
     </div>
   `;
 }
 
-function renderExecutionSection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+function renderExecutionSection(controller: TaskfoldProjectViewController, card: TaskfoldCard) {
   const { state } = controller;
   const projectArchived = Boolean(state.project?.board.archivedAt);
   const inspection = inspectionForCard(state, card.id);
@@ -1467,16 +1467,16 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
     state.executionInspectionCardId === card.id && state.executionInspectionLoading;
 
   return html`
-    <section class="flowboard-project__detail-section flowboard-project__execution-section">
-      <div class="flowboard-project__execution-heading">
-        <h3>${t("flowboardProject.execution")}</h3>
+    <section class="taskfold-project__detail-section taskfold-project__execution-section">
+      <div class="taskfold-project__execution-heading">
+        <h3>${t("taskfoldProject.execution")}</h3>
         ${active
           ? html`
               <button
-                class="flowboard-project__icon-button"
+                class="taskfold-project__icon-button"
                 type="button"
-                title=${t("flowboardProject.refreshExecution")}
-                aria-label=${t("flowboardProject.refreshExecution")}
+                title=${t("taskfoldProject.refreshExecution")}
+                aria-label=${t("taskfoldProject.refreshExecution")}
                 ?disabled=${inspectionLoading}
                 @click=${() => controller.refreshCardExecution(card.id)}
               >&#8635;</button>
@@ -1485,41 +1485,41 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
       </div>
       ${active
         ? html`
-            <p class="flowboard-project__execution-state">
-              ${t("flowboardProject.executionRunning")}
+            <p class="taskfold-project__execution-state">
+              ${t("taskfoldProject.executionRunning")}
             </p>
-            <dl class="flowboard-project__execution-facts">
+            <dl class="taskfold-project__execution-facts">
               ${sessionKey
-                ? html`<div><dt>${t("flowboardProject.executionSession")}</dt><dd>${sessionKey}</dd></div>`
+                ? html`<div><dt>${t("taskfoldProject.executionSession")}</dt><dd>${sessionKey}</dd></div>`
                 : nothing}
               ${runId
-                ? html`<div><dt>${t("flowboardProject.executionRun")}</dt><dd>${runId}</dd></div>`
+                ? html`<div><dt>${t("taskfoldProject.executionRun")}</dt><dd>${runId}</dd></div>`
                 : nothing}
               ${workspace?.kind === "worktree" && workspace.path
-                ? html`<div><dt>${t("flowboardProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
+                ? html`<div><dt>${t("taskfoldProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
                 : nothing}
             </dl>
             ${inspectionLoading
-              ? html`<p class="flowboard-project__detail-empty">${t(
-                  "flowboardProject.refreshingExecution",
+              ? html`<p class="taskfold-project__detail-empty">${t(
+                  "taskfoldProject.refreshingExecution",
                 )}</p>`
               : nothing}
             ${inspectionError
-              ? html`<p class="flowboard-project__execution-error">${inspectionError}</p>`
+              ? html`<p class="taskfold-project__execution-error">${inspectionError}</p>`
               : nothing}
             ${inspection?.preview
               ? html`
-                  <details class="flowboard-project__execution-preview">
-                    <summary>${t("flowboardProject.executionSessionPreview")}</summary>
+                  <details class="taskfold-project__execution-preview">
+                    <summary>${t("taskfoldProject.executionSessionPreview")}</summary>
                     <pre>${executionValue(inspection.preview)}</pre>
                   </details>
                 `
               : nothing}
-            <div class="flowboard-project__execution-actions">
+            <div class="taskfold-project__execution-actions">
               ${sessionKey
                 ? html`
-                    <a class="btn" href=${flowboardNativeChatHref(sessionKey)} target="_top">
-                      ${t("flowboardProject.openNativeChat")}
+                    <a class="btn" href=${taskfoldNativeChatHref(sessionKey)} target="_top">
+                      ${t("taskfoldProject.openNativeChat")}
                     </a>
                   `
                 : nothing}
@@ -1529,38 +1529,38 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
                 ?disabled=${state.busy}
                 @click=${() => controller.abortCardExecution(card.id)}
               >
-                ${t("flowboardProject.stopExecution")}
+                ${t("taskfoldProject.stopExecution")}
               </button>
             </div>
             <form
-              class="flowboard-project__execution-steer"
+              class="taskfold-project__execution-steer"
               @submit=${(event: SubmitEvent) => {
                 event.preventDefault();
                 controller.steerCardExecution(card.id, readForm(event).message ?? "");
               }}
             >
               <label>
-                ${t("flowboardProject.steerInstruction")}
+                ${t("taskfoldProject.steerInstruction")}
                 <textarea
                   name="message"
                   required
-                  placeholder=${t("flowboardProject.steerInstructionPlaceholder")}
+                  placeholder=${t("taskfoldProject.steerInstructionPlaceholder")}
                 ></textarea>
               </label>
               <button class="btn" type="submit" ?disabled=${state.busy}>
-                ${t("flowboardProject.steerExecution")}
+                ${t("taskfoldProject.steerExecution")}
               </button>
             </form>
           `
         : unresolvedActive
           ? html`
-              <p class="flowboard-project__detail-empty">
+              <p class="taskfold-project__detail-empty">
                 ${inspectionLoading
-                  ? t("flowboardProject.refreshingExecution")
-                  : t("flowboardProject.executionCheckRequired")}
+                  ? t("taskfoldProject.refreshingExecution")
+                  : t("taskfoldProject.executionCheckRequired")}
               </p>
               ${inspectionError
-                ? html`<p class="flowboard-project__execution-error">${inspectionError}</p>`
+                ? html`<p class="taskfold-project__execution-error">${inspectionError}</p>`
                 : nothing}
               <button
                 class="btn"
@@ -1568,25 +1568,25 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
                 ?disabled=${inspectionLoading}
                 @click=${() => controller.refreshCardExecution(card.id)}
               >
-                ${t("flowboardProject.refreshExecution")}
+                ${t("taskfoldProject.refreshExecution")}
               </button>
             `
         : html`
-            <p class="flowboard-project__detail-empty">
+            <p class="taskfold-project__detail-empty">
               ${card.execution?.status === "done"
-                ? t("flowboardProject.executionFinished")
+                ? t("taskfoldProject.executionFinished")
                 : card.execution?.status === "blocked"
-                  ? t("flowboardProject.executionStopped")
-                  : t("flowboardProject.executionIdle")}
+                  ? t("taskfoldProject.executionStopped")
+                  : t("taskfoldProject.executionIdle")}
             </p>
             ${runId || (workspace?.kind === "worktree" && workspace.path)
               ? html`
-                  <dl class="flowboard-project__execution-facts">
+                  <dl class="taskfold-project__execution-facts">
                     ${runId
-                      ? html`<div><dt>${t("flowboardProject.executionRun")}</dt><dd>${runId}</dd></div>`
+                      ? html`<div><dt>${t("taskfoldProject.executionRun")}</dt><dd>${runId}</dd></div>`
                       : nothing}
                     ${workspace?.kind === "worktree" && workspace.path
-                      ? html`<div><dt>${t("flowboardProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
+                      ? html`<div><dt>${t("taskfoldProject.executionWorktreePath")}</dt><dd>${workspace.path}</dd></div>`
                       : nothing}
                   </dl>
                 `
@@ -1597,40 +1597,40 @@ function renderExecutionSection(controller: FlowboardProjectViewController, card
               ?disabled=${state.busy || !controller.connected || isArchivedCard(card) || projectArchived}
               @click=${() => controller.prepareCardExecution(card.id)}
             >
-              ${t("flowboardProject.startExecution")}
+              ${t("taskfoldProject.startExecution")}
             </button>
           `}
     </section>
   `;
 }
 
-function renderDeliverySection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+function renderDeliverySection(controller: TaskfoldProjectViewController, card: TaskfoldCard) {
   const delivery = card.delivery;
   return html`
-    <section class="flowboard-project__detail-section">
-      <h3>${t("flowboardProject.deliveryFacts")}</h3>
+    <section class="taskfold-project__detail-section">
+      <h3>${t("taskfoldProject.deliveryFacts")}</h3>
       <form
-        class="flowboard-project__delivery-form"
+        class="taskfold-project__delivery-form"
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           controller.updateCardDelivery(card.id, readForm(event));
         }}
       >
         <label>
-          ${t("flowboardProject.deliveryObjective")}
+          ${t("taskfoldProject.deliveryObjective")}
           <textarea name="objective" .value=${delivery?.objective ?? ""}></textarea>
         </label>
         <label>
-          ${t("flowboardProject.deliverySummary")}
+          ${t("taskfoldProject.deliverySummary")}
           <textarea name="deliverySummary" .value=${delivery?.deliverySummary ?? ""}></textarea>
         </label>
         <label>
-          ${t("flowboardProject.deliveryOpenItems")}
+          ${t("taskfoldProject.deliveryOpenItems")}
           <textarea name="openItems" .value=${delivery?.openItems ?? ""}></textarea>
         </label>
-        <div class="flowboard-project__modal-grid">
+        <div class="taskfold-project__modal-grid">
           <label>
-            ${t("flowboardProject.deliveryImplementation")}
+            ${t("taskfoldProject.deliveryImplementation")}
             <select name="implementationState">
               ${renderDeliveryOptions(
                 IMPLEMENTATION_STATES,
@@ -1640,7 +1640,7 @@ function renderDeliverySection(controller: FlowboardProjectViewController, card:
             </select>
           </label>
           <label>
-            ${t("flowboardProject.deliveryVerification")}
+            ${t("taskfoldProject.deliveryVerification")}
             <select name="verificationState">
               ${renderDeliveryOptions(
                 VERIFICATION_STATES,
@@ -1650,28 +1650,28 @@ function renderDeliverySection(controller: FlowboardProjectViewController, card:
             </select>
           </label>
           <label>
-            ${t("flowboardProject.deliveryRelease")}
+            ${t("taskfoldProject.deliveryRelease")}
             <select name="releaseState">
               ${renderDeliveryOptions(RELEASE_STATES, delivery?.releaseState, "release")}
             </select>
           </label>
         </div>
         <button class="btn" type="submit" ?disabled=${controller.state.busy}>
-          ${t("flowboardProject.saveDelivery")}
+          ${t("taskfoldProject.saveDelivery")}
         </button>
       </form>
     </section>
   `;
 }
 
-function renderSourceReferenceSection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+function renderSourceReferenceSection(controller: TaskfoldProjectViewController, card: TaskfoldCard) {
   const references = [...(card.sourceReferences ?? [])].toSorted(
     (left, right) => left.position - right.position || left.createdAt - right.createdAt,
   );
   return html`
-    <section class="flowboard-project__detail-section">
-      <h3>${t("flowboardProject.sourceReferences")}</h3>
-      <div class="flowboard-project__detail-list">
+    <section class="taskfold-project__detail-section">
+      <h3>${t("taskfoldProject.sourceReferences")}</h3>
+      <div class="taskfold-project__detail-list">
         ${references.length
           ? references.map((reference, index) => {
               const ids = references.map((item) => item.id);
@@ -1695,19 +1695,19 @@ function renderSourceReferenceSection(controller: FlowboardProjectViewController
                   : undefined;
               return html`
                 <form
-                  class="flowboard-project__source-reference"
+                  class="taskfold-project__source-reference"
                   @submit=${(event: SubmitEvent) => {
                     event.preventDefault();
                     controller.updateSourceReference(card.id, readForm(event));
                   }}
                 >
                   <input type="hidden" name="sourceReferenceId" value=${reference.id} />
-                  <input name="label" aria-label=${t("flowboardProject.sourceReferenceLabel")} .value=${reference.label} required />
-                  <input name="target" aria-label=${t("flowboardProject.sourceReferenceTarget")} .value=${reference.target} required />
-                  <input name="note" aria-label=${t("flowboardProject.sourceReferenceNote")} .value=${reference.note ?? ""} />
-                  <div class="flowboard-project__inline-actions">
+                  <input name="label" aria-label=${t("taskfoldProject.sourceReferenceLabel")} .value=${reference.label} required />
+                  <input name="target" aria-label=${t("taskfoldProject.sourceReferenceTarget")} .value=${reference.target} required />
+                  <input name="note" aria-label=${t("taskfoldProject.sourceReferenceNote")} .value=${reference.note ?? ""} />
+                  <div class="taskfold-project__inline-actions">
                     <button class="btn" type="submit" ?disabled=${controller.state.busy}>
-                      ${t("flowboardProject.save")}
+                      ${t("taskfoldProject.save")}
                     </button>
                     ${renderOrderControls({
                       canMoveUp: Boolean(moveUp),
@@ -1718,7 +1718,7 @@ function renderSourceReferenceSection(controller: FlowboardProjectViewController
                         moveDown && controller.reorderSourceReferences(card.id, moveDown),
                     })}
                     <button
-                      class="flowboard-project__icon-button"
+                      class="taskfold-project__icon-button"
                       type="button"
                       title=${t("common.delete")}
                       @click=${() => controller.deleteSourceReference(card.id, reference.id)}
@@ -1727,43 +1727,43 @@ function renderSourceReferenceSection(controller: FlowboardProjectViewController
                 </form>
               `;
             })
-          : html`<p class="flowboard-project__detail-empty">${t(
-              "flowboardProject.noSourceReferences",
+          : html`<p class="taskfold-project__detail-empty">${t(
+              "taskfoldProject.noSourceReferences",
             )}</p>`}
       </div>
       <form
-        class="flowboard-project__source-reference"
+        class="taskfold-project__source-reference"
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           controller.createSourceReference(card.id, readForm(event));
         }}
       >
-        <input name="label" placeholder=${t("flowboardProject.sourceReferenceLabel")} required />
-        <input name="target" placeholder=${t("flowboardProject.sourceReferenceTarget")} required />
-        <input name="note" placeholder=${t("flowboardProject.sourceReferenceNote")} />
+        <input name="label" placeholder=${t("taskfoldProject.sourceReferenceLabel")} required />
+        <input name="target" placeholder=${t("taskfoldProject.sourceReferenceTarget")} required />
+        <input name="note" placeholder=${t("taskfoldProject.sourceReferenceNote")} />
         <button class="btn" type="submit" ?disabled=${controller.state.busy}>
-          ${t("flowboardProject.addSourceReference")}
+          ${t("taskfoldProject.addSourceReference")}
         </button>
       </form>
     </section>
   `;
 }
 
-function renderEvidenceSection(controller: FlowboardProjectViewController, card: FlowboardCard) {
+function renderEvidenceSection(controller: TaskfoldProjectViewController, card: TaskfoldCard) {
   const proof = card.metadata?.proof ?? [];
   const artifacts = card.metadata?.artifacts ?? [];
   return html`
-    <section class="flowboard-project__detail-section">
-      <h3>${t("flowboardProject.proof")}</h3>
-      <div class="flowboard-project__detail-list">
+    <section class="taskfold-project__detail-section">
+      <h3>${t("taskfoldProject.proof")}</h3>
+      <div class="taskfold-project__detail-list">
         ${proof.length
           ? proof.map(
               (entry) => html`
-                <div class="flowboard-project__evidence-item">
+                <div class="taskfold-project__evidence-item">
                   <span>${entry.label || entry.command || entry.url || entry.status}</span>
                   <small>${entry.status}${entry.note ? ` · ${entry.note}` : ""}</small>
                   <button
-                    class="flowboard-project__icon-button"
+                    class="taskfold-project__icon-button"
                     type="button"
                     title=${t("common.delete")}
                     @click=${() => controller.deleteProof(card.id, entry.id)}
@@ -1771,41 +1771,41 @@ function renderEvidenceSection(controller: FlowboardProjectViewController, card:
                 </div>
               `,
             )
-          : html`<p class="flowboard-project__detail-empty">${t("flowboardProject.noProof")}</p>`}
+          : html`<p class="taskfold-project__detail-empty">${t("taskfoldProject.noProof")}</p>`}
       </div>
       <form
-        class="flowboard-project__evidence-form"
+        class="taskfold-project__evidence-form"
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           controller.addProof(card.id, readForm(event));
         }}
       >
         <select name="status">
-          <option value="unknown">${t("flowboardProject.proofUnknown")}</option>
-          <option value="passed">${t("flowboardProject.proofPassed")}</option>
-          <option value="failed">${t("flowboardProject.proofFailed")}</option>
-          <option value="skipped">${t("flowboardProject.proofSkipped")}</option>
+          <option value="unknown">${t("taskfoldProject.proofUnknown")}</option>
+          <option value="passed">${t("taskfoldProject.proofPassed")}</option>
+          <option value="failed">${t("taskfoldProject.proofFailed")}</option>
+          <option value="skipped">${t("taskfoldProject.proofSkipped")}</option>
         </select>
-        <input name="label" placeholder=${t("flowboardProject.evidenceLabel")} />
-        <input name="command" placeholder=${t("flowboardProject.proofCommand")} />
-        <input name="url" placeholder=${t("flowboardProject.evidenceUrl")} />
-        <input name="note" placeholder=${t("flowboardProject.evidenceNote")} />
+        <input name="label" placeholder=${t("taskfoldProject.evidenceLabel")} />
+        <input name="command" placeholder=${t("taskfoldProject.proofCommand")} />
+        <input name="url" placeholder=${t("taskfoldProject.evidenceUrl")} />
+        <input name="note" placeholder=${t("taskfoldProject.evidenceNote")} />
         <button class="btn" type="submit" ?disabled=${controller.state.busy}>
-          ${t("flowboardProject.addProof")}
+          ${t("taskfoldProject.addProof")}
         </button>
       </form>
     </section>
-    <section class="flowboard-project__detail-section">
-      <h3>${t("flowboardProject.artifacts")}</h3>
-      <div class="flowboard-project__detail-list">
+    <section class="taskfold-project__detail-section">
+      <h3>${t("taskfoldProject.artifacts")}</h3>
+      <div class="taskfold-project__detail-list">
         ${artifacts.length
           ? artifacts.map(
               (entry) => html`
-                <div class="flowboard-project__evidence-item">
-                  <span>${entry.label || entry.path || entry.url || t("flowboardProject.artifact")}</span>
+                <div class="taskfold-project__evidence-item">
+                  <span>${entry.label || entry.path || entry.url || t("taskfoldProject.artifact")}</span>
                   <small>${entry.path || entry.url || ""}</small>
                   <button
-                    class="flowboard-project__icon-button"
+                    class="taskfold-project__icon-button"
                     type="button"
                     title=${t("common.delete")}
                     @click=${() => controller.deleteArtifact(card.id, entry.id)}
@@ -1813,23 +1813,23 @@ function renderEvidenceSection(controller: FlowboardProjectViewController, card:
                 </div>
               `,
             )
-          : html`<p class="flowboard-project__detail-empty">${t(
-              "flowboardProject.noArtifacts",
+          : html`<p class="taskfold-project__detail-empty">${t(
+              "taskfoldProject.noArtifacts",
             )}</p>`}
       </div>
       <form
-        class="flowboard-project__evidence-form"
+        class="taskfold-project__evidence-form"
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           controller.addArtifact(card.id, readForm(event));
         }}
       >
-        <input name="label" placeholder=${t("flowboardProject.evidenceLabel")} />
-        <input name="path" placeholder=${t("flowboardProject.artifactPath")} />
-        <input name="url" placeholder=${t("flowboardProject.evidenceUrl")} />
-        <input name="mimeType" placeholder=${t("flowboardProject.artifactMimeType")} />
+        <input name="label" placeholder=${t("taskfoldProject.evidenceLabel")} />
+        <input name="path" placeholder=${t("taskfoldProject.artifactPath")} />
+        <input name="url" placeholder=${t("taskfoldProject.evidenceUrl")} />
+        <input name="mimeType" placeholder=${t("taskfoldProject.artifactMimeType")} />
         <button class="btn" type="submit" ?disabled=${controller.state.busy}>
-          ${t("flowboardProject.addArtifact")}
+          ${t("taskfoldProject.addArtifact")}
         </button>
       </form>
     </section>
@@ -1837,8 +1837,8 @@ function renderEvidenceSection(controller: FlowboardProjectViewController, card:
 }
 
 function renderMoveProjectModal(
-  controller: FlowboardProjectViewController,
-  modal: Extract<FlowboardProjectModal, { kind: "move-project" }>,
+  controller: TaskfoldProjectViewController,
+  modal: Extract<TaskfoldProjectModal, { kind: "move-project" }>,
 ) {
   const project = controller.state.project;
   const card = project?.cards.find((candidate) => candidate.id === modal.cardId);
@@ -1854,7 +1854,7 @@ function renderMoveProjectModal(
   const canMove = Boolean(modal.boardId && modal.milestoneId && !controller.state.busy);
   return html`
     <form
-      class="flowboard-project__modal-panel"
+      class="taskfold-project__modal-panel"
       @submit=${(event: SubmitEvent) => {
         event.preventDefault();
         if (modal.boardId && modal.milestoneId) {
@@ -1862,10 +1862,10 @@ function renderMoveProjectModal(
         }
       }}
     >
-      <header><h2>${t("flowboardProject.moveToProject")}</h2></header>
-      <p class="flowboard-project__move-card-title">${card.title}</p>
+      <header><h2>${t("taskfoldProject.moveToProject")}</h2></header>
+      <p class="taskfold-project__move-card-title">${card.title}</p>
       <label>
-        ${t("flowboardProject.moveToProject")}
+        ${t("taskfoldProject.moveToProject")}
         <select
           .value=${modal.boardId ?? ""}
           ?disabled=${controller.state.busy}
@@ -1875,14 +1875,14 @@ function renderMoveProjectModal(
               (event.currentTarget as HTMLSelectElement).value,
             )}
         >
-          <option value="">${t("flowboardProject.selectTargetProject")}</option>
+          <option value="">${t("taskfoldProject.selectTargetProject")}</option>
           ${otherProjects.map(
             (candidate) => html`<option value=${candidate.id}>${boardName(candidate)}</option>`,
           )}
         </select>
       </label>
       <label>
-        ${t("flowboardProject.targetMilestone")}
+        ${t("taskfoldProject.targetMilestone")}
         <select
           .value=${modal.milestoneId ?? ""}
           ?disabled=${controller.state.busy || !modal.targetProject || activeMilestones.length === 0}
@@ -1892,19 +1892,19 @@ function renderMoveProjectModal(
               milestoneId: (event.currentTarget as HTMLSelectElement).value || undefined,
             })}
         >
-          <option value="">${t("flowboardProject.selectTargetMilestone")}</option>
+          <option value="">${t("taskfoldProject.selectTargetMilestone")}</option>
           ${activeMilestones.map(
             (milestone) => html`<option value=${milestone.id}>${milestone.title}</option>`,
           )}
         </select>
       </label>
       ${modal.targetProject && activeMilestones.length === 0
-        ? html`<p class="flowboard-project__empty-column">${t("flowboardProject.noActiveMilestones")}</p>`
+        ? html`<p class="taskfold-project__empty-column">${t("taskfoldProject.noActiveMilestones")}</p>`
         : nothing}
       <footer>
         <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
         <button class="btn btn--primary" type="submit" ?disabled=${!canMove}>
-          ${t("flowboardProject.moveCard")}
+          ${t("taskfoldProject.moveCard")}
         </button>
       </footer>
     </form>
@@ -1912,8 +1912,8 @@ function renderMoveProjectModal(
 }
 
 function renderExecutionStartModal(
-  controller: FlowboardProjectViewController,
-  modal: Extract<FlowboardProjectModal, { kind: "execution-start" }>,
+  controller: TaskfoldProjectViewController,
+  modal: Extract<TaskfoldProjectModal, { kind: "execution-start" }>,
 ) {
   const card = controller.state.project?.cards.find((candidate) => candidate.id === modal.cardId);
   if (!card) {
@@ -1935,34 +1935,34 @@ function renderExecutionStartModal(
       ? `${preparation.defaultProvider}/${preparation.defaultModel}`
       : preparation?.defaultModel ?? preparation?.defaultProvider;
   return html`
-    <section class="flowboard-project__modal-panel flowboard-project__execution-confirmation">
-      <header><h2>${t("flowboardProject.startExecution")}</h2></header>
-      <p class="flowboard-project__move-card-title">${card.title}</p>
+    <section class="taskfold-project__modal-panel taskfold-project__execution-confirmation">
+      <header><h2>${t("taskfoldProject.startExecution")}</h2></header>
+      <p class="taskfold-project__move-card-title">${card.title}</p>
       ${loading
-        ? html`<p class="flowboard-project__detail-empty">${t(
-            "flowboardProject.preparingExecution",
+        ? html`<p class="taskfold-project__detail-empty">${t(
+            "taskfoldProject.preparingExecution",
           )}</p>`
         : error
-          ? html`<p class="flowboard-project__execution-error">${error}</p>`
+          ? html`<p class="taskfold-project__execution-error">${error}</p>`
           : preparation
             ? html`
                 ${card.status === "done"
-                  ? html`<p class="callout">${t("flowboardProject.executionDoneNotice")}</p>`
+                  ? html`<p class="callout">${t("taskfoldProject.executionDoneNotice")}</p>`
                   : nothing}
-                <p class="callout">${t("flowboardProject.executionWorktreeNotice")}</p>
-                <dl class="flowboard-project__execution-facts">
-                  <div><dt>${t("flowboardProject.executionAgent")}</dt><dd>${preparation.agentId}</dd></div>
+                <p class="callout">${t("taskfoldProject.executionWorktreeNotice")}</p>
+                <dl class="taskfold-project__execution-facts">
+                  <div><dt>${t("taskfoldProject.executionAgent")}</dt><dd>${preparation.agentId}</dd></div>
                   ${model
-                    ? html`<div><dt>${t("flowboardProject.executionModel")}</dt><dd>${model}</dd></div>`
+                    ? html`<div><dt>${t("taskfoldProject.executionModel")}</dt><dd>${model}</dd></div>`
                     : nothing}
-                  <div><dt>${t("flowboardProject.executionSource")}</dt><dd>${preparation.sourceCheckout}</dd></div>
+                  <div><dt>${t("taskfoldProject.executionSource")}</dt><dd>${preparation.sourceCheckout}</dd></div>
                   ${preparation.baseBranch
-                    ? html`<div><dt>${t("flowboardProject.executionBaseBranch")}</dt><dd>${preparation.baseBranch}</dd></div>`
+                    ? html`<div><dt>${t("taskfoldProject.executionBaseBranch")}</dt><dd>${preparation.baseBranch}</dd></div>`
                     : nothing}
-                  <div><dt>${t("flowboardProject.executionWorktree")}</dt><dd>${preparation.worktreeName}</dd></div>
+                  <div><dt>${t("taskfoldProject.executionWorktree")}</dt><dd>${preparation.worktreeName}</dd></div>
                 </dl>
-                <details class="flowboard-project__execution-preview" open>
-                  <summary>${t("flowboardProject.executionPromptPreview")}</summary>
+                <details class="taskfold-project__execution-preview" open>
+                  <summary>${t("taskfoldProject.executionPromptPreview")}</summary>
                   <pre>${preparation.promptPreview}</pre>
                 </details>
               `
@@ -1977,14 +1977,14 @@ function renderExecutionStartModal(
           ?disabled=${!preparation || loading || controller.state.busy}
           @click=${() => controller.startCardExecution(card.id)}
         >
-          ${t("flowboardProject.confirmStartExecution")}
+          ${t("taskfoldProject.confirmStartExecution")}
         </button>
       </footer>
     </section>
   `;
 }
 
-function renderModal(controller: FlowboardProjectViewController) {
+function renderModal(controller: TaskfoldProjectViewController) {
   const { modal, project } = controller.state;
   if (!modal) {
     return nothing;
@@ -2020,23 +2020,23 @@ function renderModal(controller: FlowboardProjectViewController) {
     return html`
       <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
         <form
-          class="flowboard-project__modal-panel"
+          class="taskfold-project__modal-panel"
           @submit=${(event: SubmitEvent) => {
             event.preventDefault();
             controller.createProject(readForm(event));
           }}
         >
-          <header><h2>${t("flowboardProject.newProject")}</h2></header>
-          <label>${t("flowboardProject.projectId")}<input name="id" required pattern="[a-z0-9][a-z0-9._-]{0,79}" /></label>
-          <label>${t("flowboardProject.projectName")}<input name="name" required /></label>
-          <label>${t("flowboardProject.firstMilestone")}<input name="initialMilestoneTitle" required /></label>
+          <header><h2>${t("taskfoldProject.newProject")}</h2></header>
+          <label>${t("taskfoldProject.projectId")}<input name="id" required pattern="[a-z0-9][a-z0-9._-]{0,79}" /></label>
+          <label>${t("taskfoldProject.projectName")}<input name="name" required /></label>
+          <label>${t("taskfoldProject.firstMilestone")}<input name="initialMilestoneTitle" required /></label>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
             <button
               class="btn btn--primary"
               type="submit"
               ?disabled=${controller.state.busy || !controller.connected}
-            >${t("flowboardProject.createProject")}</button>
+            >${t("taskfoldProject.createProject")}</button>
           </footer>
         </form>
       </openclaw-modal-dialog>
@@ -2049,20 +2049,20 @@ function renderModal(controller: FlowboardProjectViewController) {
     return html`
       <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
         <form
-          class="flowboard-project__modal-panel"
+          class="taskfold-project__modal-panel"
           @submit=${(event: SubmitEvent) => {
             event.preventDefault();
             controller.createCard(readForm(event));
           }}
         >
-          <header><h2>${t("flowboardProject.newCard")}</h2></header>
+          <header><h2>${t("taskfoldProject.newCard")}</h2></header>
           <input type="hidden" name="milestoneId" value=${modal.milestoneId ?? ""} />
-          <label>${t("flowboardProject.cardTitle")}<input name="title" required /></label>
-          <label>${t("flowboardProject.cardNotes")}<textarea name="notes"></textarea></label>
-          <div class="flowboard-project__modal-grid">
-            <label>${t("flowboardProject.status")}<select name="status">${renderStatusOptions("todo")}</select></label>
-            <label>${t("flowboardProject.priority")}<select name="priority">${renderPriorityOptions("normal")}</select></label>
-            <label>${t("flowboardProject.assignee")}<input name="agentId" /></label>
+          <label>${t("taskfoldProject.cardTitle")}<input name="title" required /></label>
+          <label>${t("taskfoldProject.cardNotes")}<textarea name="notes"></textarea></label>
+          <div class="taskfold-project__modal-grid">
+            <label>${t("taskfoldProject.status")}<select name="status">${renderStatusOptions("todo")}</select></label>
+            <label>${t("taskfoldProject.priority")}<select name="priority">${renderPriorityOptions("normal")}</select></label>
+            <label>${t("taskfoldProject.assignee")}<input name="agentId" /></label>
           </div>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
@@ -2070,7 +2070,7 @@ function renderModal(controller: FlowboardProjectViewController) {
               class="btn btn--primary"
               type="submit"
               ?disabled=${controller.state.busy || !controller.connected}
-            >${t("flowboardProject.createCard")}</button>
+            >${t("taskfoldProject.createCard")}</button>
           </footer>
         </form>
       </openclaw-modal-dialog>
@@ -2081,16 +2081,16 @@ function renderModal(controller: FlowboardProjectViewController) {
     return html`
       <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
         <form
-          class="flowboard-project__modal-panel"
+          class="taskfold-project__modal-panel"
           @submit=${(event: SubmitEvent) => {
             event.preventDefault();
             controller.saveMilestone(readForm(event));
           }}
         >
-          <header><h2>${milestone ? t("flowboardProject.editMilestone") : t("flowboardProject.newMilestone")}</h2></header>
+          <header><h2>${milestone ? t("taskfoldProject.editMilestone") : t("taskfoldProject.newMilestone")}</h2></header>
           <input type="hidden" name="id" value=${milestone?.id ?? ""} />
-          <label>${t("flowboardProject.milestoneName")}<input name="title" required .value=${milestone?.title ?? ""} /></label>
-          <label>${t("flowboardProject.milestoneDescription")}<textarea name="description" .value=${milestone?.description ?? ""}></textarea></label>
+          <label>${t("taskfoldProject.milestoneName")}<input name="title" required .value=${milestone?.title ?? ""} /></label>
+          <label>${t("taskfoldProject.milestoneDescription")}<textarea name="description" .value=${milestone?.description ?? ""}></textarea></label>
           <label>Color<input name="color" .value=${milestone?.color ?? ""} /></label>
           <footer>
             <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
@@ -2099,7 +2099,7 @@ function renderModal(controller: FlowboardProjectViewController) {
               type="submit"
               ?disabled=${controller.state.busy || !controller.connected}
             >
-              ${milestone ? t("common.save") : t("flowboardProject.createMilestone")}
+              ${milestone ? t("common.save") : t("taskfoldProject.createMilestone")}
             </button>
           </footer>
         </form>
@@ -2110,21 +2110,21 @@ function renderModal(controller: FlowboardProjectViewController) {
   return html`
     <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
       <form
-        class="flowboard-project__modal-panel flowboard-project__document-form"
+        class="taskfold-project__modal-panel taskfold-project__document-form"
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           controller.saveDocument(readForm(event));
         }}
       >
-        <header><h2>${document ? t("flowboardProject.editDocument") : t("flowboardProject.addDocument")}</h2></header>
+        <header><h2>${document ? t("taskfoldProject.editDocument") : t("taskfoldProject.addDocument")}</h2></header>
         <input type="hidden" name="id" value=${document?.id ?? ""} />
         ${document
           ? nothing
-          : html`<label>${t("flowboardProject.documentKey")}<input name="key" required pattern="[a-z0-9][a-z0-9._-]{0,79}" /></label>`}
-        <label>${t("flowboardProject.documentTitle")}<input name="title" required .value=${document?.title ?? ""} /></label>
-        <div class="flowboard-project__modal-grid">
+          : html`<label>${t("taskfoldProject.documentKey")}<input name="key" required pattern="[a-z0-9][a-z0-9._-]{0,79}" /></label>`}
+        <label>${t("taskfoldProject.documentTitle")}<input name="title" required .value=${document?.title ?? ""} /></label>
+        <div class="taskfold-project__modal-grid">
           <label>
-            ${t("flowboardProject.documentSection")}
+            ${t("taskfoldProject.documentSection")}
             <select name="section" ?disabled=${Boolean(document)}>
               ${DOCUMENT_SECTIONS.map(
                 (section) =>
@@ -2133,7 +2133,7 @@ function renderModal(controller: FlowboardProjectViewController) {
             </select>
           </label>
           <label>
-            ${t("flowboardProject.documentType")}
+            ${t("taskfoldProject.documentType")}
             <select name="type">
               ${DOCUMENT_TYPES.map(
                 (type) =>
@@ -2142,27 +2142,27 @@ function renderModal(controller: FlowboardProjectViewController) {
             </select>
           </label>
         </div>
-        <label>${t("flowboardProject.documentSummary")}<input name="summary" .value=${document?.summary ?? ""} /></label>
-        <label>${t("flowboardProject.documentTarget")}<input name="target" .value=${document?.target ?? ""} /></label>
-        <label>${t("flowboardProject.documentContent")}<textarea name="content" .value=${document?.content ?? ""}></textarea></label>
+        <label>${t("taskfoldProject.documentSummary")}<input name="summary" .value=${document?.summary ?? ""} /></label>
+        <label>${t("taskfoldProject.documentTarget")}<input name="target" .value=${document?.target ?? ""} /></label>
+        <label>${t("taskfoldProject.documentContent")}<textarea name="content" .value=${document?.content ?? ""}></textarea></label>
         <footer>
           <button class="btn" type="button" @click=${controller.closeModal}>${t("common.cancel")}</button>
-          <button class="btn btn--primary" type="submit" ?disabled=${controller.state.busy}>${t("flowboardProject.saveDocument")}</button>
+          <button class="btn btn--primary" type="submit" ?disabled=${controller.state.busy}>${t("taskfoldProject.saveDocument")}</button>
         </footer>
       </form>
     </openclaw-modal-dialog>
   `;
 }
 
-function renderProjectTabs(controller: FlowboardProjectViewController): TemplateResult {
+function renderProjectTabs(controller: TaskfoldProjectViewController): TemplateResult {
   const { state } = controller;
-  const tabs: Array<[FlowboardProjectUiState["screen"], string]> = [
-    ["board", "flowboardProject.board"],
-    ["settings", "flowboardProject.settings"],
-    ["documents", "flowboardProject.documents"],
+  const tabs: Array<[TaskfoldProjectUiState["screen"], string]> = [
+    ["board", "taskfoldProject.board"],
+    ["settings", "taskfoldProject.settings"],
+    ["documents", "taskfoldProject.documents"],
   ];
   return html`
-    <nav class="flowboard-project__tabs" aria-label=${t("flowboardProject.title")}>
+    <nav class="taskfold-project__tabs" aria-label=${t("taskfoldProject.title")}>
       ${tabs.map(
         ([screen, key]) => html`
           <button
@@ -2177,48 +2177,48 @@ function renderProjectTabs(controller: FlowboardProjectViewController): Template
   `;
 }
 
-export function renderFlowboardProjects(controller: FlowboardProjectViewController): TemplateResult {
+export function renderTaskfoldProjects(controller: TaskfoldProjectViewController): TemplateResult {
   const { state } = controller;
   const projectView =
     state.screen === "overview"
       ? renderOverview(controller)
       : !state.project
-        ? html`<section class="flowboard-project__blank"><p>${t("flowboardProject.emptyProject")}</p></section>`
+        ? html`<section class="taskfold-project__blank"><p>${t("taskfoldProject.emptyProject")}</p></section>`
         : state.screen === "board"
           ? renderBoard(controller)
           : state.screen === "settings"
             ? renderSettings(controller)
             : renderDocuments(controller);
   return html`
-    <section class="flowboard-project">
-      <div class="flowboard-project__topbar">
-        <div class="flowboard-project__brand">
-          <strong>flowboard</strong>
-          <span>${t("flowboardProject.title")}</span>
+    <section class="taskfold-project">
+      <div class="taskfold-project__topbar">
+        <div class="taskfold-project__brand">
+          <strong>taskfold</strong>
+          <span>${t("taskfoldProject.title")}</span>
         </div>
-        <div class="flowboard-project__topbar-actions">
-          ${state.loading ? html`<span class="flowboard-project__refreshing">${t("flowboardProject.loading")}</span>` : nothing}
-          <button class="flowboard-project__refresh" type="button" title=${t("flowboardProject.refresh")} @click=${controller.refresh}>
+        <div class="taskfold-project__topbar-actions">
+          ${state.loading ? html`<span class="taskfold-project__refreshing">${t("taskfoldProject.loading")}</span>` : nothing}
+          <button class="taskfold-project__refresh" type="button" title=${t("taskfoldProject.refresh")} @click=${controller.refresh}>
             &#8635;
           </button>
           <button
-            class="btn flowboard-project__all-projects ${state.screen === "overview" ? "is-active" : ""}"
+            class="btn taskfold-project__all-projects ${state.screen === "overview" ? "is-active" : ""}"
             type="button"
             @click=${() => controller.setScreen("overview")}
           >
-            <span>${t("flowboardProject.allProjects")}</span>
+            <span>${t("taskfoldProject.allProjects")}</span>
             <strong>${state.projects.length}</strong>
           </button>
-          <label class="flowboard-project__language">
-            <span class="flowboard-project__sr-only">${t("flowboardProject.language")}</span>
+          <label class="taskfold-project__language">
+            <span class="taskfold-project__sr-only">${t("taskfoldProject.language")}</span>
             <select
-              class="flowboard-project__language-select"
-              aria-label=${t("flowboardProject.language")}
+              class="taskfold-project__language-select"
+              aria-label=${t("taskfoldProject.language")}
               .value=${controller.locale}
               ?disabled=${state.languageSwitching}
               @change=${(event: Event) =>
                 controller.setLocale(
-                  (event.currentTarget as HTMLSelectElement).value as FlowboardLocale,
+                  (event.currentTarget as HTMLSelectElement).value as TaskfoldLocale,
                 )}
             >
               <option value="zh-CN">${t("languages.zhCN")}</option>
@@ -2231,19 +2231,19 @@ export function renderFlowboardProjects(controller: FlowboardProjectViewControll
             ?disabled=${!controller.connected}
             @click=${() => controller.openModal({ kind: "project" })}
           >
-            ${t("flowboardProject.newProject")}
+            ${t("taskfoldProject.newProject")}
           </button>
           ${state.languageError
-            ? html`<span class="flowboard-project__language-error" role="status">${state.languageError}</span>`
+            ? html`<span class="taskfold-project__language-error" role="status">${state.languageError}</span>`
             : nothing}
         </div>
       </div>
       ${!controller.connected
-        ? html`<div class="callout">${t("flowboardProject.connectionRequired")}</div>`
+        ? html`<div class="callout">${t("taskfoldProject.connectionRequired")}</div>`
         : nothing}
       ${state.error ? html`<div class="callout danger" role="alert">${state.error}</div>` : nothing}
       ${renderProjectToolbar(controller)}
-      <main class="flowboard-project__main">
+      <main class="taskfold-project__main">
         ${state.project && state.screen !== "overview" ? renderProjectTabs(controller) : nothing}
         ${projectView}
       </main>

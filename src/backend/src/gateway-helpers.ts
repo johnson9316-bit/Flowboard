@@ -1,15 +1,15 @@
-import { FLOWBOARD_STATUSES, type FlowboardCard } from "../../contract/index.js";
-// Flowboard plugin module implements shared gateway request helpers.
+import { TASKFOLD_STATUSES, type TaskfoldCard } from "../../contract/index.js";
+// Taskfold plugin module implements shared gateway request helpers.
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { parseStrictPositiveInteger } from "openclaw/plugin-sdk/number-runtime";
 import type { OpenClawPluginApi } from "../api.js";
-import { dispatchAndStartFlowboardCards } from "./dispatcher.js";
-import type { FlowboardStore } from "./store.js";
+import { dispatchAndStartTaskfoldCards } from "./dispatcher.js";
+import type { TaskfoldStore } from "./store.js";
 import {
-  resolveAgentFlowboardWorkspaceRuntime,
-  resolveConfiguredFlowboardWorkspaceAccess,
-  resolveFlowboardAgentWorkspace,
-  type FlowboardWorkspaceAccess,
+  resolveAgentTaskfoldWorkspaceRuntime,
+  resolveConfiguredTaskfoldWorkspaceAccess,
+  resolveTaskfoldAgentWorkspace,
+  type TaskfoldWorkspaceAccess,
 } from "./workspace-access.js";
 
 export type GatewayMethodContext = Parameters<
@@ -19,7 +19,7 @@ type GatewayRespond = GatewayMethodContext["respond"];
 
 export function respondError(respond: GatewayRespond, error: unknown) {
   respond(false, undefined, {
-    code: "flowboard_error",
+    code: "taskfold_error",
     message: formatErrorMessage(error),
   });
 }
@@ -53,23 +53,23 @@ export function readPatch(params: Record<string, unknown>): Record<string, unkno
 
 export function assertNoCursorAdvance(params: Record<string, unknown>) {
   if (params.advance === true) {
-    throw new Error("notification cursor advancement requires flowboard.notifications.advance.");
+    throw new Error("notification cursor advancement requires taskfold.notifications.advance.");
   }
 }
 
-export async function listFlowboardCards(
-  store: FlowboardStore,
+export async function listTaskfoldCards(
+  store: TaskfoldStore,
   boardId: unknown,
-  redactCard: (card: FlowboardCard) => FlowboardCard,
+  redactCard: (card: TaskfoldCard) => TaskfoldCard,
 ) {
   const [cards, { boards }] = await Promise.all([store.list({ boardId }), store.listBoards()]);
-  return { cards: cards.map(redactCard), boards, statuses: FLOWBOARD_STATUSES };
+  return { cards: cards.map(redactCard), boards, statuses: TASKFOLD_STATUSES };
 }
 
-export function resolveGatewayFlowboardWorkspaceAccess(params: {
+export function resolveGatewayTaskfoldWorkspaceAccess(params: {
   context: GatewayMethodContext["context"];
   client: GatewayMethodContext["client"];
-}): FlowboardWorkspaceAccess {
+}): TaskfoldWorkspaceAccess {
   // In-process plugin dispatch has no remote client and already runs with host
   // authority. Connected write-scope clients stay within configured workspaces.
   if (!params.client) {
@@ -79,21 +79,21 @@ export function resolveGatewayFlowboardWorkspaceAccess(params: {
   if (scopes.includes("operator.admin")) {
     return { unrestricted: true };
   }
-  return resolveConfiguredFlowboardWorkspaceAccess({
+  return resolveConfiguredTaskfoldWorkspaceAccess({
     config: params.context.getRuntimeConfig(),
     unrestricted: false,
   });
 }
 
-export function createFlowboardDispatchHandler(params: {
+export function createTaskfoldDispatchHandler(params: {
   api: OpenClawPluginApi;
-  store: FlowboardStore;
-  redactCard: (card: FlowboardCard) => FlowboardCard;
+  store: TaskfoldStore;
+  redactCard: (card: TaskfoldCard) => TaskfoldCard;
 }) {
   const sandbox = (params.api.runtime as unknown as {
     sandbox?: {
       prepareWorkspaceAuthority?: Parameters<
-        typeof resolveAgentFlowboardWorkspaceRuntime
+        typeof resolveAgentTaskfoldWorkspaceRuntime
       >[0]["prepareSandboxWorkspaceAuthority"];
     };
   }).sandbox;
@@ -111,13 +111,13 @@ export function createFlowboardDispatchHandler(params: {
           ? requestParams.maxStarts
           : undefined;
       if (!options.supportsMaxStarts && rawMaxStarts !== undefined) {
-        throw new Error("maxStarts requires flowboard.cards.dispatchWithOptions.");
+        throw new Error("maxStarts requires taskfold.cards.dispatchWithOptions.");
       }
       const maxStarts = options.supportsMaxStarts
         ? readOptionalPositiveInteger(rawMaxStarts, "maxStarts")
         : undefined;
-      const workspaceAccess = resolveGatewayFlowboardWorkspaceAccess({ context, client });
-      const result = await dispatchAndStartFlowboardCards({
+      const workspaceAccess = resolveGatewayTaskfoldWorkspaceAccess({ context, client });
+      const result = await dispatchAndStartTaskfoldCards({
         store: params.store,
         subagent: params.api.runtime.subagent,
         worktrees: params.api.runtime.worktrees,
@@ -126,7 +126,7 @@ export function createFlowboardDispatchHandler(params: {
           ...(maxStarts !== undefined ? { maxStarts } : {}),
           materializeWorktree: true,
           resolveAgentWorkspace: (agentId) =>
-            resolveFlowboardAgentWorkspace(context.getRuntimeConfig(), agentId),
+            resolveTaskfoldAgentWorkspace(context.getRuntimeConfig(), agentId),
           resolveAgentWorkspaceRuntime: (
             agentId,
             sessionKey,
@@ -135,7 +135,7 @@ export function createFlowboardDispatchHandler(params: {
             modelId,
           ) => {
             const config = context.getRuntimeConfig();
-            return resolveAgentFlowboardWorkspaceRuntime({
+            return resolveAgentTaskfoldWorkspaceRuntime({
               config,
               agentId,
               sessionKey,

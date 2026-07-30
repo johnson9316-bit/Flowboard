@@ -36,14 +36,14 @@ for (const relativePath of activeFiles) {
 const manifestPath = path.join(root, "openclaw.plugin.json");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 const manifestText = JSON.stringify(manifest);
-if (manifest.id !== "flowboard" || manifest.name !== "Flowboard") {
-  violations.push("openclaw.plugin.json must expose id flowboard and name Flowboard.");
+if (manifest.id !== "taskfold" || manifest.name !== "Taskfold") {
+  violations.push("openclaw.plugin.json must expose id taskfold and name Taskfold.");
 }
-if (!manifestText.includes("flowboard.cards.list") || /\bworkboard[._]/i.test(manifestText)) {
+if (!manifestText.includes("taskfold.cards.list") || /\bworkboard[._]/i.test(manifestText)) {
   violations.push("openclaw.plugin.json contains an unmigrated public RPC name.");
 }
 
-// FLOWBOARD_TOOL_NAMES is the single source of truth for the tool surface. The
+// TASKFOLD_TOOL_NAMES is the single source of truth for the tool surface. The
 // manifest repeats it twice and the implementations a third time, so without this
 // check a tool can be advertised without existing, or exist without being
 // advertised, and nothing fails until runtime.
@@ -52,10 +52,10 @@ const toolNamesSource = fs.readFileSync(
   "utf8",
 );
 const toolNamesBlock = toolNamesSource.match(
-  /export const FLOWBOARD_TOOL_NAMES = \[([\s\S]*?)\] as const;/,
+  /export const TASKFOLD_TOOL_NAMES = \[([\s\S]*?)\] as const;/,
 );
 if (!toolNamesBlock) {
-  violations.push("workspace-access.ts no longer declares FLOWBOARD_TOOL_NAMES as a literal array.");
+  violations.push("workspace-access.ts no longer declares TASKFOLD_TOOL_NAMES as a literal array.");
 }
 const toolNames = toolNamesBlock ? [...toolNamesBlock[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
 
@@ -67,7 +67,7 @@ const implemented = new Set(
       [
         ...fs
           .readFileSync(path.join(root, "src/backend/src", entry), "utf8")
-          .matchAll(/^\s*name: "(flowboard_[a-z_]+)",$/gm),
+          .matchAll(/^\s*name: "(taskfold_[a-z_]+)",$/gm),
       ].map((m) => m[1]),
     ),
 );
@@ -79,7 +79,7 @@ function reportSetDifference(label, expected, actual) {
     violations.push(`${label} is missing: ${missing.join(", ")}`);
   }
   if (extra.length) {
-    violations.push(`${label} has entries absent from FLOWBOARD_TOOL_NAMES: ${extra.join(", ")}`);
+    violations.push(`${label} has entries absent from TASKFOLD_TOOL_NAMES: ${extra.join(", ")}`);
   }
 }
 
@@ -120,6 +120,6 @@ if (violations.length) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${activeFiles.length} active files and ${toolNames.length} tool names: flowboard public names are isolated and the tool surface agrees.`,
+    `Checked ${activeFiles.length} active files and ${toolNames.length} tool names: taskfold public names are isolated and the tool surface agrees.`,
   );
 }

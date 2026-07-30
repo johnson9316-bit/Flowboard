@@ -160,12 +160,12 @@ function deviceMessage(params: {
   ].join("|");
 }
 
-export type FlowboardGatewayState = {
+export type TaskfoldGatewayState = {
   connected: boolean;
   error?: string;
 };
 
-export class FlowboardGatewayClient {
+export class TaskfoldGatewayClient {
   private socket: WebSocket | null = null;
   private pending = new Map<string, PendingRequest>();
   private stopped = false;
@@ -176,7 +176,7 @@ export class FlowboardGatewayClient {
 
   constructor(
     private readonly options: {
-      onState: (state: FlowboardGatewayState) => void;
+      onState: (state: TaskfoldGatewayState) => void;
       onEvent?: (event: GatewayEvent) => void;
       url?: string;
     },
@@ -258,7 +258,7 @@ export class FlowboardGatewayClient {
     const identity = readIdentity();
     if (!identity) {
       this.handleDisconnect(
-        "Control UI device identity is unavailable. Open flowboard from the paired Gateway Control UI with embedSandbox set to trusted.",
+        "Control UI device identity is unavailable. Open taskfold from the paired Gateway Control UI with embedSandbox set to trusted.",
         false,
       );
       socket.close();

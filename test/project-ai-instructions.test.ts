@@ -3,15 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type {
-  PersistedFlowboardAttachment,
-  PersistedFlowboardBoard,
-  PersistedFlowboardCard,
-  PersistedFlowboardMilestone,
-  PersistedFlowboardNotificationSubscription,
-  PersistedFlowboardProjectDocument,
-  FlowboardKeyedStore,
+  PersistedTaskfoldAttachment,
+  PersistedTaskfoldBoard,
+  PersistedTaskfoldCard,
+  PersistedTaskfoldMilestone,
+  PersistedTaskfoldNotificationSubscription,
+  PersistedTaskfoldProjectDocument,
+  TaskfoldKeyedStore,
 } from "../src/backend/src/persistence-types.js";
-import { FlowboardStore } from "../src/backend/src/store.js";
+import { TaskfoldStore } from "../src/backend/src/store.js";
 
 const roots: string[] = [];
 
@@ -21,7 +21,7 @@ afterEach(() => {
   }
 });
 
-function keyedStore<T>(): FlowboardKeyedStore<T> {
+function keyedStore<T>(): TaskfoldKeyedStore<T> {
   const values = new Map<string, T>();
   return {
     async register(key, value) {
@@ -40,21 +40,21 @@ function keyedStore<T>(): FlowboardKeyedStore<T> {
 }
 
 function createStore() {
-  const documents = keyedStore<PersistedFlowboardProjectDocument>();
+  const documents = keyedStore<PersistedTaskfoldProjectDocument>();
   return {
     documents,
-    store: new FlowboardStore(keyedStore<PersistedFlowboardCard>(), {
-      boards: keyedStore<PersistedFlowboardBoard>(),
-      milestones: keyedStore<PersistedFlowboardMilestone>(),
+    store: new TaskfoldStore(keyedStore<PersistedTaskfoldCard>(), {
+      boards: keyedStore<PersistedTaskfoldBoard>(),
+      milestones: keyedStore<PersistedTaskfoldMilestone>(),
       documents,
-      subscriptions: keyedStore<PersistedFlowboardNotificationSubscription>(),
-      attachments: keyedStore<PersistedFlowboardAttachment>(),
+      subscriptions: keyedStore<PersistedTaskfoldNotificationSubscription>(),
+      attachments: keyedStore<PersistedTaskfoldAttachment>(),
     }),
   };
 }
 
 function createWorkspace(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-ai-instructions-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-ai-instructions-"));
   roots.push(root);
   fs.mkdirSync(path.join(root, "web"));
   fs.mkdirSync(path.join(root, "docs"));
@@ -104,7 +104,7 @@ function createWorkspace(): string {
   return root;
 }
 
-describe("Flowboard project document discovery", () => {
+describe("Taskfold project document discovery", () => {
   it("discovers only project-entry Markdown and AI instruction files while preserving user changes", async () => {
     const workspace = createWorkspace();
     const { store, documents } = createStore();

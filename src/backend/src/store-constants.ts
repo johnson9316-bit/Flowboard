@@ -1,4 +1,4 @@
-import type { FlowboardClaim } from "../../contract/index.js";
+import type { TaskfoldClaim } from "../../contract/index.js";
 import {
   MAX_DATE_TIMESTAMP_MS,
   resolveExpiresAtMsFromDurationMs,
@@ -26,7 +26,7 @@ export const BLOCKED_TOO_LONG_MS = 24 * 60 * 60 * 1000;
 const CLAIM_RECLAIM_MS = 5 * 60 * 1000;
 
 /** Revision assigned to a freshly created card before its first update. */
-export const FLOWBOARD_INITIAL_CARD_REVISION = 1;
+export const TASKFOLD_INITIAL_CARD_REVISION = 1;
 
 /**
  * Worker-prompt version, recorded on every run attempt so runs stay attributable
@@ -35,20 +35,20 @@ export const FLOWBOARD_INITIAL_CARD_REVISION = 1;
  * only because both the prompt builder and the attempt recorder need it, and this
  * is the module neither of them depends on transitively.
  */
-export const FLOWBOARD_PROMPT_VERSION = 1;
+export const TASKFOLD_PROMPT_VERSION = 1;
 
 /**
  * Next monotonic revision for a card write. Rows persisted before the revision
  * column existed read back as 0, so an absent or non-finite value still advances.
  */
-export function nextFlowboardCardRevision(current: number | undefined): number {
+export function nextTaskfoldCardRevision(current: number | undefined): number {
   return Number.isSafeInteger(current) && (current as number) > 0
     ? (current as number) + 1
-    : FLOWBOARD_INITIAL_CARD_REVISION;
+    : TASKFOLD_INITIAL_CARD_REVISION;
 }
 
-export function isFlowboardClaimReclaimable(
-  claim: FlowboardClaim | undefined,
+export function isTaskfoldClaimReclaimable(
+  claim: TaskfoldClaim | undefined,
   now: number,
 ): boolean {
   return Boolean(claim?.expiresAt && now - claim.expiresAt > CLAIM_RECLAIM_MS);
@@ -61,6 +61,6 @@ export function secondsToDurationMs(seconds: number): number {
     : MAX_DATE_TIMESTAMP_MS;
 }
 
-export function addFlowboardDurationMs(now: number, durationMs: number): number {
+export function addTaskfoldDurationMs(now: number, durationMs: number): number {
   return resolveExpiresAtMsFromDurationMs(durationMs, { nowMs: now }) ?? MAX_DATE_TIMESTAMP_MS;
 }

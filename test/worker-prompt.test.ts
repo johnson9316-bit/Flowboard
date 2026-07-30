@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { FlowboardCard, FlowboardRunAttempt } from "../src/contract/index.js";
+import type { TaskfoldCard, TaskfoldRunAttempt } from "../src/contract/index.js";
 import {
   buildWorkerContext,
   buildWorkerPrompt,
-  FLOWBOARD_PROMPT_VERSION,
+  TASKFOLD_PROMPT_VERSION,
 } from "../src/backend/src/worker-prompt.js";
 
 const NOW = 1_800_000_000_000;
 
-function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
+function card(overrides: Partial<TaskfoldCard> = {}): TaskfoldCard {
   return {
     id: "card-1",
     title: "Ship the thing",
@@ -23,15 +23,15 @@ function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
   };
 }
 
-function attempt(overrides: Partial<FlowboardRunAttempt> = {}): FlowboardRunAttempt {
+function attempt(overrides: Partial<TaskfoldRunAttempt> = {}): TaskfoldRunAttempt {
   return { id: "attempt-1", status: "failed", startedAt: NOW - 30_000, ...overrides };
 }
 
-function contextOf(overrides: Partial<FlowboardCard> = {}): string {
+function contextOf(overrides: Partial<TaskfoldCard> = {}): string {
   return buildWorkerContext(card(overrides), [], NOW);
 }
 
-describe("Flowboard worker prompt", () => {
+describe("Taskfold worker prompt", () => {
   it("is deterministic for a fixed card and clock", () => {
     const target = card({ notes: "Do the work." });
     expect(buildWorkerContext(target, [], NOW)).toBe(buildWorkerContext(target, [], NOW));
@@ -45,11 +45,11 @@ describe("Flowboard worker prompt", () => {
       token: "token-xyz",
     });
 
-    expect(prompt).toContain("Work on this OpenClaw Flowboard card: Ship the thing");
+    expect(prompt).toContain("Work on this OpenClaw Taskfold card: Ship the thing");
     expect(prompt).toContain("Card id: card-1");
     expect(prompt).toContain("Claim ownerId: owner-a");
     expect(prompt).toContain("Claim token: token-xyz");
-    for (const tool of ["flowboard_heartbeat", "flowboard_complete", "flowboard_block"]) {
+    for (const tool of ["taskfold_heartbeat", "taskfold_complete", "taskfold_block"]) {
       expect(prompt).toContain(tool);
     }
     expect(prompt.endsWith("CONTEXT-BODY")).toBe(true);
@@ -98,7 +98,7 @@ describe("Flowboard worker prompt", () => {
     expect(budgeted(1)).not.toContain("final attempt");
     // At the budget the next failure exhausts it, so ask for a diagnosis now.
     expect(budgeted(2)).toContain("This is the final attempt within the card's retry budget");
-    expect(budgeted(2)).toContain("flowboard_block");
+    expect(budgeted(2)).toContain("taskfold_block");
   });
 
   it("carries the card's own state into the context", () => {
@@ -115,7 +115,7 @@ describe("Flowboard worker prompt", () => {
       NOW,
     );
 
-    expect(context).toContain("# Flowboard card card-1");
+    expect(context).toContain("# Taskfold card card-1");
     expect(context).toContain("Title: Ship the thing");
     expect(context).toContain("Agent: agent-main");
     expect(context).toContain("Read the spec first.");
@@ -140,7 +140,7 @@ describe("Flowboard worker prompt", () => {
   });
 
   it("exposes a positive prompt version for attempt attribution", () => {
-    expect(Number.isSafeInteger(FLOWBOARD_PROMPT_VERSION)).toBe(true);
-    expect(FLOWBOARD_PROMPT_VERSION).toBeGreaterThan(0);
+    expect(Number.isSafeInteger(TASKFOLD_PROMPT_VERSION)).toBe(true);
+    expect(TASKFOLD_PROMPT_VERSION).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,6 @@
-import type { FlowboardCard } from "../../contract/index.js";
+import type { TaskfoldCard } from "../../contract/index.js";
 
-export function redactClaimToken(card: FlowboardCard): FlowboardCard {
+export function redactClaimToken(card: TaskfoldCard): TaskfoldCard {
   const claim = card.metadata?.claim;
   if (!claim) {
     return card;

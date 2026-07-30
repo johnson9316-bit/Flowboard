@@ -1,11 +1,11 @@
-flowboard includes adapted source from OpenClaw's Workboard extension:
+taskfold includes adapted source from OpenClaw's Workboard extension:
 
 - Project: OpenClaw
 - Repository: https://github.com/openclaw/openclaw
 - Commit: 78d6c6c0471723721243d67fb053f3810c622bf8
 - License: MIT
 
-See UPSTREAM.md for provenance. Flowboard has diverged from that baseline and is
+See UPSTREAM.md for provenance. Taskfold has diverged from that baseline and is
 no longer synchronized with it.
 
 This package also distributes dependencies under their respective licenses:

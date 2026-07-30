@@ -1,5 +1,5 @@
-// Flowboard contract declarations define the plugin and Control UI data model.
-export const FLOWBOARD_STATUSES = [
+// Taskfold contract declarations define the plugin and Control UI data model.
+export const TASKFOLD_STATUSES = [
   "triage",
   "backlog",
   "todo",
@@ -11,18 +11,18 @@ export const FLOWBOARD_STATUSES = [
   "done",
 ] as const;
 
-export const FLOWBOARD_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+export const TASKFOLD_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 /** Built-in launch choices. Persisted execution engines remain an open runtime identifier. */
-export const FLOWBOARD_EXECUTION_ENGINES = ["codex", "claude"] as const;
-export const FLOWBOARD_EXECUTION_MODES = ["autonomous", "manual"] as const;
-export const FLOWBOARD_EXECUTION_STATUSES = [
+export const TASKFOLD_EXECUTION_ENGINES = ["codex", "claude"] as const;
+export const TASKFOLD_EXECUTION_MODES = ["autonomous", "manual"] as const;
+export const TASKFOLD_EXECUTION_STATUSES = [
   "idle",
   "running",
   "review",
   "blocked",
   "done",
 ] as const;
-export const FLOWBOARD_EVENT_KINDS = [
+export const TASKFOLD_EVENT_KINDS = [
   "created",
   "edited",
   "moved",
@@ -49,23 +49,23 @@ export const FLOWBOARD_EVENT_KINDS = [
   "unarchived",
   "stale",
 ] as const;
-export const FLOWBOARD_ATTEMPT_STATUSES = [
+export const TASKFOLD_ATTEMPT_STATUSES = [
   "running",
   "succeeded",
   "failed",
   "blocked",
   "stopped",
 ] as const;
-export const FLOWBOARD_LINK_TYPES = [
+export const TASKFOLD_LINK_TYPES = [
   "parent",
   "child",
   "blocks",
   "blocked_by",
   "relates_to",
 ] as const;
-export const FLOWBOARD_PROOF_STATUSES = ["passed", "failed", "skipped", "unknown"] as const;
-export const FLOWBOARD_TEMPLATE_IDS = ["bugfix", "docs", "release", "pr_review", "plugin"] as const;
-export const FLOWBOARD_DIAGNOSTIC_KINDS = [
+export const TASKFOLD_PROOF_STATUSES = ["passed", "failed", "skipped", "unknown"] as const;
+export const TASKFOLD_TEMPLATE_IDS = ["bugfix", "docs", "release", "pr_review", "plugin"] as const;
+export const TASKFOLD_DIAGNOSTIC_KINDS = [
   "stranded_ready",
   "running_without_heartbeat",
   "blocked_too_long",
@@ -73,31 +73,31 @@ export const FLOWBOARD_DIAGNOSTIC_KINDS = [
   "missing_proof",
   "orphaned_session",
 ] as const;
-export const FLOWBOARD_DIAGNOSTIC_SEVERITIES = ["warning", "error", "critical"] as const;
-export const FLOWBOARD_NOTIFICATION_KINDS = ["completed", "failed", "stale"] as const;
-export const FLOWBOARD_MILESTONE_STATES = ["active", "completed", "archived"] as const;
-export const FLOWBOARD_PROJECT_DOCUMENT_SECTIONS = [
+export const TASKFOLD_DIAGNOSTIC_SEVERITIES = ["warning", "error", "critical"] as const;
+export const TASKFOLD_NOTIFICATION_KINDS = ["completed", "failed", "stale"] as const;
+export const TASKFOLD_MILESTONE_STATES = ["active", "completed", "archived"] as const;
+export const TASKFOLD_PROJECT_DOCUMENT_SECTIONS = [
   "project",
   "codebase",
   "environment",
   "knowledge",
 ] as const;
-export const FLOWBOARD_PROJECT_DOCUMENT_TYPES = [
+export const TASKFOLD_PROJECT_DOCUMENT_TYPES = [
   "markdown",
   "json",
   "link",
   "path",
   "secret_ref",
 ] as const;
-export const FLOWBOARD_PROJECT_DOCUMENT_SOURCES = ["project", "ai_system"] as const;
-export const FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES = [
+export const TASKFOLD_PROJECT_DOCUMENT_SOURCES = ["project", "ai_system"] as const;
+export const TASKFOLD_DELIVERY_IMPLEMENTATION_STATES = [
   "not_started",
   "in_progress",
   "code_complete",
   "not_applicable",
   "unknown",
 ] as const;
-export const FLOWBOARD_DELIVERY_VERIFICATION_STATES = [
+export const TASKFOLD_DELIVERY_VERIFICATION_STATES = [
   "not_started",
   "partial",
   "passed",
@@ -106,50 +106,50 @@ export const FLOWBOARD_DELIVERY_VERIFICATION_STATES = [
   "not_required",
   "unknown",
 ] as const;
-export const FLOWBOARD_DELIVERY_RELEASE_STATES = [
+export const TASKFOLD_DELIVERY_RELEASE_STATES = [
   "not_started",
   "pending",
   "released",
   "not_required",
   "unknown",
 ] as const;
-export const FLOWBOARD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+export const TASKFOLD_BOARD_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 
-export function isValidFlowboardBoardId(value: unknown): value is string {
-  return typeof value === "string" && FLOWBOARD_BOARD_ID_PATTERN.test(value);
+export function isValidTaskfoldBoardId(value: unknown): value is string {
+  return typeof value === "string" && TASKFOLD_BOARD_ID_PATTERN.test(value);
 }
 
-export type FlowboardStatus = (typeof FLOWBOARD_STATUSES)[number];
-export type FlowboardPriority = (typeof FLOWBOARD_PRIORITIES)[number];
-export type FlowboardExecutionEngine = string;
-export type FlowboardExecutionMode = (typeof FLOWBOARD_EXECUTION_MODES)[number];
-export type FlowboardExecutionStatus = (typeof FLOWBOARD_EXECUTION_STATUSES)[number];
-export type FlowboardEventKind = (typeof FLOWBOARD_EVENT_KINDS)[number];
-export type FlowboardAttemptStatus = (typeof FLOWBOARD_ATTEMPT_STATUSES)[number];
-export type FlowboardLinkType = (typeof FLOWBOARD_LINK_TYPES)[number];
-export type FlowboardProofStatus = (typeof FLOWBOARD_PROOF_STATUSES)[number];
-export type FlowboardTemplateId = (typeof FLOWBOARD_TEMPLATE_IDS)[number];
-export type FlowboardDiagnosticKind = (typeof FLOWBOARD_DIAGNOSTIC_KINDS)[number];
-export type FlowboardDiagnosticSeverity = (typeof FLOWBOARD_DIAGNOSTIC_SEVERITIES)[number];
-export type FlowboardNotificationKind = (typeof FLOWBOARD_NOTIFICATION_KINDS)[number];
-export type FlowboardMilestoneState = (typeof FLOWBOARD_MILESTONE_STATES)[number];
-export type FlowboardProjectDocumentSection =
-  (typeof FLOWBOARD_PROJECT_DOCUMENT_SECTIONS)[number];
-export type FlowboardProjectDocumentType = (typeof FLOWBOARD_PROJECT_DOCUMENT_TYPES)[number];
-export type FlowboardProjectDocumentSource =
-  (typeof FLOWBOARD_PROJECT_DOCUMENT_SOURCES)[number];
-export type FlowboardDeliveryImplementationState =
-  (typeof FLOWBOARD_DELIVERY_IMPLEMENTATION_STATES)[number];
-export type FlowboardDeliveryVerificationState =
-  (typeof FLOWBOARD_DELIVERY_VERIFICATION_STATES)[number];
-export type FlowboardDeliveryReleaseState = (typeof FLOWBOARD_DELIVERY_RELEASE_STATES)[number];
+export type TaskfoldStatus = (typeof TASKFOLD_STATUSES)[number];
+export type TaskfoldPriority = (typeof TASKFOLD_PRIORITIES)[number];
+export type TaskfoldExecutionEngine = string;
+export type TaskfoldExecutionMode = (typeof TASKFOLD_EXECUTION_MODES)[number];
+export type TaskfoldExecutionStatus = (typeof TASKFOLD_EXECUTION_STATUSES)[number];
+export type TaskfoldEventKind = (typeof TASKFOLD_EVENT_KINDS)[number];
+export type TaskfoldAttemptStatus = (typeof TASKFOLD_ATTEMPT_STATUSES)[number];
+export type TaskfoldLinkType = (typeof TASKFOLD_LINK_TYPES)[number];
+export type TaskfoldProofStatus = (typeof TASKFOLD_PROOF_STATUSES)[number];
+export type TaskfoldTemplateId = (typeof TASKFOLD_TEMPLATE_IDS)[number];
+export type TaskfoldDiagnosticKind = (typeof TASKFOLD_DIAGNOSTIC_KINDS)[number];
+export type TaskfoldDiagnosticSeverity = (typeof TASKFOLD_DIAGNOSTIC_SEVERITIES)[number];
+export type TaskfoldNotificationKind = (typeof TASKFOLD_NOTIFICATION_KINDS)[number];
+export type TaskfoldMilestoneState = (typeof TASKFOLD_MILESTONE_STATES)[number];
+export type TaskfoldProjectDocumentSection =
+  (typeof TASKFOLD_PROJECT_DOCUMENT_SECTIONS)[number];
+export type TaskfoldProjectDocumentType = (typeof TASKFOLD_PROJECT_DOCUMENT_TYPES)[number];
+export type TaskfoldProjectDocumentSource =
+  (typeof TASKFOLD_PROJECT_DOCUMENT_SOURCES)[number];
+export type TaskfoldDeliveryImplementationState =
+  (typeof TASKFOLD_DELIVERY_IMPLEMENTATION_STATES)[number];
+export type TaskfoldDeliveryVerificationState =
+  (typeof TASKFOLD_DELIVERY_VERIFICATION_STATES)[number];
+export type TaskfoldDeliveryReleaseState = (typeof TASKFOLD_DELIVERY_RELEASE_STATES)[number];
 
-export type FlowboardExecution = {
+export type TaskfoldExecution = {
   id: string;
   kind: "agent-session";
-  engine?: FlowboardExecutionEngine;
-  mode: FlowboardExecutionMode;
-  status: FlowboardExecutionStatus;
+  engine?: TaskfoldExecutionEngine;
+  mode: TaskfoldExecutionMode;
+  status: TaskfoldExecutionStatus;
   model?: string;
   sessionKey?: string;
   runId?: string;
@@ -157,25 +157,25 @@ export type FlowboardExecution = {
   updatedAt: number;
 };
 
-export type FlowboardEvent = {
+export type TaskfoldEvent = {
   id: string;
-  kind: FlowboardEventKind;
+  kind: TaskfoldEventKind;
   at: number;
-  fromStatus?: FlowboardStatus;
-  toStatus?: FlowboardStatus;
+  fromStatus?: TaskfoldStatus;
+  toStatus?: TaskfoldStatus;
   fromMilestoneId?: string;
   toMilestoneId?: string;
   sessionKey?: string;
   runId?: string;
 };
 
-export type FlowboardRunAttempt = {
+export type TaskfoldRunAttempt = {
   id: string;
-  status: FlowboardAttemptStatus;
+  status: TaskfoldAttemptStatus;
   startedAt: number;
   endedAt?: number;
-  engine?: FlowboardExecutionEngine;
-  mode?: FlowboardExecutionMode;
+  engine?: TaskfoldExecutionEngine;
+  mode?: TaskfoldExecutionMode;
   model?: string;
   sessionKey?: string;
   runId?: string;
@@ -187,25 +187,25 @@ export type FlowboardRunAttempt = {
   promptVersion?: number;
 };
 
-export type FlowboardComment = {
+export type TaskfoldComment = {
   id: string;
   body: string;
   createdAt: number;
   updatedAt?: number;
 };
 
-export type FlowboardLink = {
+export type TaskfoldLink = {
   id: string;
-  type: FlowboardLinkType;
+  type: TaskfoldLinkType;
   createdAt: number;
   targetCardId?: string;
   title?: string;
   url?: string;
 };
 
-export type FlowboardProof = {
+export type TaskfoldProof = {
   id: string;
-  status: FlowboardProofStatus;
+  status: TaskfoldProofStatus;
   createdAt: number;
   label?: string;
   command?: string;
@@ -213,7 +213,7 @@ export type FlowboardProof = {
   note?: string;
 };
 
-export type FlowboardArtifact = {
+export type TaskfoldArtifact = {
   id: string;
   createdAt: number;
   label?: string;
@@ -222,17 +222,17 @@ export type FlowboardArtifact = {
   mimeType?: string;
 };
 
-export type FlowboardDelivery = {
+export type TaskfoldDelivery = {
   objective?: string;
   deliverySummary?: string;
   openItems?: string;
-  implementationState?: FlowboardDeliveryImplementationState;
-  verificationState?: FlowboardDeliveryVerificationState;
-  releaseState?: FlowboardDeliveryReleaseState;
+  implementationState?: TaskfoldDeliveryImplementationState;
+  verificationState?: TaskfoldDeliveryVerificationState;
+  releaseState?: TaskfoldDeliveryReleaseState;
   updatedAt: number;
 };
 
-export type FlowboardSourceReference = {
+export type TaskfoldSourceReference = {
   id: string;
   label: string;
   target: string;
@@ -242,7 +242,7 @@ export type FlowboardSourceReference = {
   note?: string;
 };
 
-export type FlowboardAttachment = {
+export type TaskfoldAttachment = {
   id: string;
   cardId: string;
   createdAt: number;
@@ -252,7 +252,7 @@ export type FlowboardAttachment = {
   note?: string;
 };
 
-export type FlowboardWorkerLog = {
+export type TaskfoldWorkerLog = {
   id: string;
   createdAt: number;
   level: "info" | "warning" | "error";
@@ -261,19 +261,19 @@ export type FlowboardWorkerLog = {
   runId?: string;
 };
 
-export type FlowboardWorkerProtocol = {
+export type TaskfoldWorkerProtocol = {
   state: "idle" | "running" | "completed" | "blocked" | "violated";
   updatedAt: number;
   detail?: string;
 };
 
-export type FlowboardStaleState = {
+export type TaskfoldStaleState = {
   detectedAt: number;
   lastSessionUpdatedAt?: number;
   reason: string;
 };
 
-export type FlowboardClaim = {
+export type TaskfoldClaim = {
   ownerId: string;
   token: string;
   claimedAt: number;
@@ -281,25 +281,25 @@ export type FlowboardClaim = {
   expiresAt?: number;
 };
 
-export type FlowboardDiagnosticAction = {
+export type TaskfoldDiagnosticAction = {
   kind: "claim" | "unblock" | "promote" | "reclaim" | "reassign" | "add_proof" | "open_session";
   label: string;
 };
 
-export type FlowboardDiagnostic = {
-  kind: FlowboardDiagnosticKind;
-  severity: FlowboardDiagnosticSeverity;
+export type TaskfoldDiagnostic = {
+  kind: TaskfoldDiagnosticKind;
+  severity: TaskfoldDiagnosticSeverity;
   title: string;
   detail: string;
   firstSeenAt: number;
   lastSeenAt: number;
   count: number;
-  actions: FlowboardDiagnosticAction[];
+  actions: TaskfoldDiagnosticAction[];
 };
 
-export type FlowboardNotification = {
+export type TaskfoldNotification = {
   id: string;
-  kind: FlowboardNotificationKind;
+  kind: TaskfoldNotificationKind;
   createdAt: number;
   sequence?: number;
   message: string;
@@ -307,14 +307,14 @@ export type FlowboardNotification = {
   runId?: string;
 };
 
-export const FLOWBOARD_CHANGED_EVENT = "plugin.flowboard.changed";
+export const TASKFOLD_CHANGED_EVENT = "plugin.taskfold.changed";
 
-export type FlowboardChange = {
+export type TaskfoldChange = {
   epoch: string;
   revision: number;
 };
 
-export type FlowboardWorkspace = {
+export type TaskfoldWorkspace = {
   kind: "scratch" | "dir" | "worktree";
   path?: string;
   branch?: string;
@@ -322,18 +322,18 @@ export type FlowboardWorkspace = {
   sourceBranch?: string;
 };
 
-export type FlowboardWorkspaceAccess =
+export type TaskfoldWorkspaceAccess =
   | { unrestricted: true }
   | { unrestricted: false; roots: string[]; writable: boolean };
 
-export type FlowboardAutomation = {
+export type TaskfoldAutomation = {
   tenant?: string;
   boardId?: string;
   createdByCardId?: string;
   idempotencyKey?: string;
   skills?: string[];
-  workspace?: FlowboardWorkspace;
-  workspaceAccess?: FlowboardWorkspaceAccess;
+  workspace?: TaskfoldWorkspace;
+  workspaceAccess?: TaskfoldWorkspaceAccess;
   maxRuntimeSeconds?: number;
   maxRetries?: number;
   scheduledAt?: number;
@@ -343,7 +343,7 @@ export type FlowboardAutomation = {
   lastDispatchAt?: number;
 };
 
-export type FlowboardBoardMetadata = {
+export type TaskfoldBoardMetadata = {
   id: string;
   name?: string;
   description?: string;
@@ -357,14 +357,14 @@ export type FlowboardBoardMetadata = {
   repositoryUrl?: string;
   planningPath?: string;
   homepageUrl?: string;
-  defaultWorkspace?: FlowboardWorkspace;
-  orchestration?: FlowboardOrchestrationSettings;
+  defaultWorkspace?: TaskfoldWorkspace;
+  orchestration?: TaskfoldOrchestrationSettings;
   createdAt: number;
   updatedAt: number;
   archivedAt?: number;
 };
 
-export type FlowboardBoardSummary = {
+export type TaskfoldBoardSummary = {
   id: string;
   name?: string;
   description?: string;
@@ -378,44 +378,44 @@ export type FlowboardBoardSummary = {
   repositoryUrl?: string;
   planningPath?: string;
   homepageUrl?: string;
-  defaultWorkspace?: FlowboardWorkspace;
-  orchestration?: FlowboardOrchestrationSettings;
+  defaultWorkspace?: TaskfoldWorkspace;
+  orchestration?: TaskfoldOrchestrationSettings;
   total: number;
   active: number;
   archived: number;
-  byStatus: Partial<Record<FlowboardStatus, number>>;
+  byStatus: Partial<Record<TaskfoldStatus, number>>;
   updatedAt?: number;
   archivedAt?: number;
 };
 
-export type FlowboardOrchestrationSettings = {
+export type TaskfoldOrchestrationSettings = {
   autoDecompose?: boolean;
   autoDecomposePerDispatch?: number;
   defaultAssignee?: string;
   orchestratorProfile?: string;
 };
 
-export type FlowboardMilestone = {
+export type TaskfoldMilestone = {
   id: string;
   boardId: string;
   title: string;
   description?: string;
   color?: string;
   position: number;
-  state: FlowboardMilestoneState;
+  state: TaskfoldMilestoneState;
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
   archivedAt?: number;
 };
 
-export type FlowboardProjectDocument = {
+export type TaskfoldProjectDocument = {
   id: string;
   boardId: string;
   key: string;
-  section: FlowboardProjectDocumentSection;
-  source: FlowboardProjectDocumentSource;
-  type: FlowboardProjectDocumentType;
+  section: TaskfoldProjectDocumentSection;
+  source: TaskfoldProjectDocumentSource;
+  type: TaskfoldProjectDocumentType;
   title: string;
   summary?: string;
   target?: string;
@@ -427,8 +427,8 @@ export type FlowboardProjectDocument = {
   updatedAt: number;
 };
 
-export type FlowboardProjectDocumentRead = {
-  document: FlowboardProjectDocument;
+export type TaskfoldProjectDocumentRead = {
+  document: TaskfoldProjectDocument;
   content: string;
   source: "stored" | "path";
   revision: string;
@@ -436,14 +436,14 @@ export type FlowboardProjectDocumentRead = {
   modifiedAt?: number;
 };
 
-export type FlowboardNotificationSubscription = {
+export type TaskfoldNotificationSubscription = {
   id: string;
   boardId: string;
   cardId?: string;
   sessionKey?: string;
   runId?: string;
   target?: string;
-  eventKinds?: FlowboardNotificationKind[];
+  eventKinds?: TaskfoldNotificationKind[];
   lastEventAt?: number;
   lastEventId?: string;
   lastEventSequence?: number;
@@ -452,41 +452,41 @@ export type FlowboardNotificationSubscription = {
   updatedAt: number;
 };
 
-export type FlowboardMetadata = {
-  attempts?: FlowboardRunAttempt[];
-  comments?: FlowboardComment[];
-  links?: FlowboardLink[];
-  proof?: FlowboardProof[];
-  artifacts?: FlowboardArtifact[];
-  attachments?: FlowboardAttachment[];
-  workerLogs?: FlowboardWorkerLog[];
-  workerProtocol?: FlowboardWorkerProtocol;
-  automation?: FlowboardAutomation;
-  claim?: FlowboardClaim;
-  diagnostics?: FlowboardDiagnostic[];
-  notifications?: FlowboardNotification[];
-  templateId?: FlowboardTemplateId;
+export type TaskfoldMetadata = {
+  attempts?: TaskfoldRunAttempt[];
+  comments?: TaskfoldComment[];
+  links?: TaskfoldLink[];
+  proof?: TaskfoldProof[];
+  artifacts?: TaskfoldArtifact[];
+  attachments?: TaskfoldAttachment[];
+  workerLogs?: TaskfoldWorkerLog[];
+  workerProtocol?: TaskfoldWorkerProtocol;
+  automation?: TaskfoldAutomation;
+  claim?: TaskfoldClaim;
+  diagnostics?: TaskfoldDiagnostic[];
+  notifications?: TaskfoldNotification[];
+  templateId?: TaskfoldTemplateId;
   archivedAt?: number;
-  stale?: FlowboardStaleState;
+  stale?: TaskfoldStaleState;
   lifecycleStatusSourceUpdatedAt?: number;
   failureCount?: number;
 };
 
-export type FlowboardCard = {
+export type TaskfoldCard = {
   id: string;
   title: string;
   notes?: string;
-  status: FlowboardStatus;
-  priority: FlowboardPriority;
+  status: TaskfoldStatus;
+  priority: TaskfoldPriority;
   labels: string[];
   agentId?: string;
   sessionKey?: string;
   runId?: string;
   taskId?: string;
   sourceUrl?: string;
-  execution?: FlowboardExecution;
-  delivery?: FlowboardDelivery;
-  sourceReferences?: FlowboardSourceReference[];
+  execution?: TaskfoldExecution;
+  delivery?: TaskfoldDelivery;
+  sourceReferences?: TaskfoldSourceReference[];
   milestoneId?: string;
   position: number;
   createdAt: number;
@@ -500,17 +500,17 @@ export type FlowboardCard = {
   revision: number;
   startedAt?: number;
   completedAt?: number;
-  events?: FlowboardEvent[];
-  metadata?: FlowboardMetadata;
+  events?: TaskfoldEvent[];
+  metadata?: TaskfoldMetadata;
 };
 
-export type FlowboardProjectView = {
-  board: FlowboardBoardMetadata;
-  milestones: FlowboardMilestone[];
-  cards: FlowboardCard[];
+export type TaskfoldProjectView = {
+  board: TaskfoldBoardMetadata;
+  milestones: TaskfoldMilestone[];
+  cards: TaskfoldCard[];
 };
 
-export type FlowboardListResult = {
-  cards: FlowboardCard[];
-  statuses: readonly FlowboardStatus[];
+export type TaskfoldListResult = {
+  cards: TaskfoldCard[];
+  statuses: readonly TaskfoldStatus[];
 };

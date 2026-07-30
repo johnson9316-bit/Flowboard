@@ -3,7 +3,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createFlowboardStaticUiHandler } from "../src/ui-static.js";
+import { createTaskfoldStaticUiHandler } from "../src/ui-static.js";
 
 const roots: string[] = [];
 
@@ -14,11 +14,11 @@ afterEach(() => {
 });
 
 function createUiRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "flowboard-ui-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "taskfold-ui-"));
   roots.push(root);
   fs.mkdirSync(path.join(root, "assets"));
-  fs.writeFileSync(path.join(root, "index.html"), "<!doctype html><title>flowboard</title>");
-  fs.writeFileSync(path.join(root, "assets", "app.js"), "console.log('flowboard');");
+  fs.writeFileSync(path.join(root, "index.html"), "<!doctype html><title>taskfold</title>");
+  fs.writeFileSync(path.join(root, "assets", "app.js"), "console.log('taskfold');");
   return root;
 }
 
@@ -27,7 +27,7 @@ async function request(
   requestPath: string,
   method = "GET",
 ): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
-  const server = http.createServer((req, res) => createFlowboardStaticUiHandler(root)(req, res));
+  const server = http.createServer((req, res) => createTaskfoldStaticUiHandler(root)(req, res));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") {
@@ -65,24 +65,24 @@ async function request(
   }
 }
 
-describe("flowboard static Control UI route", () => {
+describe("taskfold static Control UI route", () => {
   it("serves immutable assets and SPA fallbacks", async () => {
     const root = createUiRoot();
-    const asset = await request(root, "/flowboard/assets/app.js");
-    const fallback = await request(root, "/flowboard/cards/card-1");
+    const asset = await request(root, "/taskfold/assets/app.js");
+    const fallback = await request(root, "/taskfold/cards/card-1");
 
     expect(asset.status).toBe(200);
     expect(asset.headers["cache-control"]).toContain("immutable");
     expect(asset.headers["content-type"]).toContain("text/javascript");
     expect(fallback.status).toBe(200);
-    expect(fallback.body).toContain("flowboard");
+    expect(fallback.body).toContain("taskfold");
   });
 
   it("rejects missing assets, encoded traversal, and non-read methods", async () => {
     const root = createUiRoot();
 
-    await expect(request(root, "/flowboard/assets/missing.js")).resolves.toMatchObject({ status: 404 });
-    await expect(request(root, "/flowboard/%2e%2e/secret")).resolves.toMatchObject({ status: 404 });
-    await expect(request(root, "/flowboard/", "POST")).resolves.toMatchObject({ status: 405 });
+    await expect(request(root, "/taskfold/assets/missing.js")).resolves.toMatchObject({ status: 404 });
+    await expect(request(root, "/taskfold/%2e%2e/secret")).resolves.toMatchObject({ status: 404 });
+    await expect(request(root, "/taskfold/", "POST")).resolves.toMatchObject({ status: 405 });
   });
 });

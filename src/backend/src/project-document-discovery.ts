@@ -3,18 +3,18 @@ import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
-  FlowboardProjectDocumentSection,
-  FlowboardProjectDocumentSource,
+  TaskfoldProjectDocumentSection,
+  TaskfoldProjectDocumentSource,
 } from "../../contract/index.js";
 
-export type FlowboardProjectDocumentCandidate = {
+export type TaskfoldProjectDocumentCandidate = {
   key: string;
   relativePath: string;
   target: string;
   title: string;
   summary: string;
-  section: FlowboardProjectDocumentSection;
-  source: FlowboardProjectDocumentSource;
+  section: TaskfoldProjectDocumentSection;
+  source: TaskfoldProjectDocumentSource;
 };
 
 const MAX_DISCOVERED_DOCUMENTS = 500;
@@ -51,7 +51,7 @@ function isMarkdownPath(relativePath: string): boolean {
   return MARKDOWN_EXTENSIONS.has(path.extname(relativePath).toLocaleLowerCase());
 }
 
-function sourceForDocument(relativePath: string): FlowboardProjectDocumentSource {
+function sourceForDocument(relativePath: string): TaskfoldProjectDocumentSource {
   const normalized = relativePath.toLocaleLowerCase();
   if (
     normalized === ".github/copilot-instructions.md" ||
@@ -64,7 +64,7 @@ function sourceForDocument(relativePath: string): FlowboardProjectDocumentSource
   return "project";
 }
 
-function sectionForDocument(relativePath: string): FlowboardProjectDocumentSection {
+function sectionForDocument(relativePath: string): TaskfoldProjectDocumentSection {
   const normalized = relativePath.toLocaleLowerCase();
   if (normalized.startsWith(".planning/codebase/")) {
     return "codebase";
@@ -81,7 +81,7 @@ function sectionForDocument(relativePath: string): FlowboardProjectDocumentSecti
   return "project";
 }
 
-function candidateKey(relativePath: string, source: FlowboardProjectDocumentSource): string {
+function candidateKey(relativePath: string, source: TaskfoldProjectDocumentSource): string {
   if (source === "ai_system") {
     const normalized = relativePath
       .toLocaleLowerCase()
@@ -109,7 +109,7 @@ async function directoryEntries(directory: string): Promise<Dirent<string>[]> {
 async function addCandidate(params: {
   root: string;
   relativePath: string;
-  results: FlowboardProjectDocumentCandidate[];
+  results: TaskfoldProjectDocumentCandidate[];
   targets: Set<string>;
 }): Promise<void> {
   if (params.results.length >= MAX_DISCOVERED_DOCUMENTS || !isMarkdownPath(params.relativePath)) {
@@ -151,7 +151,7 @@ async function addCandidate(params: {
 async function addDirectoryMarkdownFiles(params: {
   root: string;
   relativeDirectory: string;
-  results: FlowboardProjectDocumentCandidate[];
+  results: TaskfoldProjectDocumentCandidate[];
   targets: Set<string>;
 }): Promise<void> {
   const directory = path.join(params.root, params.relativeDirectory);
@@ -168,7 +168,7 @@ async function addDirectoryMarkdownFiles(params: {
 
 async function addTopLevelModuleAiInstructions(params: {
   root: string;
-  results: FlowboardProjectDocumentCandidate[];
+  results: TaskfoldProjectDocumentCandidate[];
   targets: Set<string>;
 }): Promise<void> {
   const entries = await directoryEntries(params.root);
@@ -197,7 +197,7 @@ async function addTopLevelModuleAiInstructions(params: {
   }
 }
 
-export async function resolveFlowboardProjectDocumentWorkspacePath(
+export async function resolveTaskfoldProjectDocumentWorkspacePath(
   workspacePath: string,
 ): Promise<string> {
   let root: string;
@@ -218,7 +218,7 @@ export async function resolveFlowboardProjectDocumentWorkspacePath(
   return root;
 }
 
-export function isFlowboardProjectDocumentDiscoveryPath(
+export function isTaskfoldProjectDocumentDiscoveryPath(
   workspaceRoot: string,
   target: string | undefined,
 ): boolean {
@@ -259,11 +259,11 @@ export function isFlowboardProjectDocumentDiscoveryPath(
   return EXTRA_DOCUMENT_PATHS.includes(relativePath as (typeof EXTRA_DOCUMENT_PATHS)[number]);
 }
 
-export async function discoverFlowboardProjectDocuments(
+export async function discoverTaskfoldProjectDocuments(
   workspacePath: string,
-): Promise<FlowboardProjectDocumentCandidate[]> {
-  const root = await resolveFlowboardProjectDocumentWorkspacePath(workspacePath);
-  const results: FlowboardProjectDocumentCandidate[] = [];
+): Promise<TaskfoldProjectDocumentCandidate[]> {
+  const root = await resolveTaskfoldProjectDocumentWorkspacePath(workspacePath);
+  const results: TaskfoldProjectDocumentCandidate[] = [];
   const targets = new Set<string>();
   const params = { root, results, targets };
 

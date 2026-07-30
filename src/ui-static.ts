@@ -3,7 +3,7 @@ import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 
-const UI_PREFIX = "/flowboard/";
+const UI_PREFIX = "/taskfold/";
 const MIME_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -64,7 +64,7 @@ function resolveUiFile(root: string, requestPath: string): { filePath: string; f
   return null;
 }
 
-export function createFlowboardStaticUiHandler(uiRoot?: string) {
+export function createTaskfoldStaticUiHandler(uiRoot?: string) {
   const root = path.resolve(
     uiRoot ?? fileURLToPath(new URL("../ui/dist/", import.meta.url)),
   );
@@ -75,7 +75,7 @@ export function createFlowboardStaticUiHandler(uiRoot?: string) {
       return true;
     }
 
-    const pathname = new URL(req.url ?? UI_PREFIX, "http://flowboard.local").pathname;
+    const pathname = new URL(req.url ?? UI_PREFIX, "http://taskfold.local").pathname;
     if (!pathname.startsWith(UI_PREFIX)) {
       send(req, res, 404, {});
       return true;

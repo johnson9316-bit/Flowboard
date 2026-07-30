@@ -1,26 +1,26 @@
 import { LitElement, html } from "lit";
 import type {
-  FlowboardBoardSummary,
-  FlowboardProjectDocument,
-  FlowboardProjectDocumentRead,
-  FlowboardProjectView,
-  FlowboardStatus,
+  TaskfoldBoardSummary,
+  TaskfoldProjectDocument,
+  TaskfoldProjectDocumentRead,
+  TaskfoldProjectView,
+  TaskfoldStatus,
 } from "../../src/contract/index.ts";
-import { FlowboardGatewayClient, type FlowboardGatewayState } from "./gateway-client.ts";
+import { TaskfoldGatewayClient, type TaskfoldGatewayState } from "./gateway-client.ts";
 import {
-  readInitialFlowboardHostLocale,
-  startFlowboardThemeSync,
-  type FlowboardLocale,
+  readInitialTaskfoldHostLocale,
+  startTaskfoldThemeSync,
+  type TaskfoldLocale,
 } from "./host-context.ts";
 import { i18n } from "./i18n/index.ts";
-import { flowboardEditorHtmlToMarkdown } from "./lib/markdown.ts";
+import { taskfoldEditorHtmlToMarkdown } from "./lib/markdown.ts";
 import {
-  createFlowboardProjectUiState,
-  renderFlowboardProjects,
-  type FlowboardCardExecutionInspection,
-  type FlowboardCardExecutionPreparation,
-  type FlowboardProjectModal,
-  type FlowboardProjectUiState,
+  createTaskfoldProjectUiState,
+  renderTaskfoldProjects,
+  type TaskfoldCardExecutionInspection,
+  type TaskfoldCardExecutionPreparation,
+  type TaskfoldProjectModal,
+  type TaskfoldProjectUiState,
 } from "./pages/projects/project-view.ts";
 import "./host.css";
 
@@ -35,28 +35,28 @@ type ChangeWaitResult = {
 };
 
 type ProjectListResponse = {
-  projects: FlowboardBoardSummary[];
+  projects: TaskfoldBoardSummary[];
 };
 
 type ProjectResponse = {
-  project: FlowboardProjectView;
+  project: TaskfoldProjectView;
 };
 
 type ProjectDocumentsResponse = {
-  documents: FlowboardProjectDocument[];
+  documents: TaskfoldProjectDocument[];
 };
 
 type ProjectDocumentReadResponse = {
-  preview: FlowboardProjectDocumentRead;
+  preview: TaskfoldProjectDocumentRead;
 };
 
 type ProjectDocumentWriteResponse = {
-  preview: FlowboardProjectDocumentRead;
+  preview: TaskfoldProjectDocumentRead;
 };
 
-type CardExecutionPreparationResponse = FlowboardCardExecutionPreparation;
+type CardExecutionPreparationResponse = TaskfoldCardExecutionPreparation;
 
-type CardExecutionInspectionResponse = FlowboardCardExecutionInspection;
+type CardExecutionInspectionResponse = TaskfoldCardExecutionInspection;
 
 function validChange(value: unknown): value is ChangeCursor {
   return Boolean(
@@ -71,7 +71,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function normalizeProjectDocument(document: FlowboardProjectDocument): FlowboardProjectDocument {
+function normalizeProjectDocument(document: TaskfoldProjectDocument): TaskfoldProjectDocument {
   return {
     ...document,
     source: document.source ?? "project",
@@ -79,15 +79,15 @@ function normalizeProjectDocument(document: FlowboardProjectDocument): Flowboard
 }
 
 function normalizeProjectDocumentRead(
-  preview: FlowboardProjectDocumentRead,
-): FlowboardProjectDocumentRead {
+  preview: TaskfoldProjectDocumentRead,
+): TaskfoldProjectDocumentRead {
   return {
     ...preview,
     document: normalizeProjectDocument(preview.document),
   };
 }
 
-class FlowboardProjectHost extends LitElement {
+class TaskfoldProjectHost extends LitElement {
   private connectedToGateway = false;
   private stopped = false;
   private changeLoopGeneration = 0;
@@ -96,11 +96,11 @@ class FlowboardProjectHost extends LitElement {
   private executionRefreshTimer: number | null = null;
   private unsubscribeI18n?: () => void;
   private stopHostSync?: () => void;
-  private readonly state: FlowboardProjectUiState = createFlowboardProjectUiState();
-  private readonly gateway = new FlowboardGatewayClient({
+  private readonly state: TaskfoldProjectUiState = createTaskfoldProjectUiState();
+  private readonly gateway = new TaskfoldGatewayClient({
     onState: (state) => this.handleGatewayState(state),
     onEvent: (event) => {
-      if (event.event === "plugin.flowboard.changed") {
+      if (event.event === "plugin.taskfold.changed") {
         void this.refresh();
       }
     },
@@ -117,14 +117,14 @@ class FlowboardProjectHost extends LitElement {
       document.documentElement.lang = locale;
       this.requestUpdate();
     });
-    this.stopHostSync = startFlowboardThemeSync();
+    this.stopHostSync = startTaskfoldThemeSync();
     document.documentElement.lang = i18n.getLocale();
     this.state.languageSwitching = true;
     void i18n
-      .initialize(readInitialFlowboardHostLocale())
+      .initialize(readInitialTaskfoldHostLocale())
       .then((applied) => {
         if (!applied && !this.stopped) {
-          this.state.languageError = i18n.t("flowboardProject.languageChangeFailed");
+          this.state.languageError = i18n.t("taskfoldProject.languageChangeFailed");
         }
       })
       .finally(() => {
@@ -157,7 +157,7 @@ class FlowboardProjectHost extends LitElement {
     }
   };
 
-  private setLocale(locale: FlowboardLocale) {
+  private setLocale(locale: TaskfoldLocale) {
     if (this.state.languageSwitching) {
       return;
     }
@@ -168,7 +168,7 @@ class FlowboardProjectHost extends LitElement {
       .setLocale(locale)
       .then((applied) => {
         if (!applied && !this.stopped) {
-          this.state.languageError = i18n.t("flowboardProject.languageChangeFailed");
+          this.state.languageError = i18n.t("taskfoldProject.languageChangeFailed");
         }
       })
       .finally(() => {
@@ -179,7 +179,7 @@ class FlowboardProjectHost extends LitElement {
       });
   }
 
-  private handleGatewayState(state: FlowboardGatewayState) {
+  private handleGatewayState(state: TaskfoldGatewayState) {
     const wasConnected = this.connectedToGateway;
     this.connectedToGateway = state.connected;
     if (state.connected && !wasConnected) {
@@ -206,7 +206,7 @@ class FlowboardProjectHost extends LitElement {
       this.connectedToGateway
     ) {
       try {
-        const result = await this.gateway.request<ChangeWaitResult>("flowboard.changes.wait", {
+        const result = await this.gateway.request<ChangeWaitResult>("taskfold.changes.wait", {
           ...(this.changeCursor ? { after: this.changeCursor } : {}),
           timeoutMs: 25_000,
         });
@@ -238,7 +238,7 @@ class FlowboardProjectHost extends LitElement {
     this.state.error = null;
     this.requestUpdate();
     try {
-      const list = await this.gateway.request<ProjectListResponse>("flowboard.projects.list", {
+      const list = await this.gateway.request<ProjectListResponse>("taskfold.projects.list", {
         includeArchived: true,
       });
       if (generation !== this.refreshGeneration) {
@@ -258,7 +258,7 @@ class FlowboardProjectHost extends LitElement {
         this.clearExecutionState();
         this.state.screen = "overview";
       } else if (selectedId) {
-        const project = await this.gateway.request<ProjectResponse>("flowboard.projects.get", {
+        const project = await this.gateway.request<ProjectResponse>("taskfold.projects.get", {
           id: selectedId,
         });
         if (generation !== this.refreshGeneration) {
@@ -267,7 +267,7 @@ class FlowboardProjectHost extends LitElement {
         this.state.project = project.project;
         if (this.state.screen === "documents") {
           const documents = await this.gateway.request<ProjectDocumentsResponse>(
-            "flowboard.projects.documents.list",
+            "taskfold.projects.documents.list",
             {
               boardId: selectedId,
               includeHidden: true,
@@ -314,7 +314,7 @@ class FlowboardProjectHost extends LitElement {
     void this.refresh();
   }
 
-  private setScreen(screen: FlowboardProjectUiState["screen"]) {
+  private setScreen(screen: TaskfoldProjectUiState["screen"]) {
     if (screen !== "overview" && !this.state.selectedProjectId) {
       this.state.screen = "overview";
       this.requestUpdate();
@@ -328,7 +328,7 @@ class FlowboardProjectHost extends LitElement {
     }
   }
 
-  private openModal(modal: FlowboardProjectModal) {
+  private openModal(modal: TaskfoldProjectModal) {
     this.clearExecutionRefreshTimer();
     this.state.modal = modal;
     this.requestUpdate();
@@ -383,7 +383,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     if (!this.connectedToGateway) {
-      this.state.error = i18n.t("flowboardProject.connectionRequired");
+      this.state.error = i18n.t("taskfoldProject.connectionRequired");
       this.requestUpdate();
       return;
     }
@@ -407,7 +407,7 @@ class FlowboardProjectHost extends LitElement {
 
   private createProject(data: Record<string, string>) {
     void this.mutate(async () => {
-      const response = await this.gateway.request<ProjectResponse>("flowboard.projects.create", {
+      const response = await this.gateway.request<ProjectResponse>("taskfold.projects.create", {
         id: data.id,
         name: data.name,
         initialMilestoneTitle: data.initialMilestoneTitle,
@@ -424,7 +424,7 @@ class FlowboardProjectHost extends LitElement {
     }
     void this.mutate(async () => {
       const workspacePath = data.workspacePath?.trim();
-      await this.gateway.request("flowboard.projects.update", {
+      await this.gateway.request("taskfold.projects.update", {
         id: project.board.id,
         name: data.name,
         version: data.version,
@@ -449,14 +449,14 @@ class FlowboardProjectHost extends LitElement {
     if (
       archived &&
       !window.confirm(
-        i18n.t("flowboardProject.archiveProjectConfirm"),
+        i18n.t("taskfoldProject.archiveProjectConfirm"),
       )
     ) {
       return;
     }
     void this.mutate(async () => {
       await this.gateway.request(
-        archived ? "flowboard.projects.archive" : "flowboard.projects.restore",
+        archived ? "taskfold.projects.archive" : "taskfold.projects.restore",
         { id: project.board.id },
       );
     }, { closeModal: false });
@@ -468,7 +468,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.create", {
+      await this.gateway.request("taskfold.cards.create", {
         boardId: project.board.id,
         title: data.title,
         notes: data.notes,
@@ -480,15 +480,15 @@ class FlowboardProjectHost extends LitElement {
     });
   }
 
-  private updateCardStatus(id: string, status: FlowboardStatus) {
+  private updateCardStatus(id: string, status: TaskfoldStatus) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.move", { id, status });
+      await this.gateway.request("taskfold.cards.move", { id, status });
     }, { closeModal: false });
   }
 
   private archiveCard(id: string, archived: boolean) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.archive", { id, archived });
+      await this.gateway.request("taskfold.cards.archive", { id, archived });
     }, { closeModal: false });
   }
 
@@ -498,7 +498,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.moveMilestone", {
+      await this.gateway.request("taskfold.cards.moveMilestone", {
         id,
         ...(milestoneId ? { milestoneId } : {}),
         ...(position !== undefined ? { position } : {}),
@@ -512,7 +512,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.moveProject", { id, boardId, milestoneId });
+      await this.gateway.request("taskfold.cards.moveProject", { id, boardId, milestoneId });
     });
   }
 
@@ -527,7 +527,7 @@ class FlowboardProjectHost extends LitElement {
     this.state.error = null;
     this.requestUpdate();
     void this.gateway
-      .request<ProjectResponse>("flowboard.projects.get", { id: boardId })
+      .request<ProjectResponse>("taskfold.projects.get", { id: boardId })
       .then((response) => {
         const modal = this.state.modal;
         if (
@@ -549,7 +549,7 @@ class FlowboardProjectHost extends LitElement {
 
   private reorderProjects(ids: string[]) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.projects.reorder", { ids });
+      await this.gateway.request("taskfold.projects.reorder", { ids });
     }, { closeModal: false });
   }
 
@@ -559,7 +559,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.projects.milestones.reorder", {
+      await this.gateway.request("taskfold.projects.milestones.reorder", {
         boardId: project.board.id,
         milestoneIds,
       });
@@ -572,7 +572,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.projects.documents.reorder", {
+      await this.gateway.request("taskfold.projects.documents.reorder", {
         boardId: project.board.id,
         documentIds,
       });
@@ -619,13 +619,13 @@ class FlowboardProjectHost extends LitElement {
   private formatDocument(
     command: "bold" | "italic" | "formatBlock" | "insertUnorderedList",
   ) {
-    const editor = this.querySelector<HTMLElement>(".flowboard-project__rich-editor");
+    const editor = this.querySelector<HTMLElement>(".taskfold-project__rich-editor");
     if (!editor) {
       return;
     }
     editor.focus();
     document.execCommand(command, false, command === "formatBlock" ? "h2" : undefined);
-    this.state.documentDraft = flowboardEditorHtmlToMarkdown(editor.innerHTML);
+    this.state.documentDraft = taskfoldEditorHtmlToMarkdown(editor.innerHTML);
   }
 
   private cancelDocumentEdit() {
@@ -651,7 +651,7 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     if (!this.connectedToGateway) {
-      this.state.documentPreviewError = i18n.t("flowboardProject.connectionRequired");
+      this.state.documentPreviewError = i18n.t("taskfoldProject.connectionRequired");
       this.requestUpdate();
       return;
     }
@@ -659,7 +659,7 @@ class FlowboardProjectHost extends LitElement {
     this.state.documentPreviewError = null;
     this.requestUpdate();
     void this.gateway
-      .request<ProjectDocumentWriteResponse>("flowboard.projects.documents.write", {
+      .request<ProjectDocumentWriteResponse>("taskfold.projects.documents.write", {
         id: document.id,
         content,
         expectedRevision: preview.revision,
@@ -704,7 +704,7 @@ class FlowboardProjectHost extends LitElement {
     this.requestUpdate();
     try {
       const response = await this.gateway.request<ProjectDocumentReadResponse>(
-        "flowboard.projects.documents.read",
+        "taskfold.projects.documents.read",
         { id },
       );
       if (this.state.selectedDocumentId === id) {
@@ -729,7 +729,7 @@ class FlowboardProjectHost extends LitElement {
     }
     void this.mutate(async () => {
       if (data.id) {
-        await this.gateway.request("flowboard.projects.milestones.update", {
+        await this.gateway.request("taskfold.projects.milestones.update", {
           id: data.id,
           title: data.title,
           description: data.description,
@@ -737,7 +737,7 @@ class FlowboardProjectHost extends LitElement {
         });
         return;
       }
-      await this.gateway.request("flowboard.projects.milestones.create", {
+      await this.gateway.request("taskfold.projects.milestones.create", {
         boardId: project.board.id,
         title: data.title,
         description: data.description,
@@ -748,14 +748,14 @@ class FlowboardProjectHost extends LitElement {
 
   private completeMilestone(id: string) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.projects.milestones.complete", { id });
+      await this.gateway.request("taskfold.projects.milestones.complete", { id });
     }, { closeModal: false });
   }
 
   private archiveMilestone(id: string, archived: boolean) {
     void this.mutate(async () => {
       await this.gateway.request(
-        archived ? "flowboard.projects.milestones.archive" : "flowboard.projects.milestones.restore",
+        archived ? "taskfold.projects.milestones.archive" : "taskfold.projects.milestones.restore",
         { id },
       );
     }, { closeModal: false });
@@ -775,10 +775,10 @@ class FlowboardProjectHost extends LitElement {
         content: data.content,
       };
       if (data.id) {
-        await this.gateway.request("flowboard.projects.documents.update", { id: data.id, ...common });
+        await this.gateway.request("taskfold.projects.documents.update", { id: data.id, ...common });
         return;
       }
-      await this.gateway.request("flowboard.projects.documents.create", {
+      await this.gateway.request("taskfold.projects.documents.create", {
         boardId: project.board.id,
         key: data.key,
         section: data.section,
@@ -790,7 +790,7 @@ class FlowboardProjectHost extends LitElement {
   private hideDocument(id: string, hidden: boolean) {
     void this.mutate(async () => {
       await this.gateway.request(
-        hidden ? "flowboard.projects.documents.hide" : "flowboard.projects.documents.restore",
+        hidden ? "taskfold.projects.documents.hide" : "taskfold.projects.documents.restore",
         { id },
       );
     }, { closeModal: false });
@@ -801,13 +801,13 @@ class FlowboardProjectHost extends LitElement {
       return;
     }
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.projects.documents.delete", { id });
+      await this.gateway.request("taskfold.projects.documents.delete", { id });
     }, { closeModal: false });
   }
 
   private updateCardDelivery(id: string, data: Record<string, string>) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.update", {
+      await this.gateway.request("taskfold.cards.update", {
         id,
         delivery: {
           objective: data.objective,
@@ -823,7 +823,7 @@ class FlowboardProjectHost extends LitElement {
 
   private prepareCardExecution(id: string) {
     if (!this.connectedToGateway) {
-      this.state.error = i18n.t("flowboardProject.connectionRequired");
+      this.state.error = i18n.t("taskfoldProject.connectionRequired");
       this.requestUpdate();
       return;
     }
@@ -835,7 +835,7 @@ class FlowboardProjectHost extends LitElement {
     this.state.executionPreparationError = null;
     this.requestUpdate();
     void this.gateway
-      .request<CardExecutionPreparationResponse>("flowboard.cards.execution.prepare", { id })
+      .request<CardExecutionPreparationResponse>("taskfold.cards.execution.prepare", { id })
       .then((preparation) => {
         if (
           this.state.executionPreparationCardId !== id ||
@@ -871,7 +871,7 @@ class FlowboardProjectHost extends LitElement {
     }
     void this.mutate(
       async () => {
-        await this.gateway.request("flowboard.cards.execution.start", {
+        await this.gateway.request("taskfold.cards.execution.start", {
           id,
           expectedRevision: preparation.expectedRevision,
         });
@@ -898,7 +898,7 @@ class FlowboardProjectHost extends LitElement {
     // so the UI never writes lifecycle state — it would only be correct while a
     // browser happened to be open on the right card.
     void this.gateway
-      .request<CardExecutionInspectionResponse>("flowboard.cards.execution.inspect", { id })
+      .request<CardExecutionInspectionResponse>("taskfold.cards.execution.inspect", { id })
       .then((inspection) => {
         if (this.state.executionInspectionCardId !== id) {
           return;
@@ -946,7 +946,7 @@ class FlowboardProjectHost extends LitElement {
           key: sessionKey,
           message,
         });
-        await this.gateway.request("flowboard.cards.execution.steer", {
+        await this.gateway.request("taskfold.cards.execution.steer", {
           id,
           ...(typeof response.runId === "string" && response.runId.trim()
             ? { nextRunId: response.runId }
@@ -959,7 +959,7 @@ class FlowboardProjectHost extends LitElement {
   }
 
   private abortCardExecution(id: string) {
-    if (!window.confirm(i18n.t("flowboardProject.stopExecutionConfirm"))) {
+    if (!window.confirm(i18n.t("taskfoldProject.stopExecutionConfirm"))) {
       return;
     }
     void this.mutate(
@@ -983,7 +983,7 @@ class FlowboardProjectHost extends LitElement {
         if (!confirmed) {
           throw new Error("OpenClaw did not confirm that the active run was stopped.");
         }
-        await this.gateway.request("flowboard.cards.execution.abort", {
+        await this.gateway.request("taskfold.cards.execution.abort", {
           id,
           ...(runId ? { expectedRunId: runId } : {}),
         });
@@ -995,54 +995,54 @@ class FlowboardProjectHost extends LitElement {
 
   private createSourceReference(id: string, data: Record<string, string>) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.sources.create", { id, ...data });
+      await this.gateway.request("taskfold.cards.sources.create", { id, ...data });
     }, { closeModal: false });
   }
 
   private updateSourceReference(id: string, data: Record<string, string>) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.sources.update", { id, ...data });
+      await this.gateway.request("taskfold.cards.sources.update", { id, ...data });
     }, { closeModal: false });
   }
 
   private deleteSourceReference(id: string, sourceReferenceId: string) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.sources.delete", { id, sourceReferenceId });
+      await this.gateway.request("taskfold.cards.sources.delete", { id, sourceReferenceId });
     }, { closeModal: false });
   }
 
   private reorderSourceReferences(id: string, sourceReferenceIds: string[]) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.sources.reorder", { id, sourceReferenceIds });
+      await this.gateway.request("taskfold.cards.sources.reorder", { id, sourceReferenceIds });
     }, { closeModal: false });
   }
 
   private addProof(id: string, data: Record<string, string>) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.proof", { id, ...data });
+      await this.gateway.request("taskfold.cards.proof", { id, ...data });
     }, { closeModal: false });
   }
 
   private deleteProof(id: string, proofId: string) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.proof.delete", { id, proofId });
+      await this.gateway.request("taskfold.cards.proof.delete", { id, proofId });
     }, { closeModal: false });
   }
 
   private addArtifact(id: string, data: Record<string, string>) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.artifact", { id, ...data });
+      await this.gateway.request("taskfold.cards.artifact", { id, ...data });
     }, { closeModal: false });
   }
 
   private deleteArtifact(id: string, artifactId: string) {
     void this.mutate(async () => {
-      await this.gateway.request("flowboard.cards.artifact.delete", { id, artifactId });
+      await this.gateway.request("taskfold.cards.artifact.delete", { id, artifactId });
     }, { closeModal: false });
   }
 
   render() {
-    return html`${renderFlowboardProjects({
+    return html`${renderTaskfoldProjects({
       state: this.state,
       connected: this.connectedToGateway,
       requestUpdate: () => this.requestUpdate(),
@@ -1104,6 +1104,6 @@ class FlowboardProjectHost extends LitElement {
 // Matches the mount point in index.html. The element previously registered under
 // a different name and then replaced the whole body to compensate, which left the
 // declared mount point dead and the page dependent on that side effect.
-if (!customElements.get("flowboard-app")) {
-  customElements.define("flowboard-app", FlowboardProjectHost);
+if (!customElements.get("taskfold-app")) {
+  customElements.define("taskfold-app", TaskfoldProjectHost);
 }

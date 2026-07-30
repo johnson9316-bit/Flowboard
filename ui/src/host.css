@@ -55,14 +55,14 @@ body {
   padding: 16px;
 }
 
-flowboard-workboard {
+taskfold-workboard {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: calc(100vh - 32px);
 }
 
-.flowboard-host-header {
+.taskfold-host-header {
   align-items: center;
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -70,17 +70,17 @@ flowboard-workboard {
   padding: 0 2px 10px;
 }
 
-.flowboard-host-header strong {
+.taskfold-host-header strong {
   font-size: 15px;
   letter-spacing: 0;
 }
 
-.flowboard-host-header span {
+.taskfold-host-header span {
   color: var(--muted);
   font-size: 12px;
 }
 
-.flowboard-host-header span::before {
+.taskfold-host-header span::before {
   background: var(--danger);
   border-radius: 50%;
   content: "";
@@ -90,7 +90,7 @@ flowboard-workboard {
   width: 7px;
 }
 
-.flowboard-host-header span.is-connected::before {
+.taskfold-host-header span.is-connected::before {
   background: var(--success);
 }
 
@@ -195,7 +195,7 @@ openclaw-modal-dialog > * {
     padding: 8px;
   }
 
-  flowboard-workboard {
+  taskfold-workboard {
     min-height: calc(100vh - 16px);
   }
 

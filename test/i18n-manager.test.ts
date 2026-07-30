@@ -1,23 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TranslationMap } from "../ui/src/i18n/lib/types.ts";
 import {
-  resolveInitialFlowboardLocale,
-  type FlowboardLocale,
+  resolveInitialTaskfoldLocale,
+  type TaskfoldLocale,
 } from "../ui/src/i18n/lib/translate.ts";
 
 type TestI18nManager = {
   initialize(hostLocale?: unknown): Promise<boolean>;
-  getLocale(): FlowboardLocale;
-  setLocale(locale: FlowboardLocale): Promise<boolean>;
+  getLocale(): TaskfoldLocale;
+  setLocale(locale: TaskfoldLocale): Promise<boolean>;
 };
 
 type TestI18nApi = {
   createI18nManager(
-    loadLocaleTranslation: (locale: FlowboardLocale) => Promise<TranslationMap | null>,
+    loadLocaleTranslation: (locale: TaskfoldLocale) => Promise<TranslationMap | null>,
   ): TestI18nManager;
 };
 
-const LOCALE_STORAGE_KEY = "flowboard.i18n.locale";
+const LOCALE_STORAGE_KEY = "taskfold.i18n.locale";
+const LEGACY_LOCALE_STORAGE_KEY = "flowboard.i18n.locale";
 const TEST_I18N_API = Symbol.for("openclaw.i18nManagerTestApi");
 
 class MemoryStorage {
@@ -36,7 +37,7 @@ const originalLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localS
 let storage: MemoryStorage;
 
 function createManager(
-  loader: (locale: FlowboardLocale) => Promise<TranslationMap | null>,
+  loader: (locale: TaskfoldLocale) => Promise<TranslationMap | null>,
 ): TestI18nManager {
   const api = (globalThis as Record<PropertyKey, unknown>)[TEST_I18N_API] as TestI18nApi;
   return api.createI18nManager(loader);
@@ -58,31 +59,42 @@ afterEach(() => {
   }
 });
 
-describe("Flowboard i18n", () => {
-  it("prefers a saved Flowboard language, then the one-time host locale, then browser locale", () => {
+describe("Taskfold i18n", () => {
+  it("prefers a saved Taskfold language, then the one-time host locale, then browser locale", () => {
     expect(
-      resolveInitialFlowboardLocale({
+      resolveInitialTaskfoldLocale({
         storedLocale: "en",
         hostLocale: "zh-CN",
         browserLocale: "zh-CN",
       }),
     ).toBe("en");
     expect(
-      resolveInitialFlowboardLocale({
+      resolveInitialTaskfoldLocale({
         hostLocale: "zh-TW",
         browserLocale: "en-US",
       }),
     ).toBe("zh-CN");
-    expect(resolveInitialFlowboardLocale({ browserLocale: "zh-CN" })).toBe("zh-CN");
-    expect(resolveInitialFlowboardLocale({ browserLocale: "ja-JP" })).toBe("en");
+    expect(resolveInitialTaskfoldLocale({ browserLocale: "zh-CN" })).toBe("zh-CN");
+    expect(resolveInitialTaskfoldLocale({ browserLocale: "ja-JP" })).toBe("en");
   });
 
-  it("persists the first successful host-derived locale as Flowboard's independent preference", async () => {
+  it("persists the first successful host-derived locale as Taskfold's independent preference", async () => {
     const manager = createManager(async (locale) =>
-      locale === "zh-CN" ? { flowboardProject: { title: "项目" } } : null,
+      locale === "zh-CN" ? { taskfoldProject: { title: "项目" } } : null,
     );
 
     await expect(manager.initialize("zh-CN")).resolves.toBe(true);
+    expect(manager.getLocale()).toBe("zh-CN");
+    expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe("zh-CN");
+  });
+
+  it("carries an existing Flowboard language preference into Taskfold once", async () => {
+    storage.setItem(LEGACY_LOCALE_STORAGE_KEY, "zh-CN");
+    const manager = createManager(async (locale) =>
+      locale === "zh-CN" ? { taskfoldProject: { title: "项目" } } : null,
+    );
+
+    await expect(manager.initialize("en")).resolves.toBe(true);
     expect(manager.getLocale()).toBe("zh-CN");
     expect(storage.getItem(LOCALE_STORAGE_KEY)).toBe("zh-CN");
   });
@@ -110,7 +122,7 @@ describe("Flowboard i18n", () => {
 
     const chinese = manager.setLocale("zh-CN");
     await expect(manager.setLocale("en")).resolves.toBe(true);
-    resolveChinese?.({ flowboardProject: { title: "项目" } });
+    resolveChinese?.({ taskfoldProject: { title: "项目" } });
 
     await expect(chinese).resolves.toBe(false);
     expect(manager.getLocale()).toBe("en");

@@ -1,6 +1,6 @@
 import type { TaskRunView } from "openclaw/plugin-sdk";
 import { describe, expect, it } from "vitest";
-import type { FlowboardCard } from "../src/contract/index.js";
+import type { TaskfoldCard } from "../src/contract/index.js";
 import { buildSessionKey } from "../src/backend/src/dispatcher.js";
 
 // Fixtures below are verbatim excerpts of what a live OpenClaw 2026.7.1-2 Gateway
@@ -16,11 +16,11 @@ import { buildSessionKey } from "../src/backend/src/dispatcher.js";
 // change breaks the build instead of silently reintroducing that class of bug.
 
 const CARD_ID = "252615eb-1a96-461c-8e04-58f9ce0ed7ad";
-const RUN_ID = `flowboard:execution:${CARD_ID}:1785313282219`;
+const RUN_ID = `taskfold:execution:${CARD_ID}:1785313282219`;
 
 /** One row of the live `sessions.list` payload, fields trimmed to what we read. */
 const HOST_SESSION_ROW = {
-  key: `agent:main:subagent:flowboard-flowboard-${CARD_ID}`,
+  key: `agent:main:subagent:taskfold-taskfold-${CARD_ID}`,
   status: "done",
   hasActiveRun: false,
   updatedAt: 1785313650854,
@@ -38,10 +38,10 @@ const HOST_TASK_ROW = {
   sessionKey: "agent:main:main",
   ownerKey: "agent:main:main",
   scope: "session",
-  childSessionKey: `agent:main:subagent:flowboard-flowboard-${CARD_ID}`,
+  childSessionKey: `agent:main:subagent:taskfold-taskfold-${CARD_ID}`,
   agentId: "main",
-  label: "plugin:flowboard",
-  title: "Work on this OpenClaw Flowboard card: 提交git",
+  label: "plugin:taskfold",
+  title: "Work on this OpenClaw Taskfold card: 提交git",
   status: "succeeded",
   deliveryStatus: "delivered",
   notifyPolicy: "done_only",
@@ -67,7 +67,7 @@ const TASK_STATUS_HANDLING = {
   lost: "terminal",
 } satisfies Record<TaskRunView["status"], "in flight" | "terminal">;
 
-function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
+function card(overrides: Partial<TaskfoldCard> = {}): TaskfoldCard {
   return {
     id: CARD_ID,
     title: "提交git",
@@ -78,9 +78,9 @@ function card(overrides: Partial<FlowboardCard> = {}): FlowboardCard {
     createdAt: 1785313282219,
     updatedAt: 1785313282219,
     revision: 1,
-    // The observed run belonged to the board literally named "flowboard", which is
-    // why its session key reads `flowboard-flowboard-<cardId>`.
-    metadata: { automation: { boardId: "flowboard" } },
+    // The observed run belonged to the board literally named "taskfold", which is
+    // why its session key reads `taskfold-taskfold-<cardId>`.
+    metadata: { automation: { boardId: "taskfold" } },
     ...overrides,
   };
 }
@@ -117,7 +117,7 @@ describe("host payload contract", () => {
 
   it("stores a session key the host reports back under a different, agent-scoped name", () => {
     const stored = buildSessionKey(card());
-    expect(stored).toBe(`subagent:flowboard-flowboard-${CARD_ID}`);
+    expect(stored).toBe(`subagent:taskfold-taskfold-${CARD_ID}`);
     // Not equal, and that is fine: the host resolves either form, verified against a
     // live Gateway with `sessions.get` for both spellings of this very key. What is
     // not fine is comparing them literally — the previous reconciler did, so "the

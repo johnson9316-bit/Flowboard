@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type {
-  PersistedFlowboardAttachment,
-  PersistedFlowboardBoard,
-  PersistedFlowboardCard,
-  PersistedFlowboardMilestone,
-  PersistedFlowboardNotificationSubscription,
-  PersistedFlowboardProjectDocument,
-  FlowboardKeyedStore,
+  PersistedTaskfoldAttachment,
+  PersistedTaskfoldBoard,
+  PersistedTaskfoldCard,
+  PersistedTaskfoldMilestone,
+  PersistedTaskfoldNotificationSubscription,
+  PersistedTaskfoldProjectDocument,
+  TaskfoldKeyedStore,
 } from "../src/backend/src/persistence-types.js";
-import { FlowboardStore } from "../src/backend/src/store.js";
+import { TaskfoldStore } from "../src/backend/src/store.js";
 
-function keyedStore<T>(): FlowboardKeyedStore<T> {
+function keyedStore<T>(): TaskfoldKeyedStore<T> {
   const values = new Map<string, T>();
   return {
     async register(key, value) {
@@ -29,22 +29,22 @@ function keyedStore<T>(): FlowboardKeyedStore<T> {
 }
 
 function createStore() {
-  const cards = keyedStore<PersistedFlowboardCard>();
-  const documents = keyedStore<PersistedFlowboardProjectDocument>();
+  const cards = keyedStore<PersistedTaskfoldCard>();
+  const documents = keyedStore<PersistedTaskfoldProjectDocument>();
   return {
     cards,
     documents,
-    store: new FlowboardStore(cards, {
-      boards: keyedStore<PersistedFlowboardBoard>(),
-      milestones: keyedStore<PersistedFlowboardMilestone>(),
+    store: new TaskfoldStore(cards, {
+      boards: keyedStore<PersistedTaskfoldBoard>(),
+      milestones: keyedStore<PersistedTaskfoldMilestone>(),
       documents,
-      subscriptions: keyedStore<PersistedFlowboardNotificationSubscription>(),
-      attachments: keyedStore<PersistedFlowboardAttachment>(),
+      subscriptions: keyedStore<PersistedTaskfoldNotificationSubscription>(),
+      attachments: keyedStore<PersistedTaskfoldAttachment>(),
     }),
   };
 }
 
-describe("Flowboard M2 project store", () => {
+describe("Taskfold M2 project store", () => {
   it("creates a project atomically with its first milestone", async () => {
     const { store } = createStore();
 

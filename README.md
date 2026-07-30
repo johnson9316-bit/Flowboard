@@ -1,6 +1,6 @@
-# Flowboard
+# Taskfold
 
-Flowboard is an OpenClaw plugin for planning and running work across projects.
+Taskfold is an OpenClaw plugin for planning and running work across projects.
 It combines project milestones, a lightweight document reader, delivery facts,
 and OpenClaw-managed worktree execution in one board.
 
@@ -19,7 +19,7 @@ Simplified Chinese.
   start confirmation, run inspection, steering, abort, and a link to the
   native Chat session.
 - OpenClaw CLI commands, slash commands, tools, and Gateway RPC methods under
-  the isolated `flowboard` namespace.
+  the isolated `taskfold` namespace.
 - Independent English/Simplified Chinese UI language preference, while still
   inheriting the host Control UI theme.
 
@@ -45,7 +45,7 @@ Admission decisions — claiming a card, starting a run — commit through a dat
 compare-and-swap on a monotonic card `revision`, so a card cannot be claimed
 twice even by two Gateway processes sharing one database.
 
-Idle UI refresh waits on the `flowboard.changes.wait` long-wait RPC instead of
+Idle UI refresh waits on the `taskfold.changes.wait` long-wait RPC instead of
 polling `cards.list`. Its cursor is scoped to the database and advances
 monotonically across restarts, so restarting the Gateway does not invalidate a
 connected client's cursor.
@@ -56,7 +56,7 @@ connected client's cursor.
 - Node.js `>=22`
 - A trusted Control UI embedding configuration for the authenticated plugin UI
 
-Flowboard runs inside the same Gateway as the Control UI. It does not start a
+Taskfold runs inside the same Gateway as the Control UI. It does not start a
 separate web server.
 
 ## Install
@@ -66,8 +66,8 @@ separate web server.
 After the package is published, install the scoped package:
 
 ```bash
-openclaw plugins install clawhub:@johnson9316-bit/flowboard
-openclaw plugins enable flowboard
+openclaw plugins install clawhub:@johnson9316-bit/taskfold
+openclaw plugins enable taskfold
 openclaw gateway restart
 ```
 
@@ -76,12 +76,12 @@ openclaw gateway restart
 Install directly from this repository:
 
 ```bash
-openclaw plugins install git:github.com/johnson9316-bit/Flowboard
-openclaw plugins enable flowboard
+openclaw plugins install git:github.com/johnson9316-bit/Taskfold
+openclaw plugins enable taskfold
 openclaw gateway restart
 ```
 
-Open the **Flowboard** tab from the OpenClaw Control UI after the Gateway has
+Open the **Taskfold** tab from the OpenClaw Control UI after the Gateway has
 restarted.
 
 ## Control UI Security
@@ -101,21 +101,30 @@ its installed plugins are trusted:
 ```
 
 The default `scripts` sandbox is origin-isolated and cannot access that paired
-identity, so it cannot provide the complete Flowboard UI.
+identity, so it cannot provide the complete Taskfold UI.
 
 ## Data and Execution
 
-Flowboard stores its SQLite state under:
+Taskfold stores its SQLite state under:
 
 ```text
-plugins/flowboard/flowboard.sqlite
+plugins/taskfold/taskfold.sqlite
 ```
 
 relative to `OPENCLAW_STATE_DIR`. It uses its own data, commands, tools, RPC
 methods, UI route, and database namespace. The bundled OpenClaw Workboard can
 remain enabled.
 
-When a card starts OpenClaw-native execution, Flowboard only supports a
+### Migrating From Flowboard
+
+Taskfold `0.2.0` is the renamed successor to the local Flowboard plugin. Before
+the first Taskfold startup, disable the old `flowboard` plugin and restart the
+Gateway. If `plugins/flowboard/flowboard.sqlite` exists and the Taskfold
+database does not, Taskfold makes a consistent SQLite snapshot at
+`plugins/taskfold/taskfold.sqlite` and upgrades its private table names. The
+old database is left untouched as a rollback copy.
+
+When a card starts OpenClaw-native execution, Taskfold only supports a
 managed Git worktree. It does not fall back to running directly in the primary
 checkout. Stopping an execution preserves the card's business status and does
 not automatically infer delivery, validation, or release facts.
@@ -134,10 +143,10 @@ npm run pack:check
 For local Gateway testing:
 
 ```bash
-openclaw plugins install --link /home/john/src/personal/Flowboard
-openclaw plugins enable flowboard
+openclaw plugins install --link /home/john/src/personal/Taskfold
+openclaw plugins enable taskfold
 openclaw gateway restart
-openclaw plugins inspect flowboard --runtime
+openclaw plugins inspect taskfold --runtime
 openclaw plugins doctor
 ```
 
@@ -147,17 +156,16 @@ flows through the Gateway-hosted Control UI.
 
 ## Release and Publishing
 
-The ClawHub package identity is `@johnson9316-bit/flowboard`. The unscoped
-`flowboard` name belongs to an unrelated community package and is intentionally
-not used.
+The ClawHub package identity is `@johnson9316-bit/taskfold`; the scoped name is
+intentional so it remains distinct from unrelated packages.
 
 The release procedure, validation steps, and trusted-publisher handoff are
 recorded in [docs/CLAW_HUB_PUBLISHING.md](docs/CLAW_HUB_PUBLISHING.md).
 
 ## License and Attribution
 
-Flowboard is distributed under the [MIT License](LICENSE). It began from an
+Taskfold is distributed under the [MIT License](LICENSE). It began from an
 imported OpenClaw Workboard baseline and has since diverged; that provenance is
 recorded in [UPSTREAM.md](UPSTREAM.md) and attribution in
-[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES). Flowboard is not synchronized with
+[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES). Taskfold is not synchronized with
 upstream.

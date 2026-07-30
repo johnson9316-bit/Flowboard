@@ -1,29 +1,29 @@
-// Flowboard plugin module builds the worker prompt.
+// Taskfold plugin module builds the worker prompt.
 //
-// The prompt is the interface between Flowboard and the agent doing the work, so
+// The prompt is the interface between Taskfold and the agent doing the work, so
 // it lives in one place and carries a version. Recording that version on each
 // attempt is what makes "which prompt produced this run" answerable after the
 // fact — otherwise a prompt change silently rewrites the meaning of old runs.
-import type { FlowboardCard, FlowboardRunAttempt } from "../../contract/index.js";
+import type { TaskfoldCard, TaskfoldRunAttempt } from "../../contract/index.js";
 import {
   capText,
   cardBoardId,
   cardParentIds,
   computeCardDiagnostics,
 } from "./store-card-helpers.js";
-import { FLOWBOARD_PROMPT_VERSION } from "./store-constants.js";
+import { TASKFOLD_PROMPT_VERSION } from "./store-constants.js";
 
 /**
  * Bump on any change below that could alter worker behavior. Declared in
  * `store-constants.ts` so the attempt recorder can stamp it without importing
  * this module, and re-exported here because this is where it is decided.
  */
-export { FLOWBOARD_PROMPT_VERSION };
+export { TASKFOLD_PROMPT_VERSION };
 
 const RECENT_ATTEMPTS = 8;
 const FAILED_ATTEMPT_DETAIL = 3;
 
-function cardResultSummary(card: FlowboardCard): string | undefined {
+function cardResultSummary(card: TaskfoldCard): string | undefined {
   return (
     card.metadata?.automation?.summary ??
     card.metadata?.comments?.findLast((comment) => comment.body.trim())?.body ??
@@ -31,7 +31,7 @@ function cardResultSummary(card: FlowboardCard): string | undefined {
   );
 }
 
-function isFailedAttempt(attempt: FlowboardRunAttempt): boolean {
+function isFailedAttempt(attempt: TaskfoldRunAttempt): boolean {
   return attempt.status === "failed" || attempt.status === "blocked" || attempt.status === "stopped";
 }
 
@@ -42,7 +42,7 @@ function isFailedAttempt(attempt: FlowboardRunAttempt): boolean {
  * the card is on its last try so the worker records findings before the budget
  * closes.
  */
-function retryGuidance(card: FlowboardCard): string[] {
+function retryGuidance(card: TaskfoldCard): string[] {
   const attempts = card.metadata?.attempts ?? [];
   const failed = attempts.filter(isFailedAttempt);
   if (failed.length === 0) {
@@ -65,7 +65,7 @@ function retryGuidance(card: FlowboardCard): string[] {
   const failureCount = card.metadata?.failureCount ?? 0;
   if (maxRetries && failureCount >= maxRetries) {
     lines.push(
-      "This is the final attempt within the card's retry budget. If you cannot finish, call flowboard_block with a precise diagnosis and record what you learned — a bare failure leaves the next person with nothing.",
+      "This is the final attempt within the card's retry budget. If you cannot finish, call taskfold_block with a precise diagnosis and record what you learned — a bare failure leaves the next person with nothing.",
     );
   }
   return lines;
@@ -73,12 +73,12 @@ function retryGuidance(card: FlowboardCard): string[] {
 
 /** Card state the worker needs to act: notes, history, dependencies, diagnostics. */
 export function buildWorkerContext(
-  card: FlowboardCard,
-  cards: readonly FlowboardCard[] = [],
+  card: TaskfoldCard,
+  cards: readonly TaskfoldCard[] = [],
   now = Date.now(),
 ): string {
   const lines = [
-    `# Flowboard card ${card.id}`,
+    `# Taskfold card ${card.id}`,
     `Title: ${card.title}`,
     `Status: ${card.status}`,
     `Priority: ${card.priority}`,
@@ -158,7 +158,7 @@ export function buildWorkerContext(
   const cardsById = new Map(cards.map((entry) => [entry.id, entry]));
   const parentResults = cardParentIds(card)
     .map((parentId) => cardsById.get(parentId))
-    .filter((parent): parent is FlowboardCard => parent !== undefined && parent.status === "done")
+    .filter((parent): parent is TaskfoldCard => parent !== undefined && parent.status === "done")
     .slice(-6);
   if (parentResults.length) {
     lines.push("", "## Parent results");
@@ -222,23 +222,23 @@ export function buildWorkerContext(
 
 /** The worker protocol header plus the card context, as sent to the agent. */
 export function buildWorkerPrompt(params: {
-  card: FlowboardCard;
+  card: TaskfoldCard;
   context: string;
   ownerId: string;
   token: string;
 }): string {
   return [
-    `Work on this OpenClaw Flowboard card: ${params.card.title}`,
+    `Work on this OpenClaw Taskfold card: ${params.card.title}`,
     "",
     "## Worker protocol",
     `Card id: ${params.card.id}`,
     `Claim ownerId: ${params.ownerId}`,
     `Claim token: ${params.token}`,
     "",
-    "Heartbeat with flowboard_heartbeat using the card id and token while working.",
-    "When done, call flowboard_complete with the card id, token, summary, and proof.",
-    "If you called flowboard_proof separately, pass its returned proofId to flowboard_complete.",
-    "If blocked, call flowboard_block with the card id, token, and reason.",
+    "Heartbeat with taskfold_heartbeat using the card id and token while working.",
+    "When done, call taskfold_complete with the card id, token, summary, and proof.",
+    "If you called taskfold_proof separately, pass its returned proofId to taskfold_complete.",
+    "If blocked, call taskfold_block with the card id, token, and reason.",
     "",
     params.context,
   ].join("\n");

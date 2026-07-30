@@ -1,12 +1,12 @@
-# Flowboard
+# Taskfold
 
-> 规划文档入口。2026-07-28 起，Flowboard 是 OpenClaw 插件；此前“独立本地应用优先”的方案已停止。
+> 规划文档入口。2026-07-28 起，Taskfold 是 OpenClaw 插件；此前“独立本地应用优先”的方案已停止。
 
 ## 当前决定
 
-- 产品形态：唯一形态是 OpenClaw 插件，产品显示名称为 Flowboard，插件 ID 为 `flowboard`。
-- M1：以固定的 OpenClaw Workboard 上游快照为代码、目录和开发规范基线，完整复制其功能层后做成可安装的 Flowboard 插件；不重写为独立应用，不另造一套架构。
-- 本机开发安装：`openclaw plugins install --link /home/john/src/personal/Flowboard`。
+- 产品形态：唯一形态是 OpenClaw 插件，产品显示名称为 Taskfold，插件 ID 为 `taskfold`。
+- M1：以固定的 OpenClaw Workboard 上游快照为代码、目录和开发规范基线，完整复制其功能层后做成可安装的 Taskfold 插件；不重写为独立应用，不另造一套架构。
+- 本机开发安装：`openclaw plugins install --link /home/john/src/personal/Taskfold`。
 - 分发安装：用户可执行 `openclaw plugins install <Git-仓库地址>` 安装插件。
 - 交付要求：提交 Git 仓库、保留 OpenClaw 的 MIT 版权与许可证、提供安装说明，并在本机 OpenClaw 中完成真实安装和运行验证。
 - M2 先在 Workboard 基线上完成多项目、项目设置与项目资料；M3 补齐 Card 交付事实和安全 Markdown 阅读；GSD 映射与开发执行能力从 M4 开始。M1 不改造为独立服务，也不提前开发这些扩展。

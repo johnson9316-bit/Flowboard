@@ -1,4 +1,4 @@
-// Flowboard API module exposes the plugin public contract.
+// Taskfold API module exposes the plugin public contract.
 export {
   definePluginEntry,
   type OpenClawPluginApi,

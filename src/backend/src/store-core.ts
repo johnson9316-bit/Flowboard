@@ -1,21 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type {
-  FlowboardBoardMetadata,
-  FlowboardChange,
-  FlowboardCard,
-  FlowboardSourceReference,
-  FlowboardLink,
-  FlowboardMetadata,
-  FlowboardStatus,
+  TaskfoldBoardMetadata,
+  TaskfoldChange,
+  TaskfoldCard,
+  TaskfoldSourceReference,
+  TaskfoldLink,
+  TaskfoldMetadata,
+  TaskfoldStatus,
 } from "../../contract/index.js";
 import type {
-  PersistedFlowboardAttachment,
-  PersistedFlowboardBoard,
-  PersistedFlowboardCard,
-  PersistedFlowboardMilestone,
-  PersistedFlowboardNotificationSubscription,
-  PersistedFlowboardProjectDocument,
-  FlowboardKeyedStore,
+  PersistedTaskfoldAttachment,
+  PersistedTaskfoldBoard,
+  PersistedTaskfoldCard,
+  PersistedTaskfoldMilestone,
+  PersistedTaskfoldNotificationSubscription,
+  PersistedTaskfoldProjectDocument,
+  TaskfoldKeyedStore,
 } from "./persistence-types.js";
 import { normalizeAutomationPatch, normalizeCardAutomation } from "./store-automation.js";
 import {
@@ -32,27 +32,27 @@ import {
   updateEvent,
   appendEvent,
 } from "./store-card-helpers.js";
-import { FlowboardChangeTracker } from "./store-change-tracker.js";
+import { TaskfoldChangeTracker } from "./store-change-tracker.js";
 import {
   MAX_CARD_COMMENTS,
   MAX_CARD_WORKER_LOGS,
-  nextFlowboardCardRevision,
+  nextTaskfoldCardRevision,
   POSITION_STEP,
 } from "./store-constants.js";
 import type {
-  FlowboardBoardInput,
-  FlowboardBoardSummary,
-  FlowboardCardPatch,
-  FlowboardCommentInput,
-  FlowboardLinkInput,
-  FlowboardLinkedCreateInput,
-  FlowboardListOptions,
-  FlowboardMutationScope,
-  FlowboardSourceReferenceCreateInput,
-  FlowboardSourceReferenceDeleteInput,
-  FlowboardSourceReferenceReorderInput,
-  FlowboardSourceReferenceUpdateInput,
-  FlowboardStatsResult,
+  TaskfoldBoardInput,
+  TaskfoldBoardSummary,
+  TaskfoldCardPatch,
+  TaskfoldCommentInput,
+  TaskfoldLinkInput,
+  TaskfoldLinkedCreateInput,
+  TaskfoldListOptions,
+  TaskfoldMutationScope,
+  TaskfoldSourceReferenceCreateInput,
+  TaskfoldSourceReferenceDeleteInput,
+  TaskfoldSourceReferenceReorderInput,
+  TaskfoldSourceReferenceUpdateInput,
+  TaskfoldStatsResult,
 } from "./store-inputs.js";
 import {
   appendLinkPreservingDependencies,
@@ -81,13 +81,13 @@ import {
 } from "./store-normalizers.js";
 
 /** Raised when a compare-and-swap loses to a concurrent write. */
-export class FlowboardRevisionConflictError extends Error {
+export class TaskfoldRevisionConflictError extends Error {
   constructor(
     readonly cardId: string,
     readonly expectedRevision: number,
   ) {
     super(`card ${cardId} changed since revision ${expectedRevision}.`);
-    this.name = "FlowboardRevisionConflictError";
+    this.name = "TaskfoldRevisionConflictError";
   }
 }
 
@@ -99,10 +99,10 @@ const CARD_CAS_MAX_ATTEMPTS = 3;
  * as the optimistic-concurrency token. The stamp is applied in place so the card
  * object the caller returns matches what was persisted.
  */
-function stampCardRevisions(store: FlowboardKeyedStore): FlowboardKeyedStore {
-  const stamp = (value: PersistedFlowboardCard): PersistedFlowboardCard => {
+function stampCardRevisions(store: TaskfoldKeyedStore): TaskfoldKeyedStore {
+  const stamp = (value: PersistedTaskfoldCard): PersistedTaskfoldCard => {
     if (value?.version === 1 && value.card) {
-      value.card.revision = nextFlowboardCardRevision(value.card.revision);
+      value.card.revision = nextTaskfoldCardRevision(value.card.revision);
     }
     return value;
   };
@@ -120,51 +120,51 @@ function stampCardRevisions(store: FlowboardKeyedStore): FlowboardKeyedStore {
   };
 }
 
-export class FlowboardCoreStore {
+export class TaskfoldCoreStore {
   private mutationQueue: Promise<unknown> = Promise.resolve();
   private lastNotificationSequence = 0;
-  private readonly changes: FlowboardChangeTracker;
-  protected readonly store: FlowboardKeyedStore;
-  protected readonly boardStore: FlowboardKeyedStore<PersistedFlowboardBoard>;
-  protected readonly milestoneStore: FlowboardKeyedStore<PersistedFlowboardMilestone>;
-  protected readonly documentStore: FlowboardKeyedStore<PersistedFlowboardProjectDocument>;
-  protected readonly subscriptionStore: FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>;
-  protected readonly attachmentStore: FlowboardKeyedStore<PersistedFlowboardAttachment>;
+  private readonly changes: TaskfoldChangeTracker;
+  protected readonly store: TaskfoldKeyedStore;
+  protected readonly boardStore: TaskfoldKeyedStore<PersistedTaskfoldBoard>;
+  protected readonly milestoneStore: TaskfoldKeyedStore<PersistedTaskfoldMilestone>;
+  protected readonly documentStore: TaskfoldKeyedStore<PersistedTaskfoldProjectDocument>;
+  protected readonly subscriptionStore: TaskfoldKeyedStore<PersistedTaskfoldNotificationSubscription>;
+  protected readonly attachmentStore: TaskfoldKeyedStore<PersistedTaskfoldAttachment>;
 
   constructor(
-    store: FlowboardKeyedStore,
+    store: TaskfoldKeyedStore,
     stores: {
-      boards?: FlowboardKeyedStore<PersistedFlowboardBoard>;
-      milestones?: FlowboardKeyedStore<PersistedFlowboardMilestone>;
-      documents?: FlowboardKeyedStore<PersistedFlowboardProjectDocument>;
-      subscriptions?: FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>;
-      attachments?: FlowboardKeyedStore<PersistedFlowboardAttachment>;
+      boards?: TaskfoldKeyedStore<PersistedTaskfoldBoard>;
+      milestones?: TaskfoldKeyedStore<PersistedTaskfoldMilestone>;
+      documents?: TaskfoldKeyedStore<PersistedTaskfoldProjectDocument>;
+      subscriptions?: TaskfoldKeyedStore<PersistedTaskfoldNotificationSubscription>;
+      attachments?: TaskfoldKeyedStore<PersistedTaskfoldAttachment>;
       dataVersion?: () => number;
       changeEpoch?: string;
       reserveChangeRevisions?: (count: number) => number;
     } = {},
   ) {
-    this.changes = new FlowboardChangeTracker(
+    this.changes = new TaskfoldChangeTracker(
       stores.dataVersion,
       stores.changeEpoch,
       stores.reserveChangeRevisions,
     );
     this.store = this.changes.track(stampCardRevisions(store));
     this.boardStore = this.changes.track(
-      stores.boards ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardBoard>),
+      stores.boards ?? (store as unknown as TaskfoldKeyedStore<PersistedTaskfoldBoard>),
     );
     this.milestoneStore = this.changes.track(
-      stores.milestones ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardMilestone>),
+      stores.milestones ?? (store as unknown as TaskfoldKeyedStore<PersistedTaskfoldMilestone>),
     );
     this.documentStore = this.changes.track(
       stores.documents ??
-        (store as unknown as FlowboardKeyedStore<PersistedFlowboardProjectDocument>),
+        (store as unknown as TaskfoldKeyedStore<PersistedTaskfoldProjectDocument>),
     );
     this.subscriptionStore =
       stores.subscriptions ??
-      (store as unknown as FlowboardKeyedStore<PersistedFlowboardNotificationSubscription>);
+      (store as unknown as TaskfoldKeyedStore<PersistedTaskfoldNotificationSubscription>);
     this.attachmentStore =
-      stores.attachments ?? (store as unknown as FlowboardKeyedStore<PersistedFlowboardAttachment>);
+      stores.attachments ?? (store as unknown as TaskfoldKeyedStore<PersistedTaskfoldAttachment>);
   }
 
   announceChangeEpoch(): void {
@@ -175,15 +175,15 @@ export class FlowboardCoreStore {
     return this.changes.reconcileExternalChanges();
   }
 
-  currentChange(): FlowboardChange | undefined {
+  currentChange(): TaskfoldChange | undefined {
     return this.changes.current();
   }
 
   async waitForChange(
-    after: FlowboardChange | undefined,
+    after: TaskfoldChange | undefined,
     timeoutMs: number,
-  ): Promise<{ change?: FlowboardChange; timedOut: boolean }> {
-    const isNewer = (change: FlowboardChange) =>
+  ): Promise<{ change?: TaskfoldChange; timedOut: boolean }> {
+    const isNewer = (change: TaskfoldChange) =>
       !after || change.epoch !== after.epoch || change.revision > after.revision;
     const current = this.changes.current();
     if (current && isNewer(current)) {
@@ -218,9 +218,9 @@ export class FlowboardCoreStore {
 
   protected async updateMetadata(
     id: string,
-    mutate: (existing: FlowboardCard) => FlowboardMetadata,
+    mutate: (existing: TaskfoldCard) => TaskfoldMetadata,
     options: { preserveProofId?: string } = {},
-  ): Promise<FlowboardCard> {
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -231,8 +231,8 @@ export class FlowboardCoreStore {
   }
 
   protected async deleteDetachedAttachments(
-    existing: FlowboardCard,
-    next: FlowboardCard,
+    existing: TaskfoldCard,
+    next: TaskfoldCard,
   ): Promise<void> {
     const nextIds = new Set(next.metadata?.attachments?.map((attachment) => attachment.id) ?? []);
     for (const attachment of existing.metadata?.attachments ?? []) {
@@ -248,21 +248,21 @@ export class FlowboardCoreStore {
     return this.lastNotificationSequence;
   }
 
-  async list(options: FlowboardListOptions = {}): Promise<FlowboardCard[]> {
+  async list(options: TaskfoldListOptions = {}): Promise<TaskfoldCard[]> {
     const boardId = normalizeBoardId(options.boardId);
     const entries = await this.store.entries();
     return entries
       .map((entry) => entry.value)
       .filter(
-        (entry): entry is PersistedFlowboardCard => entry?.version === 1 && Boolean(entry.card?.id),
+        (entry): entry is PersistedTaskfoldCard => entry?.version === 1 && Boolean(entry.card?.id),
       )
       .map((entry) => entry.card)
       .filter((card) => !boardId || cardBoardId(card) === boardId)
       .toSorted(compareCards);
   }
 
-  async listBoards(): Promise<{ boards: FlowboardBoardSummary[] }> {
-    const boards = new Map<string, FlowboardBoardSummary>();
+  async listBoards(): Promise<{ boards: TaskfoldBoardSummary[] }> {
+    const boards = new Map<string, TaskfoldBoardSummary>();
     for (const entry of await this.boardStore.entries()) {
       if (entry.value?.version !== 1 || !entry.value.board?.id) {
         continue;
@@ -311,7 +311,7 @@ export class FlowboardCoreStore {
           active: 0,
           archived: 0,
           byStatus: {},
-        } satisfies FlowboardBoardSummary);
+        } satisfies TaskfoldBoardSummary);
       summary.total += 1;
       if (card.metadata?.archivedAt) {
         summary.archived += 1;
@@ -334,7 +334,7 @@ export class FlowboardCoreStore {
     return Boolean(board?.version === 1 && board.board.archivedAt);
   }
 
-  async upsertBoard(input: FlowboardBoardInput): Promise<FlowboardBoardMetadata> {
+  async upsertBoard(input: TaskfoldBoardInput): Promise<TaskfoldBoardMetadata> {
     return await this.enqueueMutation(async () => {
       const id = normalizeBoardIdRequired(input.id);
       const existing = await this.boardStore.lookup(id);
@@ -344,7 +344,7 @@ export class FlowboardCoreStore {
     });
   }
 
-  async archiveBoard(id: unknown, archived: unknown = true): Promise<FlowboardBoardMetadata> {
+  async archiveBoard(id: unknown, archived: unknown = true): Promise<TaskfoldBoardMetadata> {
     return await this.upsertBoard({ id, archived });
   }
 
@@ -366,10 +366,10 @@ export class FlowboardCoreStore {
     });
   }
 
-  async stats(input: FlowboardListOptions = {}, now = Date.now()): Promise<FlowboardStatsResult> {
+  async stats(input: TaskfoldListOptions = {}, now = Date.now()): Promise<TaskfoldStatsResult> {
     const cards = await this.list(input);
     const boardId = normalizeBoardId(input.boardId) ?? "all";
-    const byStatus: Partial<Record<FlowboardStatus, number>> = {};
+    const byStatus: Partial<Record<TaskfoldStatus, number>> = {};
     const byAgent = Object.create(null) as Record<string, number>;
     let oldestReadyAt: number | undefined;
     let updatedAt: number | undefined;
@@ -397,7 +397,7 @@ export class FlowboardCoreStore {
     };
   }
 
-  async get(id: string): Promise<FlowboardCard | undefined> {
+  async get(id: string): Promise<TaskfoldCard | undefined> {
     const entry = await this.store.lookup(id.trim());
     return entry?.version === 1 ? entry.card : undefined;
   }
@@ -418,16 +418,16 @@ export class FlowboardCoreStore {
   }
 
   async create(
-    input: FlowboardLinkedCreateInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldLinkedCreateInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => await this.createDirect(input, scope));
   }
 
   protected async createDirect(
-    input: FlowboardLinkedCreateInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldLinkedCreateInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const now = Date.now();
     const requestedStatus = normalizeStatus(input.status, "todo");
     const cards = await this.list();
@@ -436,7 +436,7 @@ export class FlowboardCoreStore {
     const heldBySchedule =
       Boolean(automation?.scheduledAt && automation.scheduledAt > now) &&
       requestedStatus !== "blocked";
-    let status: FlowboardStatus = heldBySchedule ? "scheduled" : requestedStatus;
+    let status: TaskfoldStatus = heldBySchedule ? "scheduled" : requestedStatus;
     let heldByDependencies = false;
     if (parents.length > 0 && (status === "running" || status === "review")) {
       status = "todo";
@@ -517,7 +517,7 @@ export class FlowboardCoreStore {
             )
             .map((card) => card.position),
         ) + POSITION_STEP;
-    let card: FlowboardCard = {
+    let card: TaskfoldCard = {
       id: randomUUID(),
       title: normalizeTitle(input.title),
       status,
@@ -569,12 +569,12 @@ export class FlowboardCoreStore {
 
   async update(
     id: string,
-    patch: FlowboardCardPatch,
+    patch: TaskfoldCardPatch,
     options: {
       /** See {@link updateCard}: write only if the card is still at this revision. */
       expectedRevision?: number;
     } = {},
-  ): Promise<FlowboardCard> {
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(
       async () =>
         await this.updateCard(id, patch, {
@@ -589,7 +589,7 @@ export class FlowboardCoreStore {
 
   protected async updateCard(
     id: string,
-    patch: FlowboardCardPatch,
+    patch: TaskfoldCardPatch,
     options: {
       allowMetadataDependencyLinks?: boolean;
       enforceStatusHolds?: boolean;
@@ -597,19 +597,19 @@ export class FlowboardCoreStore {
       /**
        * Compare-and-swap guard. When set, the write lands only if the card is
        * still at this revision, and a losing write throws
-       * {@link FlowboardRevisionConflictError} instead of clobbering the winner.
+       * {@link TaskfoldRevisionConflictError} instead of clobbering the winner.
        * Required for admission decisions (claiming, dispatching) that must stay
        * correct across processes rather than only within this one.
        */
       expectedRevision?: number;
     } = {},
-  ): Promise<FlowboardCard> {
+  ): Promise<TaskfoldCard> {
     const existing = await this.get(id);
     if (!existing) {
       throw new Error(`card not found: ${id}`);
     }
     if (options.expectedRevision !== undefined && existing.revision !== options.expectedRevision) {
-      throw new FlowboardRevisionConflictError(id, options.expectedRevision);
+      throw new TaskfoldRevisionConflictError(id, options.expectedRevision);
     }
     const lifecycleStatusSourceUpdatedAt = lifecycleStatusSourceUpdatedAtFromPatch(patch.metadata);
     const existingLifecycleStatusSourceUpdatedAt =
@@ -777,7 +777,7 @@ export class FlowboardCoreStore {
    * fall back to the plain write already guarded by the read-revision check in
    * {@link updateCard} and the in-process mutation queue.
    */
-  private async persistCard(card: FlowboardCard, expectedRevision?: number): Promise<void> {
+  private async persistCard(card: TaskfoldCard, expectedRevision?: number): Promise<void> {
     if (expectedRevision === undefined || !this.store.compareAndSwap) {
       await this.store.register(card.id, { version: 1, card });
       return;
@@ -787,7 +787,7 @@ export class FlowboardCoreStore {
       card,
     });
     if (!swapped) {
-      throw new FlowboardRevisionConflictError(card.id, expectedRevision);
+      throw new TaskfoldRevisionConflictError(card.id, expectedRevision);
     }
   }
 
@@ -800,7 +800,7 @@ export class FlowboardCoreStore {
       try {
         return await run();
       } catch (error) {
-        if (!(error instanceof FlowboardRevisionConflictError) || attempt >= CARD_CAS_MAX_ATTEMPTS) {
+        if (!(error instanceof TaskfoldRevisionConflictError) || attempt >= CARD_CAS_MAX_ATTEMPTS) {
           throw error;
         }
       }
@@ -808,8 +808,8 @@ export class FlowboardCoreStore {
   }
 
   private async assertActiveStatusAllowed(
-    existing: FlowboardCard,
-    next: FlowboardCard,
+    existing: TaskfoldCard,
+    next: TaskfoldCard,
     now: number,
   ): Promise<void> {
     if (
@@ -864,9 +864,9 @@ export class FlowboardCoreStore {
 
   async addComment(
     id: string,
-    input: FlowboardCommentInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldCommentInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const now = Date.now();
     const body = normalizeBoundedString(input.body, undefined, 2000, "comment body");
     if (!body) {
@@ -884,8 +884,8 @@ export class FlowboardCoreStore {
 
   async addSourceReference(
     id: string,
-    input: FlowboardSourceReferenceCreateInput,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldSourceReferenceCreateInput,
+  ): Promise<TaskfoldCard> {
     const now = Date.now();
     const label = normalizeTitle(input.label);
     const target = normalizeBoundedString(input.target, undefined, 2000, "source reference target");
@@ -909,8 +909,8 @@ export class FlowboardCoreStore {
 
   async updateSourceReference(
     id: string,
-    input: FlowboardSourceReferenceUpdateInput,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldSourceReferenceUpdateInput,
+  ): Promise<TaskfoldCard> {
     const sourceReferenceId = normalizeBoundedString(
       input.sourceReferenceId,
       undefined,
@@ -942,7 +942,7 @@ export class FlowboardCoreStore {
         if (reference.id !== sourceReferenceId) {
           return reference;
         }
-        const next: FlowboardSourceReference = {
+        const next: TaskfoldSourceReference = {
           ...reference,
           label,
           target,
@@ -959,8 +959,8 @@ export class FlowboardCoreStore {
 
   async deleteSourceReference(
     id: string,
-    input: FlowboardSourceReferenceDeleteInput,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldSourceReferenceDeleteInput,
+  ): Promise<TaskfoldCard> {
     const sourceReferenceId = normalizeBoundedString(
       input.sourceReferenceId,
       undefined,
@@ -980,8 +980,8 @@ export class FlowboardCoreStore {
 
   async reorderSourceReferences(
     id: string,
-    input: FlowboardSourceReferenceReorderInput,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldSourceReferenceReorderInput,
+  ): Promise<TaskfoldCard> {
     if (
       !Array.isArray(input.sourceReferenceIds) ||
       input.sourceReferenceIds.some((value) => typeof value !== "string")
@@ -1014,8 +1014,8 @@ export class FlowboardCoreStore {
 
   private async mutateSourceReferences(
     id: string,
-    mutate: (references: FlowboardSourceReference[]) => FlowboardSourceReference[],
-  ): Promise<FlowboardCard> {
+    mutate: (references: TaskfoldSourceReference[]) => TaskfoldSourceReference[],
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -1041,7 +1041,7 @@ export class FlowboardCoreStore {
     });
   }
 
-  async addLink(id: string, input: FlowboardLinkInput): Promise<FlowboardCard> {
+  async addLink(id: string, input: TaskfoldLinkInput): Promise<TaskfoldCard> {
     const now = Date.now();
     const targetCardId = normalizeBoundedString(input.targetCardId, undefined, 120, "link target");
     const url = normalizeBoundedString(input.url, undefined, 2000, "link URL");
@@ -1053,7 +1053,7 @@ export class FlowboardCoreStore {
     if (type === "parent" || type === "child") {
       throw new Error("parent and child dependency links must use linkDependency.");
     }
-    const link: FlowboardLink = {
+    const link: TaskfoldLink = {
       id: randomUUID(),
       type,
       createdAt: now,
@@ -1070,8 +1070,8 @@ export class FlowboardCoreStore {
   async linkCards(
     parentId: string,
     childId: string,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(
       async () => await this.linkCardsDirect(parentId, childId, Date.now(), { scope }),
     );
@@ -1081,8 +1081,8 @@ export class FlowboardCoreStore {
     parentId: string,
     childId: string,
     now = Date.now(),
-    options: { allowStatusOnlyActiveChild?: boolean; scope?: FlowboardMutationScope } = {},
-  ): Promise<FlowboardCard> {
+    options: { allowStatusOnlyActiveChild?: boolean; scope?: TaskfoldMutationScope } = {},
+  ): Promise<TaskfoldCard> {
     if (parentId.trim() === childId.trim()) {
       throw new Error("parent and child cards must differ.");
     }
@@ -1142,7 +1142,7 @@ export class FlowboardCoreStore {
     return await this.promoteDependencyReady(nextChild.id);
   }
 
-  private async dependencyTargetStatus(card: FlowboardCard, now: number): Promise<FlowboardStatus> {
+  private async dependencyTargetStatus(card: TaskfoldCard, now: number): Promise<TaskfoldStatus> {
     const scheduledAt = card.metadata?.automation?.scheduledAt;
     const parents = cardParentIds(card);
     if (card.status === "scheduled" && !scheduledAt) {
@@ -1195,7 +1195,7 @@ export class FlowboardCoreStore {
     return visit(cardId);
   }
 
-  protected async recordDispatch(card: FlowboardCard, now: number): Promise<FlowboardCard> {
+  protected async recordDispatch(card: TaskfoldCard, now: number): Promise<TaskfoldCard> {
     const metadata = trimMetadataToBudget(
       normalizeMetadata(
         {
@@ -1222,9 +1222,9 @@ export class FlowboardCoreStore {
   }
 
   protected async recordOrchestrationCandidate(
-    card: FlowboardCard,
+    card: TaskfoldCard,
     now: number,
-  ): Promise<FlowboardCard> {
+  ): Promise<TaskfoldCard> {
     const metadata = trimMetadataToBudget({
       ...card.metadata,
       workerLogs: [
@@ -1239,7 +1239,7 @@ export class FlowboardCoreStore {
       workerProtocol: {
         state: "idle" as const,
         updatedAt: now,
-        detail: "Awaiting flowboard_specify or flowboard_decompose.",
+        detail: "Awaiting taskfold_specify or taskfold_decompose.",
       },
     });
     const next = removeUndefinedCardFields({
@@ -1251,7 +1251,7 @@ export class FlowboardCoreStore {
     return next;
   }
 
-  protected async promoteDependencyReady(id: string, now = Date.now()): Promise<FlowboardCard> {
+  protected async promoteDependencyReady(id: string, now = Date.now()): Promise<TaskfoldCard> {
     const card = await this.get(id);
     if (!card) {
       throw new Error(`card not found: ${id}`);

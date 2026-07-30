@@ -4,28 +4,28 @@ import { describe, expect, it } from "vitest";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-describe("Flowboard M2 project UI host", () => {
+describe("Taskfold M2 project UI host", () => {
   it("uses the project page and live refresh instead of cards.list polling", () => {
     const main = fs.readFileSync(path.join(root, "ui/src/main.ts"), "utf8");
     const page = fs.readFileSync(path.join(root, "ui/src/pages/projects/project-view.ts"), "utf8");
 
     expect(main).toContain('from "./pages/projects/project-view.ts"');
-    expect(main).toContain("flowboard.changes.wait");
-    expect(main).toContain("flowboard.projects.list");
-    expect(main).toContain("flowboard.projects.get");
-    expect(main).toContain("flowboard.cards.moveMilestone");
-    expect(main).toContain("flowboard.cards.moveProject");
-    expect(main).toContain('i18n.t("flowboardProject.connectionRequired")');
-    expect(main).toContain("readInitialFlowboardHostLocale");
-    expect(main).toContain("startFlowboardThemeSync");
-    expect(main).not.toContain("startFlowboardHostSync");
+    expect(main).toContain("taskfold.changes.wait");
+    expect(main).toContain("taskfold.projects.list");
+    expect(main).toContain("taskfold.projects.get");
+    expect(main).toContain("taskfold.cards.moveMilestone");
+    expect(main).toContain("taskfold.cards.moveProject");
+    expect(main).toContain('i18n.t("taskfoldProject.connectionRequired")');
+    expect(main).toContain("readInitialTaskfoldHostLocale");
+    expect(main).toContain("startTaskfoldThemeSync");
+    expect(main).not.toContain("startTaskfoldHostSync");
     expect(main).not.toMatch(/setInterval\s*\(/);
-    expect(page).toContain("flowboardProject.unassigned");
+    expect(page).toContain("taskfoldProject.unassigned");
     expect(page).toContain("draggable=");
-    expect(page).toContain("flowboard-project__kanban");
-    expect(page).toContain("flowboard-project__project-toolbar");
-    expect(page).toContain("flowboard-project__language-select");
-    expect(page).not.toContain("flowboard-project__sidebar");
+    expect(page).toContain("taskfold-project__kanban");
+    expect(page).toContain("taskfold-project__project-toolbar");
+    expect(page).toContain("taskfold-project__language-select");
+    expect(page).not.toContain("taskfold-project__sidebar");
     expect(page).toContain("?disabled=${controller.state.busy || !controller.connected}");
   });
 

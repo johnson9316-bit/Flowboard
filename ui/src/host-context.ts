@@ -1,6 +1,6 @@
 import type { Locale } from "./i18n/index.ts";
 
-export type FlowboardLocale = Extract<Locale, "en" | "zh-CN">;
+export type TaskfoldLocale = Extract<Locale, "en" | "zh-CN">;
 
 const CONTROL_UI_SETTINGS_PREFIX = "openclaw.control.settings.v1";
 const CONTROL_UI_THEME_VARIABLES = [
@@ -42,25 +42,25 @@ const CONTROL_UI_THEME_VARIABLES = [
   "--control-ui-text-scale",
 ] as const;
 
-export function resolveFlowboardLocale(value: unknown): FlowboardLocale | null {
+export function resolveTaskfoldLocale(value: unknown): TaskfoldLocale | null {
   if (typeof value !== "string" || !value.trim()) {
     return null;
   }
   return value.trim().toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
-export function hostLocaleFromSettings(value: unknown): FlowboardLocale | null {
+export function hostLocaleFromSettings(value: unknown): TaskfoldLocale | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
-  return resolveFlowboardLocale((value as Record<string, unknown>).locale);
+  return resolveTaskfoldLocale((value as Record<string, unknown>).locale);
 }
 
 export function isControlUiSettingsKey(key: string | null): boolean {
   return typeof key === "string" && key.startsWith(CONTROL_UI_SETTINGS_PREFIX);
 }
 
-function readHostLocale(storage: Storage): FlowboardLocale | null {
+function readHostLocale(storage: Storage): TaskfoldLocale | null {
   try {
     for (let index = 0; index < storage.length; index += 1) {
       const key = storage.key(index);
@@ -146,7 +146,7 @@ function syncTheme(hostDocument: Document): void {
   }
 }
 
-export function readInitialFlowboardHostLocale(): FlowboardLocale | null {
+export function readInitialTaskfoldHostLocale(): TaskfoldLocale | null {
   const hostWindow = parentWindow();
   if (!hostWindow) {
     return null;
@@ -158,11 +158,11 @@ export function readInitialFlowboardHostLocale(): FlowboardLocale | null {
   const storage = parentStorage(hostWindow);
   return (
     (storage ? readHostLocale(storage) : null) ??
-    resolveFlowboardLocale(hostDocument.documentElement.lang)
+    resolveTaskfoldLocale(hostDocument.documentElement.lang)
   );
 }
 
-export function startFlowboardThemeSync(): () => void {
+export function startTaskfoldThemeSync(): () => void {
   const hostWindow = parentWindow();
   if (!hostWindow) {
     return () => {};

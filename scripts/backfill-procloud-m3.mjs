@@ -476,7 +476,7 @@ function hasReference(card, expected) {
 }
 
 async function main() {
-  const { project } = await gatewayCall("flowboard.projects.get", { id: PROJECT_ID });
+  const { project } = await gatewayCall("taskfold.projects.get", { id: PROJECT_ID });
   assert(project.board.id === PROJECT_ID, "ProCloud project ID does not match.");
   assert(project.cards.length === 81, `Expected 81 ProCloud cards, found ${project.cards.length}.`);
   assert(project.milestones.length === 3, `Expected 3 milestones, found ${project.milestones.length}.`);
@@ -506,7 +506,7 @@ async function main() {
     assert(card.status === mutation.expectedStatus, `Card has an unexpected status: ${card.title}`);
   }
 
-  const { documents } = await gatewayCall("flowboard.projects.documents.list", {
+  const { documents } = await gatewayCall("taskfold.projects.documents.list", {
     boardId: PROJECT_ID,
     includeHidden: true,
   });
@@ -525,7 +525,7 @@ async function main() {
     if (document?.target === update.target && document.summary === update.summary && document.type === "path") {
       continue;
     }
-    await gatewayCall("flowboard.projects.documents.update", {
+    await gatewayCall("taskfold.projects.documents.update", {
       id: update.id,
       type: "path",
       target: update.target,
@@ -538,7 +538,7 @@ async function main() {
     if (!documentsById.has(removal.id)) {
       continue;
     }
-    await gatewayCall("flowboard.projects.documents.delete", { id: removal.id });
+    await gatewayCall("taskfold.projects.documents.delete", { id: removal.id });
     written.documentsDeleted.push(removal.id);
   }
 
@@ -549,7 +549,7 @@ async function main() {
     }
     let current = card;
     if (!sameDelivery(current, mutation.delivery)) {
-      const result = await gatewayCall("flowboard.cards.update", {
+      const result = await gatewayCall("taskfold.cards.update", {
         id: mutation.id,
         delivery: mutation.delivery,
       });
@@ -560,7 +560,7 @@ async function main() {
       if (hasReference(current, item)) {
         continue;
       }
-      const result = await gatewayCall("flowboard.cards.sources.create", {
+      const result = await gatewayCall("taskfold.cards.sources.create", {
         id: mutation.id,
         ...item,
       });

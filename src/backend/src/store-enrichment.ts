@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type {
-  FlowboardAttachment,
-  FlowboardCard,
-  FlowboardNotification,
-  FlowboardWorkerLog,
+  TaskfoldAttachment,
+  TaskfoldCard,
+  TaskfoldNotification,
+  TaskfoldWorkerLog,
 } from "../../contract/index.js";
-import type { PersistedFlowboardAttachment } from "./persistence-types.js";
+import type { PersistedTaskfoldAttachment } from "./persistence-types.js";
 import {
   assertCanMutateClaimedCard,
   capText,
@@ -20,14 +20,14 @@ import {
   MAX_CARD_PROOF,
   MAX_CARD_WORKER_LOGS,
 } from "./store-constants.js";
-import { FlowboardCoreStore } from "./store-core.js";
+import { TaskfoldCoreStore } from "./store-core.js";
 import type {
-  FlowboardArtifactInput,
-  FlowboardAttachmentInput,
-  FlowboardMutationScope,
-  FlowboardProofInput,
-  FlowboardProtocolViolationInput,
-  FlowboardWorkerLogInput,
+  TaskfoldArtifactInput,
+  TaskfoldAttachmentInput,
+  TaskfoldMutationScope,
+  TaskfoldProofInput,
+  TaskfoldProtocolViolationInput,
+  TaskfoldWorkerLogInput,
 } from "./store-inputs.js";
 import {
   clearDiagnostics,
@@ -37,12 +37,12 @@ import {
   normalizeProofInput,
 } from "./store-normalizers.js";
 
-export class FlowboardEnrichmentStore extends FlowboardCoreStore {
+export class TaskfoldEnrichmentStore extends TaskfoldCoreStore {
   async addProof(
     id: string,
-    input: FlowboardProofInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldProofInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const now = Date.now();
     const proof = normalizeProofInput(input, now);
     return await this.updateMetadata(
@@ -61,10 +61,10 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
 
   async addProofWithArtifact(
     id: string,
-    proofInput: FlowboardProofInput,
-    artifactInput: FlowboardArtifactInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    proofInput: TaskfoldProofInput,
+    artifactInput: TaskfoldArtifactInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const now = Date.now();
     const proof = normalizeProofInput(proofInput, now);
     const artifact = normalizeArtifact({ ...artifactInput, createdAt: now });
@@ -88,9 +88,9 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
 
   async addArtifact(
     id: string,
-    input: FlowboardArtifactInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldArtifactInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const artifact = normalizeArtifact({ ...input, createdAt: Date.now() });
     if (!artifact) {
       throw new Error("artifact url or path is required.");
@@ -108,8 +108,8 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
   async deleteProof(
     id: string,
     proofId: string,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.updateMetadata(id, (existing) => {
       assertCanMutateClaimedCard(existing, scope);
       const proof = existing.metadata?.proof ?? [];
@@ -126,8 +126,8 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
   async deleteArtifact(
     id: string,
     artifactId: string,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.updateMetadata(id, (existing) => {
       assertCanMutateClaimedCard(existing, scope);
       const artifacts = existing.metadata?.artifacts ?? [];
@@ -143,9 +143,9 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
 
   async addAttachment(
     id: string,
-    input: FlowboardAttachmentInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldAttachmentInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(id);
       if (!existing) {
@@ -181,8 +181,8 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
   }
 
   async listAttachments(id: string): Promise<{
-    card: FlowboardCard;
-    attachments: FlowboardAttachment[];
+    card: TaskfoldCard;
+    attachments: TaskfoldAttachment[];
   }> {
     const card = await this.get(id);
     if (!card) {
@@ -191,7 +191,7 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
     return { card, attachments: card.metadata?.attachments ?? [] };
   }
 
-  async getAttachment(id: string): Promise<PersistedFlowboardAttachment | undefined> {
+  async getAttachment(id: string): Promise<PersistedTaskfoldAttachment | undefined> {
     const attachmentId = id.trim();
     const entry = await this.attachmentStore.lookup(attachmentId);
     return entry?.version === 1 ? entry : undefined;
@@ -200,8 +200,8 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
   async deleteAttachment(
     cardId: string,
     attachmentId: string,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const existing = await this.get(cardId);
       if (!existing) {
@@ -224,9 +224,9 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
 
   async addWorkerLog(
     id: string,
-    input: FlowboardWorkerLogInput,
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldWorkerLogInput,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     const now = Date.now();
     const message = normalizeBoundedString(input.message, undefined, 800, "worker log message");
     if (!message) {
@@ -238,7 +238,7 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
         : "info";
     const sessionKey = normalizeBoundedString(input.sessionKey, undefined, 240, "session key");
     const runId = normalizeBoundedString(input.runId, undefined, 160, "run id");
-    const log: FlowboardWorkerLog = {
+    const log: TaskfoldWorkerLog = {
       id: randomUUID(),
       level,
       message,
@@ -257,9 +257,9 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
 
   async recordProtocolViolation(
     id: string,
-    input: FlowboardProtocolViolationInput = {},
-    scope?: FlowboardMutationScope,
-  ): Promise<FlowboardCard> {
+    input: TaskfoldProtocolViolationInput = {},
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
     return await this.enqueueMutation(async () => {
       const card = await this.get(id);
       if (!card) {
@@ -272,7 +272,7 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
         "Worker stopped without completing or blocking the card.";
       const sessionKey = normalizeBoundedString(input.sessionKey, undefined, 240, "session key");
       const runId = normalizeBoundedString(input.runId, undefined, 160, "run id");
-      const log: FlowboardWorkerLog = {
+      const log: TaskfoldWorkerLog = {
         id: randomUUID(),
         level: "error",
         message: detail,
@@ -285,7 +285,7 @@ export class FlowboardEnrichmentStore extends FlowboardCoreStore {
           ? { ...card.execution, status: "blocked" as const, updatedAt: now }
           : card.execution;
       const attempts = closeRunningAttempts(card.metadata?.attempts, now, "blocked", detail);
-      const notification: FlowboardNotification = {
+      const notification: TaskfoldNotification = {
         id: randomUUID(),
         kind: "failed",
         createdAt: now,

@@ -20,42 +20,43 @@ type SetLocaleOptions = {
   persist?: boolean;
 };
 
-const FLOWBOARD_LOCALE_STORAGE_KEY = "flowboard.i18n.locale";
+const TASKFOLD_LOCALE_STORAGE_KEY = "taskfold.i18n.locale";
+const LEGACY_FLOWBOARD_LOCALE_STORAGE_KEY = "flowboard.i18n.locale";
 
-export type FlowboardLocale = Extract<Locale, "en" | "zh-CN">;
+export type TaskfoldLocale = Extract<Locale, "en" | "zh-CN">;
 
-export function resolveFlowboardLocale(value: unknown): FlowboardLocale {
+export function resolveTaskfoldLocale(value: unknown): TaskfoldLocale {
   if (typeof value !== "string") {
     return "en";
   }
   return value.trim().toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
-export function resolveInitialFlowboardLocale(input: {
+export function resolveInitialTaskfoldLocale(input: {
   storedLocale?: unknown;
   hostLocale?: unknown;
   browserLocale?: unknown;
-}): FlowboardLocale {
+}): TaskfoldLocale {
   if (typeof input.storedLocale === "string" && input.storedLocale.trim()) {
-    return resolveFlowboardLocale(input.storedLocale);
+    return resolveTaskfoldLocale(input.storedLocale);
   }
   if (typeof input.hostLocale === "string" && input.hostLocale.trim()) {
-    return resolveFlowboardLocale(input.hostLocale);
+    return resolveTaskfoldLocale(input.hostLocale);
   }
   const browserLocale = typeof input.browserLocale === "string" ? input.browserLocale : "";
-  return resolveFlowboardLocale(resolveNavigatorLocale(browserLocale));
+  return resolveTaskfoldLocale(resolveNavigatorLocale(browserLocale));
 }
 
 export { SUPPORTED_LOCALES, isSupportedLocale };
 
 class I18nManager {
-  private locale: FlowboardLocale = "en";
+  private locale: TaskfoldLocale = "en";
   private translations: Partial<Record<Locale, TranslationMap>> = { [DEFAULT_LOCALE]: en };
   private subscribers: Set<Subscriber> = new Set();
   // Locale chunks are served by the gateway, so a selection made while disconnected can fail.
   // Preserve the target for the next connected transition; otherwise the chrome silently stays
   // in the old language forever.
-  private pendingLocale: FlowboardLocale | null = null;
+  private pendingLocale: TaskfoldLocale | null = null;
   // Only the latest selection may update retry state or become active after an async chunk load.
   private localeRequestGeneration = 0;
   private localeLoadRecovery: LocaleLoadRecovery | undefined;
@@ -69,7 +70,15 @@ class I18nManager {
       return null;
     }
     try {
-      return storage.getItem(FLOWBOARD_LOCALE_STORAGE_KEY);
+      const taskfoldLocale = storage.getItem(TASKFOLD_LOCALE_STORAGE_KEY);
+      if (taskfoldLocale) {
+        return taskfoldLocale;
+      }
+      const legacyLocale = storage.getItem(LEGACY_FLOWBOARD_LOCALE_STORAGE_KEY);
+      if (legacyLocale) {
+        storage.setItem(TASKFOLD_LOCALE_STORAGE_KEY, legacyLocale);
+      }
+      return legacyLocale;
     } catch {
       return null;
     }
@@ -81,16 +90,16 @@ class I18nManager {
       return;
     }
     try {
-      storage.setItem(FLOWBOARD_LOCALE_STORAGE_KEY, locale);
+      storage.setItem(TASKFOLD_LOCALE_STORAGE_KEY, locale);
     } catch {
       // Ignore storage write failures in private/blocked contexts.
     }
   }
 
-  private resolveInitialLocale(hostLocale: unknown): FlowboardLocale {
+  private resolveInitialLocale(hostLocale: unknown): TaskfoldLocale {
     const language =
       typeof globalThis.navigator?.language === "string" ? globalThis.navigator.language : null;
-    return resolveInitialFlowboardLocale({
+    return resolveInitialTaskfoldLocale({
       storedLocale: this.readStoredLocale(),
       hostLocale,
       browserLocale: language,
@@ -105,16 +114,16 @@ class I18nManager {
     return this.initialization;
   }
 
-  public getLocale(): FlowboardLocale {
+  public getLocale(): TaskfoldLocale {
     return this.locale;
   }
 
-  public async setLocale(locale: FlowboardLocale, options: SetLocaleOptions = {}): Promise<boolean> {
-    return this.applyLocale(resolveFlowboardLocale(locale), false, options.persist !== false);
+  public async setLocale(locale: TaskfoldLocale, options: SetLocaleOptions = {}): Promise<boolean> {
+    return this.applyLocale(resolveTaskfoldLocale(locale), false, options.persist !== false);
   }
 
   private async applyLocale(
-    locale: FlowboardLocale,
+    locale: TaskfoldLocale,
     retrying: boolean,
     persist: boolean,
   ): Promise<boolean> {

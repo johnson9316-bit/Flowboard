@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-let createFlowboardProjectUiState: typeof import("../ui/src/pages/projects/project-view.ts")["createFlowboardProjectUiState"];
+let createTaskfoldProjectUiState: typeof import("../ui/src/pages/projects/project-view.ts")["createTaskfoldProjectUiState"];
 let reorderVisibleItemIds: typeof import("../ui/src/pages/projects/project-view.ts")["reorderVisibleItemIds"];
-let flowboardNativeChatHref: typeof import("../ui/src/pages/projects/project-view.ts")["flowboardNativeChatHref"];
+let taskfoldNativeChatHref: typeof import("../ui/src/pages/projects/project-view.ts")["taskfoldNativeChatHref"];
 
 beforeAll(async () => {
   class HTMLElementShim {}
@@ -15,14 +15,14 @@ beforeAll(async () => {
       },
     },
   });
-  ({ createFlowboardProjectUiState, reorderVisibleItemIds, flowboardNativeChatHref } = await import(
+  ({ createTaskfoldProjectUiState, reorderVisibleItemIds, taskfoldNativeChatHref } = await import(
     "../ui/src/pages/projects/project-view.ts"
   ));
 });
 
-describe("Flowboard M2 project UI state", () => {
+describe("Taskfold M2 project UI state", () => {
   it("starts at the project overview with Unassigned-capable board state", () => {
-    expect(createFlowboardProjectUiState()).toMatchObject({
+    expect(createTaskfoldProjectUiState()).toMatchObject({
       screen: "overview",
       selectedProjectId: null,
       project: null,
@@ -53,10 +53,10 @@ describe("Flowboard M2 project UI state", () => {
   });
 
   it("builds a native Chat link below the current Control UI base path", () => {
-    expect(flowboardNativeChatHref("agent:main:subagent:flowboard-alpha-card", "/plugin")).toBe(
-      "/chat?session=agent%3Amain%3Asubagent%3Aflowboard-alpha-card",
+    expect(taskfoldNativeChatHref("agent:main:subagent:taskfold-alpha-card", "/plugin")).toBe(
+      "/chat?session=agent%3Amain%3Asubagent%3Ataskfold-alpha-card",
     );
-    expect(flowboardNativeChatHref("session with spaces", "/control/plugin")).toBe(
+    expect(taskfoldNativeChatHref("session with spaces", "/control/plugin")).toBe(
       "/control/chat?session=session%20with%20spaces",
     );
   });
