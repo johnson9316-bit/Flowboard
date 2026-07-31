@@ -39,10 +39,12 @@ type TaskfoldCardInput = {
   startedAt?: unknown;
   completedAt?: unknown;
   parents?: unknown;
+  kind?: unknown;
+  requirementId?: unknown;
 };
 
 export type TaskfoldCardPatch = Partial<
-  Omit<TaskfoldCardInput, "boardId" | "milestoneId" | "position">
+  Omit<TaskfoldCardInput, "boardId" | "milestoneId" | "position" | "kind" | "requirementId">
 >;
 export type TaskfoldCommentInput = { body?: unknown };
 export type TaskfoldLinkInput = {
@@ -186,6 +188,7 @@ export type TaskfoldBoardInput = {
   homepageUrl?: unknown;
   defaultWorkspace?: unknown;
   orchestration?: unknown;
+  boardView?: unknown;
   archived?: unknown;
 };
 export type TaskfoldProjectCreateInput = TaskfoldBoardInput & {

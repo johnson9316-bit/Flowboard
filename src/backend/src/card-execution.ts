@@ -15,7 +15,7 @@ import {
   createManagedTaskfoldWorktree,
 } from "./dispatcher.js";
 import { buildWorkerPrompt } from "./worker-prompt.js";
-import { cardBoardId } from "./store-card-helpers.js";
+import { cardBoardId, isRequirementCard } from "./store-card-helpers.js";
 import { TaskfoldStore } from "./store.js";
 import {
   assertTaskfoldWorkspaceSourceAccess,
@@ -245,6 +245,9 @@ export async function prepareTaskfoldCardExecution(params: {
   options: TaskfoldCardExecutionOptions;
 }) {
   const card = await resolveCard(params.store, params.id);
+  if (isRequirementCard(card)) {
+    throw new Error("requirement cards cannot start code execution; run a child task instead.");
+  }
   if (card.metadata?.archivedAt) {
     throw new Error("card is archived.");
   }
@@ -278,6 +281,9 @@ export async function startTaskfoldCardExecution(params: {
   options: TaskfoldCardExecutionOptions;
 }) {
   const card = await resolveCard(params.store, params.id);
+  if (isRequirementCard(card)) {
+    throw new Error("requirement cards cannot start code execution; run a child task instead.");
+  }
   {
     const latest = await resolveCard(params.store, card.id);
     const sessionKey = buildSessionKey(latest);

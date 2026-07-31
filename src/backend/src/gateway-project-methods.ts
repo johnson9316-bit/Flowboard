@@ -107,6 +107,20 @@ export function registerTaskfoldProjectGatewayMethods(params: {
     { scope: WRITE_SCOPE },
   );
   api.registerGatewayMethod(
+    "taskfold.projects.boardView.update",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const id = readId(requestParams);
+        respond(true, {
+          board: await store.updateProject({ id, boardView: requestParams.boardView }),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+  api.registerGatewayMethod(
     "taskfold.projects.reorder",
     async ({ params: requestParams, respond }) => {
       try {

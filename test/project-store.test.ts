@@ -234,6 +234,67 @@ describe("Taskfold M2 project store", () => {
     ).rejects.toThrow("active milestone");
   });
 
+  it("keeps requirement hierarchy separate from execution dependencies", async () => {
+    const { store } = createStore();
+    await store.createProject({ id: "alpha", name: "Alpha" });
+    const requirement = await store.create({
+      boardId: "alpha",
+      title: "Requirement",
+      kind: "requirement",
+    });
+    const task = await store.create({
+      boardId: "alpha",
+      title: "Implement requirement",
+      requirementId: requirement.id,
+    });
+
+    expect(requirement).toMatchObject({ kind: "requirement" });
+    expect((await store.get(requirement.id))?.metadata?.links).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "contains", targetCardId: task.id }),
+      ]),
+    );
+    expect(task.metadata?.links).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "contained_by", targetCardId: requirement.id }),
+      ]),
+    );
+    await expect(store.move(task.id, "ready", undefined)).resolves.toMatchObject({
+      id: task.id,
+      status: "ready",
+    });
+    await expect(
+      store.create({
+        boardId: "alpha",
+        title: "Nested requirement",
+        kind: "requirement",
+        requirementId: requirement.id,
+      }),
+    ).rejects.toThrow("requirement cards cannot be assigned");
+  });
+
+  it("persists the current board grouping and automatic sort settings", async () => {
+    const { store } = createStore();
+    await store.createProject({ id: "alpha", name: "Alpha" });
+
+    const board = await store.updateProject({
+      id: "alpha",
+      boardView: { groupBy: "status", sortBy: "updatedAt", sortDirection: "desc" },
+    });
+
+    expect(board.boardView).toEqual({
+      groupBy: "status",
+      sortBy: "updatedAt",
+      sortDirection: "desc",
+    });
+    await expect(
+      store.updateProject({
+        id: "alpha",
+        boardView: { groupBy: "requirement", sortBy: "manual", sortDirection: "asc" },
+      }),
+    ).rejects.toThrow("manual sorting");
+  });
+
   it("protects placement fields and archived project entry points", async () => {
     const { store } = createStore();
     const project = await store.createProject({

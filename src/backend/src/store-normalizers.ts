@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import {
   isValidTaskfoldBoardId,
   TASKFOLD_ATTEMPT_STATUSES,
+  TASKFOLD_BOARD_GROUP_BY,
+  TASKFOLD_BOARD_SORT_BY,
+  TASKFOLD_BOARD_SORT_DIRECTIONS,
+  TASKFOLD_CARD_KINDS,
   TASKFOLD_DIAGNOSTIC_KINDS,
   TASKFOLD_DIAGNOSTIC_SEVERITIES,
   TASKFOLD_DELIVERY_IMPLEMENTATION_STATES,
@@ -20,7 +24,12 @@ import {
   type TaskfoldAttachment,
   type TaskfoldAttemptStatus,
   type TaskfoldAutomation,
+  type TaskfoldBoardGroupBy,
   type TaskfoldBoardMetadata,
+  type TaskfoldBoardSortBy,
+  type TaskfoldBoardSortDirection,
+  type TaskfoldBoardViewSettings,
+  type TaskfoldCardKind,
   type TaskfoldClaim,
   type TaskfoldComment,
   type TaskfoldDiagnostic,
@@ -142,6 +151,9 @@ export function normalizeBoardMetadata(
   const orchestration = Object.hasOwn(input, "orchestration")
     ? normalizeOrchestration(input.orchestration, fallback?.orchestration)
     : fallback?.orchestration;
+  const boardView = Object.hasOwn(input, "boardView")
+    ? normalizeBoardView(input.boardView, fallback?.boardView)
+    : fallback?.boardView;
   const archivedAt = Object.hasOwn(input, "archived")
     ? input.archived === false
       ? undefined
@@ -163,10 +175,51 @@ export function normalizeBoardMetadata(
     ...(homepageUrl ? { homepageUrl } : {}),
     ...(defaultWorkspace ? { defaultWorkspace } : {}),
     ...(orchestration ? { orchestration } : {}),
+    ...(boardView ? { boardView } : {}),
     createdAt: fallback?.createdAt ?? now,
     updatedAt: now,
     ...(archivedAt ? { archivedAt } : {}),
   };
+}
+
+export function defaultTaskfoldBoardView(): TaskfoldBoardViewSettings {
+  return { groupBy: "milestone", sortBy: "manual", sortDirection: "asc" };
+}
+
+export function normalizeBoardView(
+  value: unknown,
+  fallback?: TaskfoldBoardViewSettings,
+): TaskfoldBoardViewSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (value === undefined) {
+      return fallback ?? defaultTaskfoldBoardView();
+    }
+    throw new Error("board view must be an object.");
+  }
+  const record = value as Record<string, unknown>;
+  const groupBy =
+    typeof record.groupBy === "string" &&
+    (TASKFOLD_BOARD_GROUP_BY as readonly string[]).includes(record.groupBy)
+      ? (record.groupBy as TaskfoldBoardGroupBy)
+      : fallback?.groupBy ?? "milestone";
+  const defaultSortBy: TaskfoldBoardSortBy =
+    groupBy === "milestone" ? "manual" : "priority";
+  const sortBy =
+    typeof record.sortBy === "string" &&
+    (TASKFOLD_BOARD_SORT_BY as readonly string[]).includes(record.sortBy)
+      ? (record.sortBy as TaskfoldBoardSortBy)
+      : fallback?.groupBy === groupBy
+        ? fallback.sortBy
+        : defaultSortBy;
+  if (groupBy !== "milestone" && sortBy === "manual") {
+    throw new Error("manual sorting is available only when grouping by milestone.");
+  }
+  const sortDirection =
+    typeof record.sortDirection === "string" &&
+    (TASKFOLD_BOARD_SORT_DIRECTIONS as readonly string[]).includes(record.sortDirection)
+      ? (record.sortDirection as TaskfoldBoardSortDirection)
+      : fallback?.sortDirection ?? "asc";
+  return { groupBy, sortBy, sortDirection };
 }
 
 function normalizeOrchestration(
@@ -432,6 +485,16 @@ export function normalizeStatus(value: unknown, fallback: TaskfoldStatus): Taskf
     return value as TaskfoldStatus;
   }
   throw new Error(`status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`);
+}
+
+export function normalizeCardKind(value: unknown, fallback: TaskfoldCardKind = "task"): TaskfoldCardKind {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  if (typeof value === "string" && (TASKFOLD_CARD_KINDS as readonly string[]).includes(value)) {
+    return value as TaskfoldCardKind;
+  }
+  throw new Error(`card kind must be one of: ${TASKFOLD_CARD_KINDS.join(", ")}.`);
 }
 
 export function normalizePriority(value: unknown, fallback: TaskfoldPriority): TaskfoldPriority {
@@ -850,7 +913,12 @@ function normalizeLink(value: unknown): TaskfoldLink | null {
 }
 
 function isDependencyLink(link: TaskfoldLink): boolean {
-  return link.type === "parent" || link.type === "child";
+  return (
+    link.type === "parent" ||
+    link.type === "child" ||
+    link.type === "contains" ||
+    link.type === "contained_by"
+  );
 }
 
 function normalizeProof(value: unknown): TaskfoldProof | null {

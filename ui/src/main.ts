@@ -1,6 +1,7 @@
 import { LitElement, html } from "lit";
 import type {
   TaskfoldBoardSummary,
+  TaskfoldBoardViewSettings,
   TaskfoldProjectDocument,
   TaskfoldProjectDocumentRead,
   TaskfoldProjectView,
@@ -484,6 +485,8 @@ class TaskfoldProjectHost extends LitElement {
         priority: data.priority,
         agentId: data.agentId,
         ...(data.milestoneId ? { milestoneId: data.milestoneId } : {}),
+        ...(data.requirementId ? { requirementId: data.requirementId } : {}),
+        ...(data.cardKind === "requirement" ? { kind: "requirement" } : {}),
       });
     });
   }
@@ -512,6 +515,42 @@ class TaskfoldProjectHost extends LitElement {
         ...(position !== undefined ? { position } : {}),
       });
     }, { closeModal: false });
+  }
+
+  private moveCardRequirement(id: string, requirementId?: string) {
+    const project = this.state.project;
+    if (project?.board.archivedAt) {
+      return;
+    }
+    void this.mutate(async () => {
+      await this.gateway.request("taskfold.cards.requirement.set", {
+        id,
+        ...(requirementId ? { requirementId } : {}),
+      });
+    }, { closeModal: false });
+  }
+
+  private updateBoardView(boardView: TaskfoldBoardViewSettings) {
+    const project = this.state.project;
+    if (!project || project.board.archivedAt) {
+      return;
+    }
+    void this.mutate(async () => {
+      await this.gateway.request("taskfold.projects.boardView.update", {
+        id: project.board.id,
+        boardView,
+      });
+    }, { closeModal: false });
+  }
+
+  private setGraphMode(mode: TaskfoldProjectUiState["graphMode"]) {
+    this.state.graphMode = mode;
+    this.requestUpdate();
+  }
+
+  private setGraphZoom(zoom: number) {
+    this.state.graphZoom = Math.min(1.5, Math.max(0.7, Math.round(zoom * 10) / 10));
+    this.requestUpdate();
   }
 
   private moveCardProject(id: string, boardId: string, milestoneId: string) {
@@ -1069,8 +1108,12 @@ class TaskfoldProjectHost extends LitElement {
       archiveCard: (id, archived) => this.archiveCard(id, archived),
       moveCardMilestone: (id, milestoneId, position) =>
         this.moveCardMilestone(id, milestoneId, position),
+      moveCardRequirement: (id, requirementId) => this.moveCardRequirement(id, requirementId),
       moveCardProject: (id, boardId, milestoneId) =>
         this.moveCardProject(id, boardId, milestoneId),
+      updateBoardView: (boardView) => this.updateBoardView(boardView),
+      setGraphMode: (mode) => this.setGraphMode(mode),
+      setGraphZoom: (zoom) => this.setGraphZoom(zoom),
       selectMoveCardProjectTarget: (cardId, boardId) =>
         this.selectMoveCardProjectTarget(cardId, boardId),
       reorderProjects: (ids) => this.reorderProjects(ids),

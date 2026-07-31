@@ -59,10 +59,16 @@ export const TASKFOLD_ATTEMPT_STATUSES = [
 export const TASKFOLD_LINK_TYPES = [
   "parent",
   "child",
+  "contains",
+  "contained_by",
   "blocks",
   "blocked_by",
   "relates_to",
 ] as const;
+export const TASKFOLD_CARD_KINDS = ["task", "requirement"] as const;
+export const TASKFOLD_BOARD_GROUP_BY = ["milestone", "requirement", "status"] as const;
+export const TASKFOLD_BOARD_SORT_BY = ["manual", "priority", "createdAt", "updatedAt"] as const;
+export const TASKFOLD_BOARD_SORT_DIRECTIONS = ["asc", "desc"] as const;
 export const TASKFOLD_PROOF_STATUSES = ["passed", "failed", "skipped", "unknown"] as const;
 export const TASKFOLD_TEMPLATE_IDS = ["bugfix", "docs", "release", "pr_review", "plugin"] as const;
 export const TASKFOLD_DIAGNOSTIC_KINDS = [
@@ -127,6 +133,10 @@ export type TaskfoldExecutionStatus = (typeof TASKFOLD_EXECUTION_STATUSES)[numbe
 export type TaskfoldEventKind = (typeof TASKFOLD_EVENT_KINDS)[number];
 export type TaskfoldAttemptStatus = (typeof TASKFOLD_ATTEMPT_STATUSES)[number];
 export type TaskfoldLinkType = (typeof TASKFOLD_LINK_TYPES)[number];
+export type TaskfoldCardKind = (typeof TASKFOLD_CARD_KINDS)[number];
+export type TaskfoldBoardGroupBy = (typeof TASKFOLD_BOARD_GROUP_BY)[number];
+export type TaskfoldBoardSortBy = (typeof TASKFOLD_BOARD_SORT_BY)[number];
+export type TaskfoldBoardSortDirection = (typeof TASKFOLD_BOARD_SORT_DIRECTIONS)[number];
 export type TaskfoldProofStatus = (typeof TASKFOLD_PROOF_STATUSES)[number];
 export type TaskfoldTemplateId = (typeof TASKFOLD_TEMPLATE_IDS)[number];
 export type TaskfoldDiagnosticKind = (typeof TASKFOLD_DIAGNOSTIC_KINDS)[number];
@@ -359,6 +369,7 @@ export type TaskfoldBoardMetadata = {
   homepageUrl?: string;
   defaultWorkspace?: TaskfoldWorkspace;
   orchestration?: TaskfoldOrchestrationSettings;
+  boardView?: TaskfoldBoardViewSettings;
   createdAt: number;
   updatedAt: number;
   archivedAt?: number;
@@ -380,6 +391,7 @@ export type TaskfoldBoardSummary = {
   homepageUrl?: string;
   defaultWorkspace?: TaskfoldWorkspace;
   orchestration?: TaskfoldOrchestrationSettings;
+  boardView?: TaskfoldBoardViewSettings;
   total: number;
   active: number;
   archived: number;
@@ -475,6 +487,7 @@ export type TaskfoldMetadata = {
 export type TaskfoldCard = {
   id: string;
   title: string;
+  kind?: TaskfoldCardKind;
   notes?: string;
   status: TaskfoldStatus;
   priority: TaskfoldPriority;
@@ -508,6 +521,12 @@ export type TaskfoldProjectView = {
   board: TaskfoldBoardMetadata;
   milestones: TaskfoldMilestone[];
   cards: TaskfoldCard[];
+};
+
+export type TaskfoldBoardViewSettings = {
+  groupBy: TaskfoldBoardGroupBy;
+  sortBy: TaskfoldBoardSortBy;
+  sortDirection: TaskfoldBoardSortDirection;
 };
 
 export type TaskfoldListResult = {

@@ -35,7 +35,7 @@ var init_card_redaction = __esm({
 function isValidTaskfoldBoardId(value) {
   return typeof value === "string" && TASKFOLD_BOARD_ID_PATTERN.test(value);
 }
-var TASKFOLD_STATUSES, TASKFOLD_PRIORITIES, TASKFOLD_EXECUTION_MODES, TASKFOLD_EXECUTION_STATUSES, TASKFOLD_EVENT_KINDS, TASKFOLD_ATTEMPT_STATUSES, TASKFOLD_LINK_TYPES, TASKFOLD_PROOF_STATUSES, TASKFOLD_TEMPLATE_IDS, TASKFOLD_DIAGNOSTIC_KINDS, TASKFOLD_DIAGNOSTIC_SEVERITIES, TASKFOLD_NOTIFICATION_KINDS, TASKFOLD_MILESTONE_STATES, TASKFOLD_PROJECT_DOCUMENT_SECTIONS, TASKFOLD_PROJECT_DOCUMENT_TYPES, TASKFOLD_DELIVERY_IMPLEMENTATION_STATES, TASKFOLD_DELIVERY_VERIFICATION_STATES, TASKFOLD_DELIVERY_RELEASE_STATES, TASKFOLD_BOARD_ID_PATTERN;
+var TASKFOLD_STATUSES, TASKFOLD_PRIORITIES, TASKFOLD_EXECUTION_MODES, TASKFOLD_EXECUTION_STATUSES, TASKFOLD_EVENT_KINDS, TASKFOLD_ATTEMPT_STATUSES, TASKFOLD_LINK_TYPES, TASKFOLD_CARD_KINDS, TASKFOLD_BOARD_GROUP_BY, TASKFOLD_BOARD_SORT_BY, TASKFOLD_BOARD_SORT_DIRECTIONS, TASKFOLD_PROOF_STATUSES, TASKFOLD_TEMPLATE_IDS, TASKFOLD_DIAGNOSTIC_KINDS, TASKFOLD_DIAGNOSTIC_SEVERITIES, TASKFOLD_NOTIFICATION_KINDS, TASKFOLD_MILESTONE_STATES, TASKFOLD_PROJECT_DOCUMENT_SECTIONS, TASKFOLD_PROJECT_DOCUMENT_TYPES, TASKFOLD_DELIVERY_IMPLEMENTATION_STATES, TASKFOLD_DELIVERY_VERIFICATION_STATES, TASKFOLD_DELIVERY_RELEASE_STATES, TASKFOLD_BOARD_ID_PATTERN;
 var init_contract = __esm({
   "src/contract/index.ts"() {
     "use strict";
@@ -96,10 +96,16 @@ var init_contract = __esm({
     TASKFOLD_LINK_TYPES = [
       "parent",
       "child",
+      "contains",
+      "contained_by",
       "blocks",
       "blocked_by",
       "relates_to"
     ];
+    TASKFOLD_CARD_KINDS = ["task", "requirement"];
+    TASKFOLD_BOARD_GROUP_BY = ["milestone", "requirement", "status"];
+    TASKFOLD_BOARD_SORT_BY = ["manual", "priority", "createdAt", "updatedAt"];
+    TASKFOLD_BOARD_SORT_DIRECTIONS = ["asc", "desc"];
     TASKFOLD_PROOF_STATUSES = ["passed", "failed", "skipped", "unknown"];
     TASKFOLD_TEMPLATE_IDS = ["bugfix", "docs", "release", "pr_review", "plugin"];
     TASKFOLD_DIAGNOSTIC_KINDS = [
@@ -974,6 +980,7 @@ function normalizeBoardMetadata(input, fallback, now = Date.now()) {
   const homepageUrl = Object.hasOwn(input, "homepageUrl") ? normalizeExternalUrl(input.homepageUrl, fallback?.homepageUrl, "homepage URL") : fallback?.homepageUrl;
   const defaultWorkspace = Object.hasOwn(input, "defaultWorkspace") ? normalizeWorkspace(input.defaultWorkspace, fallback?.defaultWorkspace) : fallback?.defaultWorkspace;
   const orchestration = Object.hasOwn(input, "orchestration") ? normalizeOrchestration(input.orchestration, fallback?.orchestration) : fallback?.orchestration;
+  const boardView = Object.hasOwn(input, "boardView") ? normalizeBoardView(input.boardView, fallback?.boardView) : fallback?.boardView;
   const archivedAt = Object.hasOwn(input, "archived") ? input.archived === false ? void 0 : now : fallback?.archivedAt;
   return {
     id,
@@ -991,10 +998,31 @@ function normalizeBoardMetadata(input, fallback, now = Date.now()) {
     ...homepageUrl ? { homepageUrl } : {},
     ...defaultWorkspace ? { defaultWorkspace } : {},
     ...orchestration ? { orchestration } : {},
+    ...boardView ? { boardView } : {},
     createdAt: fallback?.createdAt ?? now,
     updatedAt: now,
     ...archivedAt ? { archivedAt } : {}
   };
+}
+function defaultTaskfoldBoardView() {
+  return { groupBy: "milestone", sortBy: "manual", sortDirection: "asc" };
+}
+function normalizeBoardView(value, fallback) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (value === void 0) {
+      return fallback ?? defaultTaskfoldBoardView();
+    }
+    throw new Error("board view must be an object.");
+  }
+  const record = value;
+  const groupBy = typeof record.groupBy === "string" && TASKFOLD_BOARD_GROUP_BY.includes(record.groupBy) ? record.groupBy : fallback?.groupBy ?? "milestone";
+  const defaultSortBy = groupBy === "milestone" ? "manual" : "priority";
+  const sortBy = typeof record.sortBy === "string" && TASKFOLD_BOARD_SORT_BY.includes(record.sortBy) ? record.sortBy : fallback?.groupBy === groupBy ? fallback.sortBy : defaultSortBy;
+  if (groupBy !== "milestone" && sortBy === "manual") {
+    throw new Error("manual sorting is available only when grouping by milestone.");
+  }
+  const sortDirection = typeof record.sortDirection === "string" && TASKFOLD_BOARD_SORT_DIRECTIONS.includes(record.sortDirection) ? record.sortDirection : fallback?.sortDirection ?? "asc";
+  return { groupBy, sortBy, sortDirection };
 }
 function normalizeOrchestration(value, fallback) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -1193,6 +1221,15 @@ function normalizeStatus(value, fallback) {
     return value;
   }
   throw new Error(`status must be one of: ${TASKFOLD_STATUSES.join(", ")}.`);
+}
+function normalizeCardKind(value, fallback = "task") {
+  if (value === void 0 || value === null || value === "") {
+    return fallback;
+  }
+  if (typeof value === "string" && TASKFOLD_CARD_KINDS.includes(value)) {
+    return value;
+  }
+  throw new Error(`card kind must be one of: ${TASKFOLD_CARD_KINDS.join(", ")}.`);
 }
 function normalizePriority(value, fallback) {
   if (typeof value !== "string" || !value.trim()) {
@@ -1508,7 +1545,7 @@ function normalizeLink(value) {
   };
 }
 function isDependencyLink(link) {
-  return link.type === "parent" || link.type === "child";
+  return link.type === "parent" || link.type === "child" || link.type === "contains" || link.type === "contained_by";
 }
 function normalizeProof(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -2424,6 +2461,17 @@ function cardParentIds(card) {
 function cardChildIds(card) {
   return (card.metadata?.links ?? []).filter((link) => link.type === "child" && link.targetCardId).map((link) => link.targetCardId).filter((id, index, ids) => ids.indexOf(id) === index);
 }
+function cardRequirementId(card) {
+  return (card.metadata?.links ?? []).find(
+    (link) => link.type === "contained_by" && link.targetCardId
+  )?.targetCardId;
+}
+function cardRequirementChildIds(card) {
+  return (card.metadata?.links ?? []).filter((link) => link.type === "contains" && link.targetCardId).map((link) => link.targetCardId).filter((id, index, ids) => ids.indexOf(id) === index);
+}
+function isRequirementCard(card) {
+  return card.kind === "requirement" || cardRequirementChildIds(card).length > 0;
+}
 function latestRunningAttempt(card) {
   return card.metadata?.attempts?.findLast((attempt) => attempt.status === "running");
 }
@@ -3192,6 +3240,9 @@ async function resolveCard(store, id) {
 }
 async function prepareTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
+  if (isRequirementCard(card)) {
+    throw new Error("requirement cards cannot start code execution; run a child task instead.");
+  }
   if (card.metadata?.archivedAt) {
     throw new Error("card is archived.");
   }
@@ -3219,6 +3270,9 @@ async function prepareTaskfoldCardExecution(params) {
 }
 async function startTaskfoldCardExecution(params) {
   const card = await resolveCard(params.store, params.id);
+  if (isRequirementCard(card)) {
+    throw new Error("requirement cards cannot start code execution; run a child task instead.");
+  }
   {
     const latest = await resolveCard(params.store, card.id);
     const sessionKey = buildSessionKey(latest);
@@ -3879,6 +3933,20 @@ function registerTaskfoldProjectGatewayMethods(params) {
     { scope: WRITE_SCOPE2 }
   );
   api.registerGatewayMethod(
+    "taskfold.projects.boardView.update",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const id = readId(requestParams);
+        respond(true, {
+          board: await store.updateProject({ id, boardView: requestParams.boardView })
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE2 }
+  );
+  api.registerGatewayMethod(
     "taskfold.projects.reorder",
     async ({ params: requestParams, respond }) => {
       try {
@@ -4230,7 +4298,7 @@ import { configureSqliteConnectionPragmas } from "openclaw/plugin-sdk/plugin-sta
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 var TASKFOLD_DB_RELATIVE_PATH = ["plugins", "taskfold", "taskfold.sqlite"];
 var LEGACY_FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"];
-var SCHEMA_VERSION = 7;
+var SCHEMA_VERSION = 8;
 var TASKFOLD_SQLITE_BUSY_TIMEOUT_MS = 5e3;
 var TASKFOLD_SQLITE_DIR_MODE = 448;
 var TASKFOLD_SQLITE_FILE_MODE = 384;
@@ -4348,6 +4416,7 @@ var TASKFOLD_SCHEMA_SQL = `
       homepage_url TEXT,
       default_workspace_json TEXT,
       orchestration_json TEXT,
+      board_view_json TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       archived_at INTEGER
@@ -4360,6 +4429,7 @@ var TASKFOLD_SCHEMA_SQL = `
       notes TEXT,
       status TEXT NOT NULL,
       priority TEXT NOT NULL,
+      card_kind TEXT,
       agent_id TEXT,
       session_key TEXT,
       run_id TEXT,
@@ -4632,6 +4702,8 @@ function ensureTaskfoldSchema(db) {
   ensureColumn(db, "taskfold_boards", "repository_url", "repository_url TEXT");
   ensureColumn(db, "taskfold_boards", "planning_path", "planning_path TEXT");
   ensureColumn(db, "taskfold_boards", "homepage_url", "homepage_url TEXT");
+  ensureColumn(db, "taskfold_boards", "board_view_json", "board_view_json TEXT");
+  ensureColumn(db, "taskfold_cards", "card_kind", "card_kind TEXT");
   ensureColumn(
     db,
     "taskfold_project_documents",
@@ -5144,6 +5216,7 @@ function readCard(db, row) {
   const sourceReferences = readSourceReferences(db, card.id);
   return {
     ...card,
+    ...stringValue(row, "card_kind") ? { kind: stringValue(row, "card_kind") } : {},
     ...stringValue(row, "notes") ? { notes: stringValue(row, "notes") } : {},
     ...stringValue(row, "agent_id") ? { agentId: stringValue(row, "agent_id") } : {},
     ...stringValue(row, "session_key") ? { sessionKey: stringValue(row, "session_key") } : {},
@@ -5179,14 +5252,14 @@ function insertCard(db, card) {
   db.prepare(
     `
       INSERT INTO taskfold_cards (
-        id, board_id, title, notes, status, priority, agent_id, session_key, run_id, task_id,
+        id, board_id, title, notes, status, priority, card_kind, agent_id, session_key, run_id, task_id,
         source_url, milestone_id, position, created_at, updated_at, started_at, completed_at,
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
         execution_model, execution_session_key, execution_run_id, execution_started_at,
         execution_updated_at, automation_json, claim_json, template_id, archived_at, stale_json,
         lifecycle_status_source_updated_at, failure_count, revision, claim_owner_id
       ) VALUES (
-        @id, @board_id, @title, @notes, @status, @priority, @agent_id, @session_key, @run_id,
+        @id, @board_id, @title, @notes, @status, @priority, @card_kind, @agent_id, @session_key, @run_id,
         @task_id, @source_url, @milestone_id, @position, @created_at, @updated_at, @started_at, @completed_at,
         @execution_id, @execution_kind, @execution_engine, @execution_mode, @execution_status,
         @execution_model, @execution_session_key, @execution_run_id, @execution_started_at,
@@ -5199,6 +5272,7 @@ function insertCard(db, card) {
         notes = excluded.notes,
         status = excluded.status,
         priority = excluded.priority,
+        card_kind = excluded.card_kind,
         agent_id = excluded.agent_id,
         session_key = excluded.session_key,
         run_id = excluded.run_id,
@@ -5237,6 +5311,7 @@ function insertCard(db, card) {
     notes: bindNull(card.notes),
     status: card.status,
     priority: card.priority,
+    card_kind: bindNull(card.kind),
     agent_id: bindNull(card.agentId),
     session_key: bindNull(card.sessionKey),
     run_id: bindNull(card.runId),
@@ -5597,9 +5672,9 @@ var TaskfoldSqliteBoardStore = class {
           INSERT INTO taskfold_boards (
             id, name, description, icon, color, position, version, current_objective, core_value,
             source_of_truth, repository_url, planning_path, homepage_url,
-            default_workspace_json, orchestration_json,
+            default_workspace_json, orchestration_json, board_view_json,
             created_at, updated_at, archived_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
@@ -5615,6 +5690,7 @@ var TaskfoldSqliteBoardStore = class {
             homepage_url = excluded.homepage_url,
             default_workspace_json = excluded.default_workspace_json,
             orchestration_json = excluded.orchestration_json,
+            board_view_json = excluded.board_view_json,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at,
             archived_at = excluded.archived_at
@@ -5635,6 +5711,7 @@ var TaskfoldSqliteBoardStore = class {
       bindNull(board.homepageUrl),
       jsonValue(board.defaultWorkspace),
       jsonValue(board.orchestration),
+      jsonValue(board.boardView),
       board.createdAt,
       board.updatedAt,
       bindNull(board.archivedAt)
@@ -5647,6 +5724,7 @@ var TaskfoldSqliteBoardStore = class {
     }
     const defaultWorkspace = parseJson(row.default_workspace_json);
     const orchestration = parseJson(row.orchestration_json);
+    const boardView = parseJson(row.board_view_json);
     return {
       version: 1,
       board: {
@@ -5665,6 +5743,7 @@ var TaskfoldSqliteBoardStore = class {
         ...stringValue(row, "homepage_url") ? { homepageUrl: stringValue(row, "homepage_url") } : {},
         ...defaultWorkspace ? { defaultWorkspace } : {},
         ...orchestration ? { orchestration } : {},
+        ...boardView ? { boardView } : {},
         createdAt: requiredNumber(row, "created_at"),
         updatedAt: requiredNumber(row, "updated_at"),
         ...numberValue(row, "archived_at") !== void 0 ? { archivedAt: numberValue(row, "archived_at") } : {}
@@ -6347,6 +6426,7 @@ var TaskfoldCoreStore = class {
         ...board.homepageUrl ? { homepageUrl: board.homepageUrl } : {},
         ...board.defaultWorkspace ? { defaultWorkspace: board.defaultWorkspace } : {},
         ...board.orchestration ? { orchestration: board.orchestration } : {},
+        ...board.boardView ? { boardView: board.boardView } : {},
         total: 0,
         active: 0,
         archived: 0,
@@ -6471,11 +6551,26 @@ var TaskfoldCoreStore = class {
     }
   }
   async create(input, scope) {
-    return await this.enqueueMutation(async () => await this.createDirect(input, scope));
+    return await this.enqueueMutation(async () => {
+      let card = await this.createDirect(input, scope);
+      const requirementId = normalizeOptionalString(input.requirementId);
+      if (!requirementId) {
+        return card;
+      }
+      try {
+        card = await this.setCardRequirementDirect(card.id, requirementId, Date.now(), scope);
+        return card;
+      } catch (error) {
+        await this.store.delete(card.id);
+        await this.removeReferencesToCard(card.id);
+        throw error;
+      }
+    });
   }
   async createDirect(input, scope) {
     const now = Date.now();
     const requestedStatus = normalizeStatus(input.status, "todo");
+    const kind = normalizeCardKind(input.kind);
     const cards = await this.list();
     const parents = normalizeStringList(input.parents, "parents", 120);
     const automation = normalizeCardAutomation(input);
@@ -6543,6 +6638,7 @@ var TaskfoldCoreStore = class {
     let card = {
       id: randomUUID6(),
       title: normalizeTitle(input.title),
+      ...kind === "requirement" ? { kind } : {},
       status,
       priority: normalizePriority(input.priority, "normal"),
       labels: normalizeLabels(input.labels),
@@ -6576,7 +6672,13 @@ var TaskfoldCoreStore = class {
     };
     await this.store.register(card.id, { version: 1, card });
     try {
+      if (kind === "requirement" && parentCards.length > 0) {
+        throw new Error("requirement cards cannot be child cards.");
+      }
       for (const parent of parentCards) {
+        if (isRequirementCard(parent)) {
+          throw new Error("requirement cards cannot be execution dependencies.");
+        }
         card = await this.linkCardsDirect(parent.id, card.id, now, {
           allowStatusOnlyActiveChild: true,
           scope
@@ -6934,6 +7036,9 @@ var TaskfoldCoreStore = class {
     if (type === "parent" || type === "child") {
       throw new Error("parent and child dependency links must use linkDependency.");
     }
+    if (type === "contains" || type === "contained_by") {
+      throw new Error("requirement hierarchy links must use setCardRequirement.");
+    }
     const link = {
       id: randomUUID6(),
       type,
@@ -6952,6 +7057,102 @@ var TaskfoldCoreStore = class {
       async () => await this.linkCardsDirect(parentId, childId, Date.now(), { scope })
     );
   }
+  async setCardRequirement(childId, requirementId, scope) {
+    return await this.enqueueMutation(
+      async () => await this.setCardRequirementDirect(childId, requirementId, Date.now(), scope)
+    );
+  }
+  async setCardRequirementDirect(childId, requirementId, now = Date.now(), scope) {
+    const child = await this.get(childId);
+    if (!child) {
+      throw new Error(`card not found: ${childId}`);
+    }
+    if (isRequirementCard(child)) {
+      throw new Error("requirement cards cannot be assigned to another requirement.");
+    }
+    const boardId = cardBoardId(child);
+    if (await this.isProjectArchived(boardId)) {
+      throw new Error("project is archived.");
+    }
+    assertCanMutateClaimedCard(child, scope);
+    const currentRequirementId = cardRequirementId(child);
+    const detach = async (parentId) => {
+      const parent = await this.get(parentId);
+      if (!parent) {
+        return;
+      }
+      assertCanMutateClaimedCard(parent, scope);
+      await this.updateCard(parent.id, {
+        metadata: {
+          ...parent.metadata,
+          links: (parent.metadata?.links ?? []).filter(
+            (link) => !(link.type === "contains" && link.targetCardId === child.id)
+          )
+        }
+      });
+    };
+    if (!requirementId) {
+      if (!currentRequirementId) {
+        return child;
+      }
+      await detach(currentRequirementId);
+      return await this.updateCard(child.id, {
+        metadata: {
+          ...child.metadata,
+          links: (child.metadata?.links ?? []).filter((link) => link.type !== "contained_by")
+        }
+      });
+    }
+    const normalizedRequirementId = requirementId.trim();
+    if (!normalizedRequirementId) {
+      return await this.setCardRequirementDirect(child.id, void 0, now, scope);
+    }
+    if (normalizedRequirementId === child.id) {
+      throw new Error("a card cannot be its own requirement.");
+    }
+    const requirement = await this.get(normalizedRequirementId);
+    if (!requirement) {
+      throw new Error(`card not found: ${normalizedRequirementId}`);
+    }
+    if (!isRequirementCard(requirement)) {
+      throw new Error("target card is not a requirement.");
+    }
+    if (cardBoardId(requirement) !== boardId) {
+      throw new Error("requirement must belong to the same project.");
+    }
+    if (cardRequirementId(requirement)) {
+      throw new Error("nested requirements are not supported.");
+    }
+    assertCanMutateClaimedCard(requirement, scope);
+    if (currentRequirementId && currentRequirementId !== requirement.id) {
+      await detach(currentRequirementId);
+    }
+    const requirementLinks = requirement.metadata?.links ?? [];
+    const childLinks = child.metadata?.links ?? [];
+    const nextRequirementLinks = requirementLinks.some(
+      (link) => link.type === "contains" && link.targetCardId === child.id
+    ) ? requirementLinks : appendLinkPreservingDependencies(requirementLinks, {
+      id: randomUUID6(),
+      type: "contains",
+      targetCardId: child.id,
+      createdAt: now
+    });
+    const nextChildLinks = [
+      ...childLinks.filter((link) => link.type !== "contained_by"),
+      {
+        id: randomUUID6(),
+        type: "contained_by",
+        targetCardId: requirement.id,
+        createdAt: now
+      }
+    ];
+    await this.updateCard(requirement.id, {
+      metadata: { ...requirement.metadata, links: nextRequirementLinks }
+    });
+    return await this.updateCard(child.id, {
+      metadata: { ...child.metadata, links: nextChildLinks }
+    });
+  }
   async linkCardsDirect(parentId, childId, now = Date.now(), options = {}) {
     if (parentId.trim() === childId.trim()) {
       throw new Error("parent and child cards must differ.");
@@ -6963,6 +7164,9 @@ var TaskfoldCoreStore = class {
     }
     if (!child) {
       throw new Error(`card not found: ${childId}`);
+    }
+    if (isRequirementCard(parent) || child.kind === "requirement") {
+      throw new Error("requirement cards cannot be execution dependencies.");
     }
     assertCanMutateClaimedCard(parent, options.scope);
     assertCanMutateClaimedCard(child, options.scope);
@@ -8845,6 +9049,9 @@ var TaskfoldProjectStore = class extends TaskfoldNotificationStore {
       }
       const currentBoardId = cardBoardId(card);
       const boardId = normalizeBoardIdRequired(input.boardId);
+      if (boardId !== currentBoardId && (isRequirementCard(card) || cardRequirementId(card) || cardRequirementChildIds(card).length > 0)) {
+        throw new Error("cards with requirement hierarchy cannot move between projects.");
+      }
       const targetBoard = await this.boardStore.lookup(boardId);
       if (!targetBoard && (await this.list({ boardId })).length === 0 && boardId !== "default") {
         throw new Error(`target project not found: ${boardId}`);
@@ -9585,6 +9792,24 @@ function registerTaskfoldGatewayMethods(params) {
         }
         respond(true, {
           card: redactClaimToken(await store.linkCards(parentId, childId))
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE3 }
+  );
+  api.registerGatewayMethod(
+    "taskfold.cards.requirement.set",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const rawRequirementId = requestParams.requirementId;
+        if (rawRequirementId !== void 0 && rawRequirementId !== null && typeof rawRequirementId !== "string") {
+          throw new Error("requirementId must be a card id or empty.");
+        }
+        const requirementId = typeof rawRequirementId === "string" && rawRequirementId.trim() ? rawRequirementId.trim() : void 0;
+        respond(true, {
+          card: redactClaimToken(await store.setCardRequirement(readId(requestParams), requirementId))
         });
       } catch (error) {
         respondError(respond, error);

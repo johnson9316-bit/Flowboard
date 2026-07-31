@@ -556,6 +556,23 @@ export function cardChildIds(card: TaskfoldCard): string[] {
     .filter((id, index, ids) => ids.indexOf(id) === index);
 }
 
+export function cardRequirementId(card: TaskfoldCard): string | undefined {
+  return (card.metadata?.links ?? []).find(
+    (link) => link.type === "contained_by" && link.targetCardId,
+  )?.targetCardId;
+}
+
+export function cardRequirementChildIds(card: TaskfoldCard): string[] {
+  return (card.metadata?.links ?? [])
+    .filter((link) => link.type === "contains" && link.targetCardId)
+    .map((link) => link.targetCardId!)
+    .filter((id, index, ids) => ids.indexOf(id) === index);
+}
+
+export function isRequirementCard(card: TaskfoldCard): boolean {
+  return card.kind === "requirement" || cardRequirementChildIds(card).length > 0;
+}
+
 export function latestRunningAttempt(card: TaskfoldCard): TaskfoldRunAttempt | undefined {
   return card.metadata?.attempts?.findLast((attempt) => attempt.status === "running");
 }

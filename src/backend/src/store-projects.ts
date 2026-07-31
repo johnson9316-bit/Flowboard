@@ -17,6 +17,9 @@ import {
 import {
   appendEvent,
   cardBoardId,
+  cardRequirementChildIds,
+  cardRequirementId,
+  isRequirementCard,
   removeUndefinedCardFields,
 } from "./store-card-helpers.js";
 import { POSITION_STEP } from "./store-constants.js";
@@ -722,6 +725,12 @@ export class TaskfoldProjectStore extends TaskfoldNotificationStore {
       }
       const currentBoardId = cardBoardId(card);
       const boardId = normalizeBoardIdRequired(input.boardId);
+      if (
+        boardId !== currentBoardId &&
+        (isRequirementCard(card) || cardRequirementId(card) || cardRequirementChildIds(card).length > 0)
+      ) {
+        throw new Error("cards with requirement hierarchy cannot move between projects.");
+      }
       const targetBoard = await this.boardStore.lookup(boardId);
       if (!targetBoard && (await this.list({ boardId })).length === 0 && boardId !== "default") {
         throw new Error(`target project not found: ${boardId}`);

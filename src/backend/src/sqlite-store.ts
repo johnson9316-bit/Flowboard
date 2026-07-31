@@ -6,6 +6,7 @@ import type {
   TaskfoldArtifact,
   TaskfoldAttachment,
   TaskfoldCard,
+  TaskfoldCardKind,
   TaskfoldComment,
   TaskfoldDiagnostic,
   TaskfoldDelivery,
@@ -34,7 +35,7 @@ import type {
 } from "./persistence-types.js";
 const TASKFOLD_DB_RELATIVE_PATH = ["plugins", "taskfold", "taskfold.sqlite"] as const;
 const LEGACY_FLOWBOARD_DB_RELATIVE_PATH = ["plugins", "flowboard", "flowboard.sqlite"] as const;
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 const TASKFOLD_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const TASKFOLD_SQLITE_DIR_MODE = 0o700;
 const TASKFOLD_SQLITE_FILE_MODE = 0o600;
@@ -182,6 +183,7 @@ const TASKFOLD_SCHEMA_SQL = `
       homepage_url TEXT,
       default_workspace_json TEXT,
       orchestration_json TEXT,
+      board_view_json TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       archived_at INTEGER
@@ -194,6 +196,7 @@ const TASKFOLD_SCHEMA_SQL = `
       notes TEXT,
       status TEXT NOT NULL,
       priority TEXT NOT NULL,
+      card_kind TEXT,
       agent_id TEXT,
       session_key TEXT,
       run_id TEXT,
@@ -467,6 +470,8 @@ function ensureTaskfoldSchema(db: DatabaseSync): void {
   ensureColumn(db, "taskfold_boards", "repository_url", "repository_url TEXT");
   ensureColumn(db, "taskfold_boards", "planning_path", "planning_path TEXT");
   ensureColumn(db, "taskfold_boards", "homepage_url", "homepage_url TEXT");
+  ensureColumn(db, "taskfold_boards", "board_view_json", "board_view_json TEXT");
+  ensureColumn(db, "taskfold_cards", "card_kind", "card_kind TEXT");
   ensureColumn(
     db,
     "taskfold_project_documents",
@@ -1078,6 +1083,9 @@ function readCard(db: DatabaseSync, row: Row): TaskfoldCard {
   const sourceReferences = readSourceReferences(db, card.id);
   return {
     ...card,
+    ...(stringValue(row, "card_kind")
+      ? { kind: stringValue(row, "card_kind") as TaskfoldCardKind }
+      : {}),
     ...(stringValue(row, "notes") ? { notes: stringValue(row, "notes") } : {}),
     ...(stringValue(row, "agent_id") ? { agentId: stringValue(row, "agent_id") } : {}),
     ...(stringValue(row, "session_key") ? { sessionKey: stringValue(row, "session_key") } : {}),
@@ -1134,14 +1142,14 @@ function insertCard(db: DatabaseSync, card: TaskfoldCard): void {
   db.prepare(
     `
       INSERT INTO taskfold_cards (
-        id, board_id, title, notes, status, priority, agent_id, session_key, run_id, task_id,
+        id, board_id, title, notes, status, priority, card_kind, agent_id, session_key, run_id, task_id,
         source_url, milestone_id, position, created_at, updated_at, started_at, completed_at,
         execution_id, execution_kind, execution_engine, execution_mode, execution_status,
         execution_model, execution_session_key, execution_run_id, execution_started_at,
         execution_updated_at, automation_json, claim_json, template_id, archived_at, stale_json,
         lifecycle_status_source_updated_at, failure_count, revision, claim_owner_id
       ) VALUES (
-        @id, @board_id, @title, @notes, @status, @priority, @agent_id, @session_key, @run_id,
+        @id, @board_id, @title, @notes, @status, @priority, @card_kind, @agent_id, @session_key, @run_id,
         @task_id, @source_url, @milestone_id, @position, @created_at, @updated_at, @started_at, @completed_at,
         @execution_id, @execution_kind, @execution_engine, @execution_mode, @execution_status,
         @execution_model, @execution_session_key, @execution_run_id, @execution_started_at,
@@ -1154,6 +1162,7 @@ function insertCard(db: DatabaseSync, card: TaskfoldCard): void {
         notes = excluded.notes,
         status = excluded.status,
         priority = excluded.priority,
+        card_kind = excluded.card_kind,
         agent_id = excluded.agent_id,
         session_key = excluded.session_key,
         run_id = excluded.run_id,
@@ -1192,6 +1201,7 @@ function insertCard(db: DatabaseSync, card: TaskfoldCard): void {
     notes: bindNull(card.notes),
     status: card.status,
     priority: card.priority,
+    card_kind: bindNull(card.kind),
     agent_id: bindNull(card.agentId),
     session_key: bindNull(card.sessionKey),
     run_id: bindNull(card.runId),
@@ -1574,9 +1584,9 @@ class TaskfoldSqliteBoardStore implements TaskfoldKeyedStore<PersistedTaskfoldBo
           INSERT INTO taskfold_boards (
             id, name, description, icon, color, position, version, current_objective, core_value,
             source_of_truth, repository_url, planning_path, homepage_url,
-            default_workspace_json, orchestration_json,
+            default_workspace_json, orchestration_json, board_view_json,
             created_at, updated_at, archived_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
@@ -1592,6 +1602,7 @@ class TaskfoldSqliteBoardStore implements TaskfoldKeyedStore<PersistedTaskfoldBo
             homepage_url = excluded.homepage_url,
             default_workspace_json = excluded.default_workspace_json,
             orchestration_json = excluded.orchestration_json,
+            board_view_json = excluded.board_view_json,
             created_at = excluded.created_at,
             updated_at = excluded.updated_at,
             archived_at = excluded.archived_at
@@ -1613,6 +1624,7 @@ class TaskfoldSqliteBoardStore implements TaskfoldKeyedStore<PersistedTaskfoldBo
         bindNull(board.homepageUrl),
         jsonValue(board.defaultWorkspace),
         jsonValue(board.orchestration),
+        jsonValue(board.boardView),
         board.createdAt,
         board.updatedAt,
         bindNull(board.archivedAt),
@@ -1631,6 +1643,9 @@ class TaskfoldSqliteBoardStore implements TaskfoldKeyedStore<PersistedTaskfoldBo
       | undefined;
     const orchestration = parseJson(row.orchestration_json) as
       | PersistedTaskfoldBoard["board"]["orchestration"]
+      | undefined;
+    const boardView = parseJson(row.board_view_json) as
+      | PersistedTaskfoldBoard["board"]["boardView"]
       | undefined;
     return {
       version: 1,
@@ -1664,6 +1679,7 @@ class TaskfoldSqliteBoardStore implements TaskfoldKeyedStore<PersistedTaskfoldBo
           : {}),
         ...(defaultWorkspace ? { defaultWorkspace } : {}),
         ...(orchestration ? { orchestration } : {}),
+        ...(boardView ? { boardView } : {}),
         createdAt: requiredNumber(row, "created_at"),
         updatedAt: requiredNumber(row, "updated_at"),
         ...(numberValue(row, "archived_at") !== undefined

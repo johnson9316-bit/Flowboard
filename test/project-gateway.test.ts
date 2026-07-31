@@ -57,6 +57,7 @@ describe("Taskfold M2 Gateway methods", () => {
     const writes = [
       "taskfold.projects.create",
       "taskfold.projects.update",
+      "taskfold.projects.boardView.update",
       "taskfold.projects.reorder",
       "taskfold.projects.archive",
       "taskfold.projects.restore",
@@ -73,6 +74,7 @@ describe("Taskfold M2 Gateway methods", () => {
       "taskfold.cards.sources.reorder",
       "taskfold.cards.moveMilestone",
       "taskfold.cards.moveProject",
+      "taskfold.cards.requirement.set",
       "taskfold.cards.execution.start",
       "taskfold.cards.execution.steer",
       "taskfold.cards.execution.abort",

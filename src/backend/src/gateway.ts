@@ -343,6 +343,32 @@ export function registerTaskfoldGatewayMethods(params: {
   );
 
   api.registerGatewayMethod(
+    "taskfold.cards.requirement.set",
+    async ({ params: requestParams, respond }) => {
+      try {
+        const rawRequirementId = requestParams.requirementId;
+        if (
+          rawRequirementId !== undefined &&
+          rawRequirementId !== null &&
+          typeof rawRequirementId !== "string"
+        ) {
+          throw new Error("requirementId must be a card id or empty.");
+        }
+        const requirementId =
+          typeof rawRequirementId === "string" && rawRequirementId.trim()
+            ? rawRequirementId.trim()
+            : undefined;
+        respond(true, {
+          card: redactClaimToken(await store.setCardRequirement(readId(requestParams), requirementId)),
+        });
+      } catch (error) {
+        respondError(respond, error);
+      }
+    },
+    { scope: WRITE_SCOPE },
+  );
+
+  api.registerGatewayMethod(
     "taskfold.cards.proof",
     async ({ params: requestParams, respond }) => {
       try {

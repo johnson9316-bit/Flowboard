@@ -248,6 +248,7 @@ describe("Taskfold SQLite schema migrations", () => {
           "repository_url",
           "planning_path",
           "homepage_url",
+          "board_view_json",
         ]),
       );
       expect(columns("taskfold_milestones")).toEqual(
@@ -257,13 +258,13 @@ describe("Taskfold SQLite schema migrations", () => {
         expect.arrayContaining(["document_key", "section", "source", "type", "system"]),
       );
       expect(columns("taskfold_cards")).toEqual(
-        expect.arrayContaining(["revision", "claim_owner_id"]),
+        expect.arrayContaining(["revision", "claim_owner_id", "card_kind"]),
       );
       expect(indexes("taskfold_cards")).toContain("taskfold_cards_board_milestone_position_idx");
       expect(indexes("taskfold_cards")).toContain("taskfold_cards_claim_owner_idx");
       expect(
         db
-          .prepare("SELECT id FROM taskfold_schema_migrations WHERE id = 'schema-7'")
+          .prepare("SELECT id FROM taskfold_schema_migrations WHERE id = 'schema-8'")
           .get(),
       ).toBeTruthy();
       expect(legacy).toMatchObject({
@@ -295,7 +296,7 @@ describe("Taskfold SQLite schema migrations", () => {
       );
       expect(
         db
-          .prepare("SELECT id FROM taskfold_schema_migrations WHERE id = 'schema-7'")
+          .prepare("SELECT id FROM taskfold_schema_migrations WHERE id = 'schema-8'")
           .get(),
       ).toBeTruthy();
       expect(legacyDocument).toMatchObject({

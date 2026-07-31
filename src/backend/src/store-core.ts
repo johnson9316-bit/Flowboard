@@ -22,7 +22,9 @@ import {
   assertCanMutateClaimedCard,
   cardBoardId,
   cardParentIds,
+  cardRequirementId,
   compareCards,
+  isRequirementCard,
   isActiveDependencyTarget,
   isDependencyPromotableStatus,
   lifecycleStatusSourceUpdatedAtFromPatch,
@@ -62,6 +64,7 @@ import {
   normalizeBoardIdRequired,
   normalizeBoardMetadata,
   normalizeBoundedString,
+  normalizeCardKind,
   normalizeExecution,
   normalizeDelivery,
   normalizeLabels,
@@ -284,6 +287,7 @@ export class TaskfoldCoreStore {
         ...(board.homepageUrl ? { homepageUrl: board.homepageUrl } : {}),
         ...(board.defaultWorkspace ? { defaultWorkspace: board.defaultWorkspace } : {}),
         ...(board.orchestration ? { orchestration: board.orchestration } : {}),
+        ...(board.boardView ? { boardView: board.boardView } : {}),
         total: 0,
         active: 0,
         archived: 0,
@@ -421,7 +425,21 @@ export class TaskfoldCoreStore {
     input: TaskfoldLinkedCreateInput,
     scope?: TaskfoldMutationScope,
   ): Promise<TaskfoldCard> {
-    return await this.enqueueMutation(async () => await this.createDirect(input, scope));
+    return await this.enqueueMutation(async () => {
+      let card = await this.createDirect(input, scope);
+      const requirementId = normalizeOptionalString(input.requirementId);
+      if (!requirementId) {
+        return card;
+      }
+      try {
+        card = await this.setCardRequirementDirect(card.id, requirementId, Date.now(), scope);
+        return card;
+      } catch (error) {
+        await this.store.delete(card.id);
+        await this.removeReferencesToCard(card.id);
+        throw error;
+      }
+    });
   }
 
   protected async createDirect(
@@ -430,6 +448,7 @@ export class TaskfoldCoreStore {
   ): Promise<TaskfoldCard> {
     const now = Date.now();
     const requestedStatus = normalizeStatus(input.status, "todo");
+    const kind = normalizeCardKind(input.kind);
     const cards = await this.list();
     const parents = normalizeStringList(input.parents, "parents", 120);
     const automation = normalizeCardAutomation(input);
@@ -520,6 +539,7 @@ export class TaskfoldCoreStore {
     let card: TaskfoldCard = {
       id: randomUUID(),
       title: normalizeTitle(input.title),
+      ...(kind === "requirement" ? { kind } : {}),
       status,
       priority: normalizePriority(input.priority, "normal"),
       labels: normalizeLabels(input.labels),
@@ -553,7 +573,13 @@ export class TaskfoldCoreStore {
     };
     await this.store.register(card.id, { version: 1, card });
     try {
+      if (kind === "requirement" && parentCards.length > 0) {
+        throw new Error("requirement cards cannot be child cards.");
+      }
       for (const parent of parentCards) {
+        if (isRequirementCard(parent)) {
+          throw new Error("requirement cards cannot be execution dependencies.");
+        }
         card = await this.linkCardsDirect(parent.id, card.id, now, {
           allowStatusOnlyActiveChild: true,
           scope,
@@ -1053,6 +1079,9 @@ export class TaskfoldCoreStore {
     if (type === "parent" || type === "child") {
       throw new Error("parent and child dependency links must use linkDependency.");
     }
+    if (type === "contains" || type === "contained_by") {
+      throw new Error("requirement hierarchy links must use setCardRequirement.");
+    }
     const link: TaskfoldLink = {
       id: randomUUID(),
       type,
@@ -1077,6 +1106,118 @@ export class TaskfoldCoreStore {
     );
   }
 
+  async setCardRequirement(
+    childId: string,
+    requirementId: string | undefined,
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
+    return await this.enqueueMutation(
+      async () => await this.setCardRequirementDirect(childId, requirementId, Date.now(), scope),
+    );
+  }
+
+  protected async setCardRequirementDirect(
+    childId: string,
+    requirementId: string | undefined,
+    now = Date.now(),
+    scope?: TaskfoldMutationScope,
+  ): Promise<TaskfoldCard> {
+    const child = await this.get(childId);
+    if (!child) {
+      throw new Error(`card not found: ${childId}`);
+    }
+    if (isRequirementCard(child)) {
+      throw new Error("requirement cards cannot be assigned to another requirement.");
+    }
+    const boardId = cardBoardId(child);
+    if (await this.isProjectArchived(boardId)) {
+      throw new Error("project is archived.");
+    }
+    assertCanMutateClaimedCard(child, scope);
+    const currentRequirementId = cardRequirementId(child);
+    const detach = async (parentId: string) => {
+      const parent = await this.get(parentId);
+      if (!parent) {
+        return;
+      }
+      assertCanMutateClaimedCard(parent, scope);
+      await this.updateCard(parent.id, {
+        metadata: {
+          ...parent.metadata,
+          links: (parent.metadata?.links ?? []).filter(
+            (link) => !(link.type === "contains" && link.targetCardId === child.id),
+          ),
+        },
+      });
+    };
+
+    if (!requirementId) {
+      if (!currentRequirementId) {
+        return child;
+      }
+      await detach(currentRequirementId);
+      return await this.updateCard(child.id, {
+        metadata: {
+          ...child.metadata,
+          links: (child.metadata?.links ?? []).filter((link) => link.type !== "contained_by"),
+        },
+      });
+    }
+
+    const normalizedRequirementId = requirementId.trim();
+    if (!normalizedRequirementId) {
+      return await this.setCardRequirementDirect(child.id, undefined, now, scope);
+    }
+    if (normalizedRequirementId === child.id) {
+      throw new Error("a card cannot be its own requirement.");
+    }
+    const requirement = await this.get(normalizedRequirementId);
+    if (!requirement) {
+      throw new Error(`card not found: ${normalizedRequirementId}`);
+    }
+    if (!isRequirementCard(requirement)) {
+      throw new Error("target card is not a requirement.");
+    }
+    if (cardBoardId(requirement) !== boardId) {
+      throw new Error("requirement must belong to the same project.");
+    }
+    if (cardRequirementId(requirement)) {
+      throw new Error("nested requirements are not supported.");
+    }
+    assertCanMutateClaimedCard(requirement, scope);
+
+    if (currentRequirementId && currentRequirementId !== requirement.id) {
+      await detach(currentRequirementId);
+    }
+    const requirementLinks = requirement.metadata?.links ?? [];
+    const childLinks = child.metadata?.links ?? [];
+    const nextRequirementLinks = requirementLinks.some(
+      (link) => link.type === "contains" && link.targetCardId === child.id,
+    )
+      ? requirementLinks
+      : appendLinkPreservingDependencies(requirementLinks, {
+          id: randomUUID(),
+          type: "contains",
+          targetCardId: child.id,
+          createdAt: now,
+        });
+    const nextChildLinks = [
+      ...childLinks.filter((link) => link.type !== "contained_by"),
+      {
+        id: randomUUID(),
+        type: "contained_by" as const,
+        targetCardId: requirement.id,
+        createdAt: now,
+      },
+    ];
+    await this.updateCard(requirement.id, {
+      metadata: { ...requirement.metadata, links: nextRequirementLinks },
+    });
+    return await this.updateCard(child.id, {
+      metadata: { ...child.metadata, links: nextChildLinks },
+    });
+  }
+
   protected async linkCardsDirect(
     parentId: string,
     childId: string,
@@ -1093,6 +1234,9 @@ export class TaskfoldCoreStore {
     }
     if (!child) {
       throw new Error(`card not found: ${childId}`);
+    }
+    if (isRequirementCard(parent) || child.kind === "requirement") {
+      throw new Error("requirement cards cannot be execution dependencies.");
     }
     assertCanMutateClaimedCard(parent, options.scope);
     assertCanMutateClaimedCard(child, options.scope);

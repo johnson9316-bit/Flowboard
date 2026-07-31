@@ -121,6 +121,24 @@ async function createProjectCard(store: TaskfoldStore, checkout: string) {
 }
 
 describe("Taskfold native card execution", () => {
+  it("rejects direct execution for requirement cards before resolving a workspace", async () => {
+    const store = createStore();
+    await store.createProject({ id: "alpha", name: "Alpha" });
+    const requirement = await store.create({
+      boardId: "alpha",
+      title: "Requirement",
+      kind: "requirement",
+    });
+    const options = executionOptions({
+      worktreeRoot: path.join(os.tmpdir(), "taskfold-unused-worktrees"),
+      taskRunId: () => "run-unused",
+    });
+
+    await expect(
+      prepareTaskfoldCardExecution({ store, id: requirement.id, options }),
+    ).rejects.toThrow("requirement cards cannot start code execution");
+  });
+
   it("prepares without writing and rejects a stale confirmation before a Worktree is created", async () => {
     const store = createStore();
     const checkout = createGitCheckout();

@@ -1,12 +1,18 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type {
   TaskfoldBoardMetadata,
+  TaskfoldBoardGroupBy,
+  TaskfoldBoardSortBy,
+  TaskfoldBoardSortDirection,
+  TaskfoldBoardViewSettings,
   TaskfoldBoardSummary,
   TaskfoldCard,
+  TaskfoldCardKind,
   TaskfoldDeliveryImplementationState,
   TaskfoldDeliveryReleaseState,
   TaskfoldDeliveryVerificationState,
   TaskfoldExecution,
+  TaskfoldLinkType,
   TaskfoldMilestone,
   TaskfoldPriority,
   TaskfoldProjectDocument,
@@ -38,6 +44,9 @@ const STATUSES: readonly TaskfoldStatus[] = [
   "done",
 ];
 const PRIORITIES: readonly TaskfoldPriority[] = ["low", "normal", "high", "urgent"];
+const BOARD_GROUPS: readonly TaskfoldBoardGroupBy[] = ["milestone", "requirement", "status"];
+const BOARD_SORTS: readonly TaskfoldBoardSortBy[] = ["manual", "priority", "createdAt", "updatedAt"];
+const BOARD_SORT_DIRECTIONS: readonly TaskfoldBoardSortDirection[] = ["asc", "desc"];
 const DOCUMENT_SECTIONS: readonly TaskfoldProjectDocumentSection[] = [
   "project",
   "codebase",
@@ -78,7 +87,13 @@ const RELEASE_STATES: readonly TaskfoldDeliveryReleaseState[] = [
 
 export type TaskfoldProjectModal =
   | { kind: "project" }
-  | { kind: "card"; milestoneId?: string }
+  | {
+      kind: "card";
+      milestoneId?: string;
+      requirementId?: string;
+      status?: TaskfoldStatus;
+      cardKind?: TaskfoldCardKind;
+    }
   | { kind: "milestone"; milestone?: TaskfoldMilestone }
   | { kind: "document"; document?: TaskfoldProjectDocument }
   | { kind: "card-detail"; cardId: string }
@@ -142,9 +157,11 @@ export type TaskfoldProjectUiState = {
   executionInspectionLoading: boolean;
   executionInspectionError: string | null;
   selectedProjectId: string | null;
-  screen: "overview" | "board" | "settings" | "documents";
+  screen: "overview" | "board" | "graph" | "settings" | "documents";
   modal: TaskfoldProjectModal | null;
   draggedCardId: string | null;
+  graphMode: "mindmap" | "flow";
+  graphZoom: number;
   showArchivedProjects: boolean;
   showHiddenDocuments: boolean;
   query: string;
@@ -168,7 +185,11 @@ export type TaskfoldProjectViewController = {
   updateCardStatus: (id: string, status: TaskfoldStatus) => void;
   archiveCard: (id: string, archived: boolean) => void;
   moveCardMilestone: (id: string, milestoneId?: string, position?: number) => void;
+  moveCardRequirement: (id: string, requirementId?: string) => void;
   moveCardProject: (id: string, boardId: string, milestoneId: string) => void;
+  updateBoardView: (boardView: TaskfoldBoardViewSettings) => void;
+  setGraphMode: (mode: TaskfoldProjectUiState["graphMode"]) => void;
+  setGraphZoom: (zoom: number) => void;
   selectMoveCardProjectTarget: (cardId: string, boardId: string) => void;
   reorderProjects: (ids: string[]) => void;
   reorderMilestones: (ids: string[]) => void;
@@ -233,6 +254,8 @@ export function createTaskfoldProjectUiState(): TaskfoldProjectUiState {
     screen: "overview",
     modal: null,
     draggedCardId: null,
+    graphMode: "mindmap",
+    graphZoom: 1,
     showArchivedProjects: false,
     showHiddenDocuments: false,
     query: "",
@@ -241,6 +264,49 @@ export function createTaskfoldProjectUiState(): TaskfoldProjectUiState {
 
 function boardName(board: Pick<TaskfoldBoardSummary | TaskfoldBoardMetadata, "id" | "name">): string {
   return board.name || board.id;
+}
+
+function boardView(board: TaskfoldBoardMetadata): TaskfoldBoardViewSettings {
+  return board.boardView ?? { groupBy: "milestone", sortBy: "manual", sortDirection: "asc" };
+}
+
+function cardRequirementId(card: TaskfoldCard): string | undefined {
+  return card.metadata?.links?.find(
+    (link) => link.type === "contained_by" && link.targetCardId,
+  )?.targetCardId;
+}
+
+function isRequirementCard(card: TaskfoldCard): boolean {
+  return card.kind === "requirement" || Boolean(
+    card.metadata?.links?.some((link) => link.type === "contains" && link.targetCardId),
+  );
+}
+
+function sortBoardCards(
+  cards: readonly TaskfoldCard[],
+  view: TaskfoldBoardViewSettings,
+): TaskfoldCard[] {
+  const multiplier = view.sortDirection === "asc" ? 1 : -1;
+  const priorityRank = new Map<TaskfoldPriority, number>([
+    ["urgent", 0],
+    ["high", 1],
+    ["normal", 2],
+    ["low", 3],
+  ]);
+  return [...cards].toSorted((left, right) => {
+    if (view.sortBy === "manual") {
+      return left.position - right.position || left.createdAt - right.createdAt;
+    }
+    if (view.sortBy === "priority") {
+      return (
+        multiplier * ((priorityRank.get(left.priority) ?? 99) - (priorityRank.get(right.priority) ?? 99)) ||
+        left.createdAt - right.createdAt
+      );
+    }
+    const leftValue = view.sortBy === "createdAt" ? left.createdAt : left.updatedAt;
+    const rightValue = view.sortBy === "createdAt" ? right.createdAt : right.updatedAt;
+    return multiplier * (leftValue - rightValue) || left.title.localeCompare(right.title);
+  });
 }
 
 function boardId(card: TaskfoldCard): string {
@@ -602,11 +668,28 @@ function renderOverview(controller: TaskfoldProjectViewController) {
   `;
 }
 
+type TaskfoldBoardColumn = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  cards: TaskfoldCard[];
+  milestone?: TaskfoldMilestone;
+  requirement?: TaskfoldCard;
+  manualOrder?: { milestoneId?: string; cards: TaskfoldCard[] };
+  onDrop: (cardId: string) => void;
+  onCreate: () => void;
+};
+
+type TaskfoldGraphEdge = {
+  from: string;
+  to: string;
+  type: TaskfoldLinkType;
+};
+
 function renderCard(
   controller: TaskfoldProjectViewController,
   card: TaskfoldCard,
-  milestoneId: string | undefined,
-  cards: readonly TaskfoldCard[],
+  options: { manualOrder?: { milestoneId?: string; cards: TaskfoldCard[] } } = {},
 ) {
   const { state } = controller;
   const project = state.project;
@@ -615,13 +698,14 @@ function renderCard(
   }
   const archived = isArchivedCard(card);
   const isProjectArchived = Boolean(project.board.archivedAt);
-  const cardIndex = cards.findIndex((candidate) => candidate.id === card.id);
-  const previousCard = cards[cardIndex - 1];
-  const nextCard = cards[cardIndex + 1];
+  const orderedCards = options.manualOrder?.cards ?? [];
+  const cardIndex = orderedCards.findIndex((candidate) => candidate.id === card.id);
+  const previousCard = orderedCards[cardIndex - 1];
+  const nextCard = orderedCards[cardIndex + 1];
   return html`
     <article
-      class="taskfold-project__card ${archived ? "is-archived" : ""}"
-      draggable=${!isProjectArchived}
+      class="taskfold-project__card ${archived ? "is-archived" : ""} ${isRequirementCard(card) ? "is-requirement" : ""}"
+      draggable=${!archived && !isProjectArchived}
       @dragstart=${(event: DragEvent) => {
         state.draggedCardId = card.id;
         event.dataTransfer?.setData("text/plain", card.id);
@@ -637,8 +721,12 @@ function renderCard(
         event.preventDefault();
         event.stopPropagation();
         const id = event.dataTransfer?.getData("text/plain") || state.draggedCardId;
-        if (id && id !== card.id) {
-          controller.moveCardMilestone(id, milestoneId, Math.max(0, card.position - 1));
+        if (options.manualOrder && id && id !== card.id) {
+          controller.moveCardMilestone(
+            id,
+            options.manualOrder.milestoneId,
+            Math.max(0, card.position - 1),
+          );
         }
       }}
     >
@@ -705,37 +793,33 @@ function renderCard(
               `,
             )}
         </select>
-        ${renderOrderControls({
-          canMoveUp: !archived && !isProjectArchived && Boolean(previousCard),
-          canMoveDown: !archived && !isProjectArchived && Boolean(nextCard),
-          onMoveUp: () =>
-            previousCard &&
-            controller.moveCardMilestone(
-              card.id,
-              milestoneId,
-              Math.max(0, previousCard.position - 1),
-            ),
-          onMoveDown: () =>
-            nextCard &&
-            controller.moveCardMilestone(card.id, milestoneId, nextCard.position + 1),
-        })}
+        ${options.manualOrder
+          ? renderOrderControls({
+              canMoveUp: !archived && !isProjectArchived && Boolean(previousCard),
+              canMoveDown: !archived && !isProjectArchived && Boolean(nextCard),
+              onMoveUp: () =>
+                previousCard &&
+                controller.moveCardMilestone(
+                  card.id,
+                  options.manualOrder?.milestoneId,
+                  Math.max(0, previousCard.position - 1),
+                ),
+              onMoveDown: () =>
+                nextCard &&
+                controller.moveCardMilestone(
+                  card.id,
+                  options.manualOrder?.milestoneId,
+                  nextCard.position + 1,
+                ),
+            })
+          : nothing}
       </div>
       ${archived ? html`<span class="taskfold-project__card-archived">${t("taskfoldProject.archived")}</span>` : nothing}
     </article>
   `;
 }
 
-function renderColumn(
-  controller: TaskfoldProjectViewController,
-  params: {
-    id?: string;
-    title: string;
-    subtitle?: string;
-    state?: TaskfoldMilestone["state"];
-    cards: TaskfoldCard[];
-    milestone?: TaskfoldMilestone;
-  },
-) {
+function renderColumn(controller: TaskfoldProjectViewController, params: TaskfoldBoardColumn) {
   const { state } = controller;
   const projectArchived = Boolean(state.project?.board.archivedAt);
   const { milestone } = params;
@@ -748,19 +832,28 @@ function renderColumn(
     : undefined;
   return html`
     <section
-      class="taskfold-project__column ${params.state ? `is-${params.state}` : "is-unassigned"}"
+      class="taskfold-project__column ${milestone ? `is-${milestone.state}` : "is-unassigned"}"
       @dragover=${(event: DragEvent) => event.preventDefault()}
       @drop=${(event: DragEvent) => {
         event.preventDefault();
         const id = event.dataTransfer?.getData("text/plain") || state.draggedCardId;
         if (id) {
-          controller.moveCardMilestone(id, params.id);
+          params.onDrop(id);
         }
       }}
     >
       <header class="taskfold-project__column-header">
         <div>
-          <h2>${params.title}</h2>
+          ${params.requirement
+            ? html`
+                <button
+                  class="taskfold-project__column-title-button"
+                  type="button"
+                  @click=${() =>
+                    controller.openModal({ kind: "card-detail", cardId: params.requirement!.id })}
+                >${params.title}</button>
+              `
+            : html`<h2>${params.title}</h2>`}
           <span>${params.subtitle || t("taskfoldProject.cards", { count: String(params.cards.length) })}</span>
         </div>
         <div class="taskfold-project__column-actions">
@@ -809,13 +902,13 @@ function renderColumn(
             type="button"
             title=${t("taskfoldProject.newCard")}
             ?disabled=${!controller.connected || projectArchived || (milestone && milestone.state !== "active")}
-            @click=${() => controller.openModal({ kind: "card", ...(params.id ? { milestoneId: params.id } : {}) })}
+            @click=${params.onCreate}
           >+</button>
         </div>
       </header>
       <div class="taskfold-project__card-list">
         ${params.cards.length
-          ? params.cards.map((card) => renderCard(controller, card, params.id, params.cards))
+          ? params.cards.map((card) => renderCard(controller, card, { manualOrder: params.manualOrder }))
           : html`<p class="taskfold-project__empty-column">${t("taskfoldProject.emptyColumn")}</p>`}
       </div>
     </section>
@@ -828,16 +921,98 @@ function renderBoard(controller: TaskfoldProjectViewController) {
   if (!project) {
     return nothing;
   }
+  const view = boardView(project.board);
   const cards = project.cards.filter((card) => !isArchivedCard(card));
-  const byMilestone = new Map<string | undefined, TaskfoldCard[]>();
-  for (const card of cards) {
-    const key = card.milestoneId;
-    const current = byMilestone.get(key) ?? [];
-    current.push(card);
-    byMilestone.set(key, current);
-  }
-  for (const columnCards of byMilestone.values()) {
-    columnCards.sort((left, right) => left.position - right.position || left.createdAt - right.createdAt);
+  const columns: TaskfoldBoardColumn[] = [];
+  const sorted = (items: readonly TaskfoldCard[]) => sortBoardCards(items, view);
+  if (view.groupBy === "milestone") {
+    const byMilestone = new Map<string | undefined, TaskfoldCard[]>();
+    for (const card of cards) {
+      const current = byMilestone.get(card.milestoneId) ?? [];
+      current.push(card);
+      byMilestone.set(card.milestoneId, current);
+    }
+    const manualOrder = view.sortBy === "manual";
+    columns.push({
+      id: "unassigned",
+      title: t("taskfoldProject.unassigned"),
+      subtitle: t("taskfoldProject.unassignedHelp"),
+      cards: sorted(byMilestone.get(undefined) ?? []),
+      ...(manualOrder
+        ? { manualOrder: { cards: sorted(byMilestone.get(undefined) ?? []) } }
+        : {}),
+      onDrop: (id) => controller.moveCardMilestone(id),
+      onCreate: () => controller.openModal({ kind: "card" }),
+    });
+    for (const milestone of project.milestones) {
+      const columnCards = sorted(byMilestone.get(milestone.id) ?? []);
+      columns.push({
+        id: milestone.id,
+        title: milestone.title,
+        subtitle: milestoneLabel(milestone),
+        cards: columnCards,
+        milestone,
+        ...(manualOrder ? { manualOrder: { milestoneId: milestone.id, cards: columnCards } } : {}),
+        onDrop: (id) => controller.moveCardMilestone(id, milestone.id),
+        onCreate: () => controller.openModal({ kind: "card", milestoneId: milestone.id }),
+      });
+    }
+  } else if (view.groupBy === "requirement") {
+    const requirements = cards.filter(
+      (card) => isRequirementCard(card) && !cardRequirementId(card),
+    );
+    const byRequirement = new Map<string | undefined, TaskfoldCard[]>();
+    for (const card of cards) {
+      if (isRequirementCard(card)) {
+        continue;
+      }
+      const requirementId = cardRequirementId(card);
+      const current = byRequirement.get(requirementId) ?? [];
+      current.push(card);
+      byRequirement.set(requirementId, current);
+    }
+    columns.push({
+      id: "unassigned",
+      title: t("taskfoldProject.unassigned"),
+      subtitle: t("taskfoldProject.unassignedRequirementHelp"),
+      cards: sorted(byRequirement.get(undefined) ?? []),
+      onDrop: (id) => controller.moveCardRequirement(id),
+      onCreate: () => controller.openModal({ kind: "card" }),
+    });
+    for (const requirement of requirements) {
+      columns.push({
+        id: requirement.id,
+        title: requirement.title,
+        subtitle: t("taskfoldProject.cards", {
+          count: String((byRequirement.get(requirement.id) ?? []).length),
+        }),
+        cards: sorted(byRequirement.get(requirement.id) ?? []),
+        requirement,
+        onDrop: (id) => controller.moveCardRequirement(id, requirement.id),
+        onCreate: () =>
+          controller.openModal({
+            kind: "card",
+            requirementId: requirement.id,
+            milestoneId: requirement.milestoneId,
+          }),
+      });
+    }
+  } else {
+    const byStatus = new Map<TaskfoldStatus, TaskfoldCard[]>();
+    for (const card of cards) {
+      const current = byStatus.get(card.status) ?? [];
+      current.push(card);
+      byStatus.set(card.status, current);
+    }
+    for (const status of STATUSES) {
+      columns.push({
+        id: status,
+        title: t(`workboard.status.${status}`),
+        cards: sorted(byStatus.get(status) ?? []),
+        onDrop: (id) => controller.updateCardStatus(id, status),
+        onCreate: () => controller.openModal({ kind: "card", status }),
+      });
+    }
   }
   return html`
     <section class="taskfold-project__board">
@@ -854,14 +1029,31 @@ function renderBoard(controller: TaskfoldProjectViewController) {
                 </button>
               `
             : html`
-                <button
-                  class="btn"
-                  type="button"
-                  ?disabled=${!controller.connected}
-                  @click=${() => controller.openModal({ kind: "milestone" })}
-                >
-                  ${t("taskfoldProject.newMilestone")}
-                </button>
+                ${view.groupBy === "milestone"
+                  ? html`
+                      <button
+                        class="btn"
+                        type="button"
+                        ?disabled=${!controller.connected}
+                        @click=${() => controller.openModal({ kind: "milestone" })}
+                      >
+                        ${t("taskfoldProject.newMilestone")}
+                      </button>
+                    `
+                  : nothing}
+                ${view.groupBy === "requirement"
+                  ? html`
+                      <button
+                        class="btn"
+                        type="button"
+                        ?disabled=${!controller.connected}
+                        @click=${() =>
+                          controller.openModal({ kind: "card", cardKind: "requirement" })}
+                      >
+                        ${t("taskfoldProject.newRequirement")}
+                      </button>
+                    `
+                  : nothing}
                 <button
                   class="btn btn--primary"
                   type="button"
@@ -876,22 +1068,287 @@ function renderBoard(controller: TaskfoldProjectViewController) {
       ${project.board.archivedAt
         ? html`<div class="callout">${t("taskfoldProject.projectArchived")}</div>`
         : nothing}
+      <div class="taskfold-project__board-controls">
+        <label>
+          ${t("taskfoldProject.groupBy")}
+          <select
+            .value=${view.groupBy}
+            @change=${(event: Event) => {
+              const groupBy = (event.currentTarget as HTMLSelectElement).value as TaskfoldBoardGroupBy;
+              controller.updateBoardView({
+                groupBy,
+                sortBy:
+                  groupBy === "milestone"
+                    ? view.sortBy
+                    : view.sortBy === "manual"
+                      ? "priority"
+                      : view.sortBy,
+                sortDirection: view.sortDirection,
+              });
+            }}
+          >
+            ${BOARD_GROUPS.map(
+              (groupBy) =>
+                html`<option value=${groupBy}>${t(`taskfoldProject.groupBy${groupBy[0].toUpperCase()}${groupBy.slice(1)}`)}</option>`,
+            )}
+          </select>
+        </label>
+        <label>
+          ${t("taskfoldProject.sortBy")}
+          <select
+            .value=${view.sortBy}
+            @change=${(event: Event) =>
+              controller.updateBoardView({
+                ...view,
+                sortBy: (event.currentTarget as HTMLSelectElement).value as TaskfoldBoardSortBy,
+              })}
+          >
+            ${BOARD_SORTS.filter((sortBy) => view.groupBy === "milestone" || sortBy !== "manual").map(
+              (sortBy) =>
+                html`<option value=${sortBy}>${t(`taskfoldProject.sortBy${sortBy[0].toUpperCase()}${sortBy.slice(1)}`)}</option>`,
+            )}
+          </select>
+        </label>
+        <label>
+          ${t("taskfoldProject.sortDirection")}
+          <select
+            .value=${view.sortDirection}
+            @change=${(event: Event) =>
+              controller.updateBoardView({
+                ...view,
+                sortDirection: (event.currentTarget as HTMLSelectElement).value as TaskfoldBoardSortDirection,
+              })}
+          >
+            ${BOARD_SORT_DIRECTIONS.map(
+              (direction) =>
+                html`<option value=${direction}>${t(`taskfoldProject.sortDirection${direction[0].toUpperCase()}${direction.slice(1)}`)}</option>`,
+            )}
+          </select>
+        </label>
+      </div>
       <div class="taskfold-project__kanban" aria-label=${t("taskfoldProject.board")}>
-        ${renderColumn(controller, {
-          title: t("taskfoldProject.unassigned"),
-          subtitle: t("taskfoldProject.unassignedHelp"),
-          cards: byMilestone.get(undefined) ?? [],
-        })}
-        ${project.milestones.map((milestone) =>
-          renderColumn(controller, {
-            id: milestone.id,
-            title: milestone.title,
-            subtitle: milestoneLabel(milestone),
-            state: milestone.state,
-            cards: byMilestone.get(milestone.id) ?? [],
-            milestone,
-          }),
-        )}
+        ${columns.map((column) => renderColumn(controller, column))}
+      </div>
+    </section>
+  `;
+}
+
+function renderGraphNode(
+  controller: TaskfoldProjectViewController,
+  card: TaskfoldCard,
+  options: { requirementId?: string } = {},
+) {
+  const { state } = controller;
+  const projectArchived = Boolean(state.project?.board.archivedAt);
+  return html`
+    <article
+      class="taskfold-project__graph-node ${isRequirementCard(card) ? "is-requirement" : ""}"
+      draggable=${!projectArchived && !isArchivedCard(card) && !isRequirementCard(card)}
+      @dragstart=${(event: DragEvent) => {
+        state.draggedCardId = card.id;
+        event.dataTransfer?.setData("text/plain", card.id);
+        event.dataTransfer && (event.dataTransfer.effectAllowed = "move");
+      }}
+      @dragend=${() => {
+        state.draggedCardId = null;
+        controller.requestUpdate();
+      }}
+    >
+      <button
+        type="button"
+        @click=${() => controller.openModal({ kind: "card-detail", cardId: card.id })}
+      >
+        <span class="taskfold-project__priority priority-${card.priority}"></span>
+        <strong>${card.title}</strong>
+        <small>${t(`workboard.status.${card.status}`)}</small>
+      </button>
+      ${options.requirementId
+        ? html`
+            <button
+              class="taskfold-project__graph-add"
+              type="button"
+              title=${t("taskfoldProject.newCard")}
+              ?disabled=${projectArchived || !controller.connected}
+              @click=${() =>
+                controller.openModal({
+                  kind: "card",
+                  requirementId: options.requirementId,
+                  milestoneId: card.milestoneId,
+                })}
+            >+</button>
+          `
+        : nothing}
+    </article>
+  `;
+}
+
+function renderGraph(controller: TaskfoldProjectViewController) {
+  const { state } = controller;
+  const project = state.project;
+  if (!project) {
+    return nothing;
+  }
+  const cards = project.cards.filter((card) => !isArchivedCard(card)).slice(0, 200);
+  const requirements = cards.filter(
+    (card) => isRequirementCard(card) && !cardRequirementId(card),
+  );
+  const childrenByRequirement = new Map<string, TaskfoldCard[]>();
+  const unassigned: TaskfoldCard[] = [];
+  for (const card of cards) {
+    if (isRequirementCard(card)) {
+      continue;
+    }
+    const requirementId = cardRequirementId(card);
+    if (!requirementId) {
+      unassigned.push(card);
+      continue;
+    }
+    const children = childrenByRequirement.get(requirementId) ?? [];
+    children.push(card);
+    childrenByRequirement.set(requirementId, children);
+  }
+  const graphCards = [...requirements, ...unassigned, ...[...childrenByRequirement.values()].flat()];
+  const graphEdges = graphCards.flatMap<TaskfoldGraphEdge>((card) =>
+    (card.metadata?.links ?? []).flatMap<TaskfoldGraphEdge>((link) => {
+      if (!link.targetCardId || link.type === "contained_by" || link.type === "child") {
+        return [];
+      }
+      if (link.type === "parent") {
+        return [{ from: link.targetCardId, to: card.id, type: link.type }];
+      }
+      return [{ from: card.id, to: link.targetCardId, type: link.type }];
+    }),
+  );
+  const projectArchived = Boolean(project.board.archivedAt);
+  const zoom = Math.min(1.5, Math.max(0.7, state.graphZoom));
+  return html`
+    <section class="taskfold-project__graph">
+      <div class="taskfold-project__section-heading">
+        <div>
+          <h1>${t("taskfoldProject.graph")}</h1>
+          <p>${project.board.currentObjective || project.board.description || project.board.id}</p>
+        </div>
+        <div class="taskfold-project__heading-actions">
+          <div class="taskfold-project__graph-mode" role="group" aria-label=${t("taskfoldProject.graphMode")}>
+            <button
+              class=${state.graphMode === "mindmap" ? "is-active" : ""}
+              type="button"
+              @click=${() => controller.setGraphMode("mindmap")}
+            >${t("taskfoldProject.mindMap")}</button>
+            <button
+              class=${state.graphMode === "flow" ? "is-active" : ""}
+              type="button"
+              @click=${() => controller.setGraphMode("flow")}
+            >${t("taskfoldProject.flowChart")}</button>
+          </div>
+          <button
+            class="taskfold-project__icon-button"
+            type="button"
+            title=${t("taskfoldProject.zoomOut")}
+            @click=${() => controller.setGraphZoom(zoom - 0.1)}
+          >-</button>
+          <button
+            class="taskfold-project__icon-button"
+            type="button"
+            title=${t("taskfoldProject.fitGraph")}
+            @click=${() => controller.setGraphZoom(1)}
+          >o</button>
+          <button
+            class="taskfold-project__icon-button"
+            type="button"
+            title=${t("taskfoldProject.zoomIn")}
+            @click=${() => controller.setGraphZoom(zoom + 0.1)}
+          >+</button>
+        </div>
+      </div>
+      ${project.cards.filter((card) => !isArchivedCard(card)).length > 200
+        ? html`<div class="callout">${t("taskfoldProject.graphLimitReached")}</div>`
+        : nothing}
+      <div class="taskfold-project__graph-viewport">
+        ${state.graphMode === "mindmap"
+          ? html`
+              <div class="taskfold-project__mindmap" style=${`--taskfold-graph-zoom:${zoom}`}>
+                <section
+                  class="taskfold-project__graph-root"
+                  @dragover=${(event: DragEvent) => event.preventDefault()}
+                  @drop=${(event: DragEvent) => {
+                    event.preventDefault();
+                    const id = event.dataTransfer?.getData("text/plain") || state.draggedCardId;
+                    if (id) {
+                      controller.moveCardRequirement(id);
+                    }
+                  }}
+                >
+                  <header>
+                    <strong>${boardName(project.board)}</strong>
+                    <button
+                      class="taskfold-project__graph-add"
+                      type="button"
+                      title=${t("taskfoldProject.newRequirement")}
+                      ?disabled=${projectArchived || !controller.connected}
+                      @click=${() =>
+                        controller.openModal({ kind: "card", cardKind: "requirement" })}
+                    >+</button>
+                  </header>
+                  <div class="taskfold-project__graph-branches">
+                    ${requirements.map((requirement) => {
+                      const children = childrenByRequirement.get(requirement.id) ?? [];
+                      return html`
+                        <section
+                          class="taskfold-project__graph-branch"
+                          @dragover=${(event: DragEvent) => event.preventDefault()}
+                          @drop=${(event: DragEvent) => {
+                            event.preventDefault();
+                            const id = event.dataTransfer?.getData("text/plain") || state.draggedCardId;
+                            if (id) {
+                              controller.moveCardRequirement(id, requirement.id);
+                            }
+                          }}
+                        >
+                          ${renderGraphNode(controller, requirement, { requirementId: requirement.id })}
+                          <div class="taskfold-project__graph-children">
+                            ${children.map((child) => renderGraphNode(controller, child))}
+                          </div>
+                        </section>
+                      `;
+                    })}
+                    <section class="taskfold-project__graph-branch is-unassigned">
+                      <header>${t("taskfoldProject.unassigned")}</header>
+                      <div class="taskfold-project__graph-children">
+                        ${unassigned.map((card) => renderGraphNode(controller, card))}
+                      </div>
+                    </section>
+                  </div>
+                </section>
+              </div>
+            `
+          : html`
+              <div class="taskfold-project__flowgraph" style=${`--taskfold-graph-zoom:${zoom}`}>
+                <div class="taskfold-project__flow-nodes">
+                  ${graphCards.map((card) => renderGraphNode(controller, card))}
+                </div>
+                <div class="taskfold-project__flow-edges">
+                  ${graphEdges.length
+                    ? graphEdges.map((edge) => {
+                        const from = graphCards.find((card) => card.id === edge.from);
+                        const to = graphCards.find((card) => card.id === edge.to);
+                        return from && to
+                          ? html`
+                              <button
+                                class="taskfold-project__flow-edge is-${edge.type}"
+                                type="button"
+                                @click=${() =>
+                                  controller.openModal({ kind: "card-detail", cardId: to.id })}
+                              >
+                                <span>${from.title}</span><b>-></b><span>${to.title}</span>
+                              </button>
+                            `
+                          : nothing;
+                      })
+                    : html`<p class="taskfold-project__empty-column">${t("taskfoldProject.noGraphRelations")}</p>`}
+                </div>
+              </div>
+            `}
       </div>
     </section>
   `;
@@ -1469,6 +1926,14 @@ function renderCardDetail(controller: TaskfoldProjectViewController, card: Taskf
 function renderExecutionSection(controller: TaskfoldProjectViewController, card: TaskfoldCard) {
   const { state } = controller;
   const projectArchived = Boolean(state.project?.board.archivedAt);
+  if (isRequirementCard(card)) {
+    return html`
+      <section class="taskfold-project__detail-section taskfold-project__execution-section">
+        <h3>${t("taskfoldProject.execution")}</h3>
+        <p class="taskfold-project__detail-empty">${t("taskfoldProject.requirementExecutionDisabled")}</p>
+      </section>
+    `;
+  }
   const inspection = inspectionForCard(state, card.id);
   const active = inspection?.active === true;
   const unresolvedActive = !active && hasActiveCardExecution(card);
@@ -2085,6 +2550,7 @@ function renderModal(controller: TaskfoldProjectViewController) {
     if (!project) {
       return nothing;
     }
+    const cardKind = modal.cardKind ?? "task";
     return html`
       <openclaw-modal-dialog @click=${closeOnBackdrop} @modal-cancel=${controller.closeModal}>
         <form
@@ -2094,12 +2560,14 @@ function renderModal(controller: TaskfoldProjectViewController) {
             controller.createCard(readForm(event));
           }}
         >
-          <header><h2>${t("taskfoldProject.newCard")}</h2></header>
+          <header><h2>${cardKind === "requirement" ? t("taskfoldProject.newRequirement") : t("taskfoldProject.newCard")}</h2></header>
           <input type="hidden" name="milestoneId" value=${modal.milestoneId ?? ""} />
+          <input type="hidden" name="requirementId" value=${modal.requirementId ?? ""} />
+          <input type="hidden" name="cardKind" value=${cardKind} />
           <label>${t("taskfoldProject.cardTitle")}<input name="title" required /></label>
           <label>${t("taskfoldProject.cardNotes")}<textarea name="notes"></textarea></label>
           <div class="taskfold-project__modal-grid">
-            <label>${t("taskfoldProject.status")}<select name="status">${renderStatusOptions("todo")}</select></label>
+            <label>${t("taskfoldProject.status")}<select name="status">${renderStatusOptions(modal.status ?? "todo")}</select></label>
             <label>${t("taskfoldProject.priority")}<select name="priority">${renderPriorityOptions("normal")}</select></label>
             <label>${t("taskfoldProject.assignee")}<input name="agentId" /></label>
           </div>
@@ -2197,6 +2665,7 @@ function renderProjectTabs(controller: TaskfoldProjectViewController): TemplateR
   const { state } = controller;
   const tabs: Array<[TaskfoldProjectUiState["screen"], string]> = [
     ["board", "taskfoldProject.board"],
+    ["graph", "taskfoldProject.graph"],
     ["settings", "taskfoldProject.settings"],
     ["documents", "taskfoldProject.documents"],
   ];
@@ -2225,9 +2694,11 @@ export function renderTaskfoldProjects(controller: TaskfoldProjectViewController
         ? html`<section class="taskfold-project__blank"><p>${t("taskfoldProject.emptyProject")}</p></section>`
         : state.screen === "board"
           ? renderBoard(controller)
-          : state.screen === "settings"
-            ? renderSettings(controller)
-            : renderDocuments(controller);
+          : state.screen === "graph"
+            ? renderGraph(controller)
+            : state.screen === "settings"
+              ? renderSettings(controller)
+              : renderDocuments(controller);
   return html`
     <section class="taskfold-project">
       <div class="taskfold-project__topbar">

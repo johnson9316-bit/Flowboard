@@ -28,6 +28,8 @@ describe("Taskfold M2 project UI state", () => {
       project: null,
       modal: null,
       draggedCardId: null,
+      graphMode: "mindmap",
+      graphZoom: 1,
       languageSwitching: false,
       languageError: null,
       showArchivedProjects: false,
